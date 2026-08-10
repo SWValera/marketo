@@ -1,15 +1,52 @@
-# vinext-starter
+# Marketo v1.0
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Marketo is a mobile-first marketplace for Kazakhstan. The current frontend is
+built with Next.js, React and TypeScript and is prepared for Supabase
+PostgreSQL/Auth/Realtime plus Cloudflare Workers and R2.
 
 ## Prerequisites
 
 - Node.js `>=22.13.0`
-- Linux with `flock`, `curl`, and GNU `timeout`
+- npm 10+
 
-## Sites Lifecycle
+## Clean installation and production build
+
+```bash
+npm ci
+npm run typecheck
+npm run build
+```
+
+The production Worker is emitted to `dist/server/index.js`; static assets are
+emitted to `dist/client`.
+
+## Cloudflare Workers (GitHub integration)
+
+- Root directory: `/`
+- Build command: `npm run build`
+- Deploy command: `npm run deploy`
+- Node.js version: `22`
+
+`wrangler.jsonc` points Cloudflare to the generated Worker and its static
+assets. The first real deployment may change the Worker name in that file.
+
+## Windows / GitHub shell-script safety
+
+All npm commands call shell helpers explicitly through `bash`. Every helper
+also calls other `.sh` files through `bash`, so the build never relies on a
+Linux executable bit surviving ZIP extraction, Windows, or GitHub Desktop.
+`.gitattributes` enforces LF endings for scripts and source files.
+
+The four retained build helpers are:
+
+- `scripts/sites-env.sh`
+- `scripts/install-ci.sh`
+- `scripts/build-verified.sh`
+- `scripts/validate-artifact.sh`
+
+They may safely have mode `0644` (non-executable).
+
+## Existing Sites lifecycle
 
 The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
 
@@ -19,9 +56,9 @@ This starter does not use `wrangler.jsonc`.
 
 Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
 
-## Included Shape
+## Project structure
 
-- edit site code under `app/`
+- application routes live under `app/`
 - `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
 - `vite.config.ts` simulates declared bindings for local development
@@ -88,13 +125,15 @@ or enforce explicit server-side membership or allowlist checks.
 Use SIWC for account pages, user-specific dashboards, saved records, and write
 actions tied to the current ChatGPT user. Leave public content anonymous.
 
-## Diagnostic Commands
+## Diagnostic commands
 
 - `npm run install:ci`: perform the one bounded lockfile install
 - `npm run dev`: start the Vite/Vinext development server
 - `npm run build`: build and validate the deployable Sites artifact
+- `npm run typecheck`: check TypeScript without emitting files
+- `npm run lint`: check React, TypeScript and Next.js rules
 - `npm run start`: start the built Vinext application
-- `npm test`: build, validate, and verify the rendered development-preview metadata
+- `npm test`: build, validate, and verify routes, PWA and deployment invariants
 - `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
@@ -102,7 +141,17 @@ Use build and validation commands for targeted diagnosis after a remote failure,
 
 The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
 
-## Learn More
+## Main routes
+
+- `/` — home
+- `/search` — catalog and filters
+- `/listing/[slug]` — listing details
+- `/publish` — four-step listing form
+- `/profile`, `/favorites`, `/messages`, `/notifications` — account screens
+- `/admin` — moderation UI
+- `/login` — Supabase Auth-ready sign-in screen
+
+## Learn more
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
