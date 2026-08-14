@@ -18,10 +18,6 @@ export function PwaInstall() {
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    }
-
     const standalone = window.matchMedia("(display-mode: standalone)").matches
       || ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     const standaloneTimer = window.setTimeout(() => setInstalled(standalone), 0);

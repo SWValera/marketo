@@ -1,9 +1,12 @@
-const CACHE_NAME = "marketo-shell-v2";
-const APP_SHELL = ["/", "/search", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE_NAME = "marketo-static-v3";
+const APP_SHELL = ["/manifest.webmanifest", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -31,12 +34,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (["image", "font"].includes(request.destination)) {
+  if (["image", "font", "script", "style"].includes(request.destination)) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-        return response;
-      })),
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+          }
+          return response;
+        });
+      }),
     );
   }
 });

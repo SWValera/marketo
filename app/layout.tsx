@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { PwaRuntime } from "@/components/pwa-runtime";
+import { NavigationHistory } from "@/components/navigation-history";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["cyrillic", "latin"], variable: "--font-inter" });
@@ -9,7 +11,6 @@ export const metadata: Metadata = {
   title: { default: "Marketo — объявления Казахстана", template: "%s | Marketo" },
   description: "Покупайте и продавайте товары, транспорт, недвижимость и услуги по всему Казахстану.",
   applicationName: "Marketo",
-  alternates: { canonical: "/" },
   openGraph: {
     title: "Marketo — объявления Казахстана",
     description: "Тысячи актуальных объявлений рядом с вами.",
@@ -38,5 +39,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#16a34a" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body className={inter.variable}>{children}</body></html>;
+  return <html lang="ru"><body className={inter.variable}>{children}<NavigationHistory /><PwaRuntime /></body></html>;
 }

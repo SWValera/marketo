@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BadgeCheck, Bell, CircleHelp, Heart, LayoutDashboard, MessageCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
+import { PageHeader } from "@/components/page-header";
 
 const dashboardLinks = [
   { href: "/profile", label: "Профиль", icon: UserRound },
@@ -13,6 +14,7 @@ const dashboardLinks = [
 ];
 
 export function DashboardShell({ title, description, active, children }: { title: string; description: string; active: string; children: ReactNode }) {
+  const fallback = active === "/profile" || active === "/favorites" || active === "/messages" ? "/" : "/profile";
   return (
     <>
       <Header />
@@ -34,7 +36,7 @@ export function DashboardShell({ title, description, active, children }: { title
           </div>
         </aside>
         <section className="dashboard-content">
-          <header className="dashboard-heading"><span className="section-kicker">Личный кабинет</span><h1>{title}</h1><p>{description}</p></header>
+          <PageHeader title={title} description={description} eyebrow="Личный кабинет" fallback={fallback} />
           {children}
         </section>
       </main>

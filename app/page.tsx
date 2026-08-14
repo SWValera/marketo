@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Heart, MapPin, MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { Header } from "@/components/header";
@@ -5,7 +6,11 @@ import { ListingCard } from "@/components/listing-card";
 import { MobileNav } from "@/components/mobile-nav";
 import { categories, heroStats, listings, SparklesIcon } from "@/lib/mock-data";
 
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
 export default function Home() {
+  const recommendedIds = ["mk-10345", "mk-10355", "mk-10353", "mk-10354", "mk-10347", "mk-10357", "mk-10358", "mk-10361"];
+  const recommendedListings = recommendedIds.map((id) => listings.find((listing) => listing.id === id)).filter((listing): listing is (typeof listings)[number] => Boolean(listing));
   return (
     <>
       <Header />
@@ -78,7 +83,7 @@ export default function Home() {
               <Link href="/search">Смотреть все <ArrowRight size={16} /></Link>
             </div>
             <div className="listing-grid">
-              {listings.map((listing) => <ListingCard listing={listing} key={listing.id} />)}
+              {recommendedListings.map((listing) => <ListingCard listing={listing} key={listing.id} />)}
             </div>
           </div>
         </section>
