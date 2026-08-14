@@ -4,8 +4,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "${SITES_ENV_READY:-}" != "1" ]]; then
-  # Do not rely on executable permissions surviving Windows or ZIP transport.
-  exec bash "${script_dir}/sites-env.sh" -- bash "$0" "$@"
+  # shellcheck source=./sites-env.sh
+  source "${script_dir}/sites-env.sh"
 fi
 
 command -v flock || {

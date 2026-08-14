@@ -4,9 +4,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "${SITES_ENV_READY:-}" != "1" ]]; then
-  # Always invoke shell files through bash. Windows ZIP/GitHub Desktop may
-  # intentionally discard the executable bit, which must never break CI.
-  exec bash "${script_dir}/sites-env.sh" -- bash "$0" "$@"
+  # shellcheck source=./sites-env.sh
+  source "${script_dir}/sites-env.sh"
 fi
 
 command -v timeout || {

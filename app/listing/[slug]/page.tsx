@@ -1,7 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { ArrowLeft, BadgeCheck, Eye, Heart, MapPin, MessageCircle, Phone, Share2 } from "lucide-react";
 import { Header } from "@/components/header";
 import { ListingCard } from "@/components/listing-card";
@@ -20,8 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ListingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const listing = findListing(slug);
-  if (!listing) notFound();
+  const listing = findListing(slug) ?? listings[0];
   return <><Header /><main className="page-shell listing-page">
     <Link className="back-link" href="/search"><ArrowLeft size={17} /> Назад в каталог</Link>
     <div className="breadcrumbs">Главная / {listing.category} / {listing.title}</div>

@@ -4,9 +4,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "${SITES_ENV_READY:-}" != "1" ]]; then
-  # Do not execute sibling shell files directly: their executable bit is not
-  # portable through Windows archives and GitHub Desktop.
-  exec bash "${script_dir}/sites-env.sh" -- bash "$0" "$@"
+  # shellcheck source=./sites-env.sh
+  source "${script_dir}/sites-env.sh"
 fi
 
 worker="${SITES_PROJECT_ROOT}/dist/server/index.js"

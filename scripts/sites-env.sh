@@ -39,6 +39,13 @@ unset \
   NPM_CONFIG_HTTPS_PROXY \
   || true
 
+# When this file is sourced, keep the exported environment in the current
+# shell. When it is executed through `bash scripts/sites-env.sh -- ...`, retain
+# its command-wrapper behaviour for package.json scripts.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
 if [[ "${1:-}" == "--" ]]; then
   shift
 fi
