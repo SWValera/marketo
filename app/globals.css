@@ -33,6 +33,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .header-actions { display: flex; align-items: center; gap: 18px; }
 .header-actions a { min-width: 50px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: #344054; }
 .header-actions a:hover { color: var(--green); }
+.language-switcher { display: inline-flex; align-items: center; flex: 0 0 auto; padding: 3px; border: 1px solid #d9e2dc; border-radius: 11px; background: #f7faf8; }
+.language-switcher button { min-width: 42px; min-height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: #667085; font-size: 11px; font-weight: 850; cursor: pointer; }
+.language-switcher button.is-active { background: #fff; color: var(--green-dark); box-shadow: 0 2px 8px rgba(20,55,35,.12); }
+.language-switcher.compact button { min-width: 36px; padding-inline: 6px; }
 .install-header-button { min-height: 46px; display: inline-flex; align-items: stretch; justify-content: center; gap: 0; padding: 0; overflow: hidden; border: 1px solid #b9dec5; border-radius: 12px; background: #f2fbf5; color: var(--green-dark); white-space: nowrap; cursor: pointer; box-shadow: 0 7px 18px rgba(22,163,74,.10); transition: border-color .2s, box-shadow .2s, transform .2s; }
 .install-header-button:hover { border-color: #78bd90; box-shadow: 0 9px 22px rgba(22,163,74,.17); transform: translateY(-1px); }
 .install-header-label { min-width: 101px; display: grid; align-content: center; justify-items: start; gap: 1px; padding: 6px 12px; line-height: 1.05; }
@@ -191,10 +195,12 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .page-shell, .header-inner { width: min(100% - 28px, 720px); }
   .header-inner { height: 66px; gap: 12px; }
   .city-button, .header-actions, .header-inner > .publish-button { display: none; }
-  .header-inner > .install-header-button, .header-inner > .pwa-installed { margin-left: auto; }
+  .header-inner > .language-switcher { margin-left: auto; }
+  .header-inner > .install-header-button, .header-inner > .pwa-installed { margin-left: 0; }
   .header-search { max-width: none; margin-left: auto; }
   .menu-toggle { display: grid; margin-left: 0; }
   .mobile-menu { display: grid; padding: 10px 18px 18px; border-top: 1px solid var(--line); background: white; }
+  .mobile-menu .language-switcher { justify-self: start; margin: 4px 0 8px; }
   .mobile-menu a { padding: 12px; border-bottom: 1px solid #f0f2f4; }
   .mobile-menu .install-header-button { width: 100%; margin-top: 8px; }
   .mobile-menu .install-header-label { flex: 1; }
@@ -217,7 +223,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .header-inner { height: auto; min-height: 64px; flex-wrap: wrap; padding: 11px 0; }
   .brand { font-size: 18px; }
   .brand-mark { width: 27px; height: 27px; }
-  .header-inner > .install-header-button { min-width: 149px; }
+  .header-inner > .install-header-button { width: 44px; min-width: 44px; min-height: 44px; }
+  .header-inner > .install-header-button .install-header-label { display: none; }
+  .header-inner > .install-header-button .install-header-icon { width: 44px; border-left: 0; }
+  .header-inner > .language-switcher button { min-width: 32px; min-height: 36px; padding-inline: 4px; }
   .header-search { order: 3; flex-basis: 100%; height: 42px; }
   .header-search button { min-width: 70px; }
   .hero-shell { padding-top: 12px; }
@@ -811,6 +820,12 @@ select {
   .form-field input:not([type="checkbox"]), .form-field select, .form-field textarea, .filters-panel input, .filters-panel select, .catalog-toolbar select, .location-search input { font-size: 16px; }
   .subpage-main, .listing-page, .seller-public-page, .admin-detail-page { padding-bottom: calc(105px + env(safe-area-inset-bottom)); }
   .site-footer, .auth-page { padding-bottom: calc(105px + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 360px) {
+  .header-inner { gap: 8px; }
+  .brand { font-size: 17px; }
+  .header-inner > .language-switcher button { min-width: 29px; padding-inline: 3px; }
 }
 
 @media (hover: none) {

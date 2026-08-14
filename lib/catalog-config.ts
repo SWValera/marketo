@@ -1,4 +1,6 @@
-export type LocalizedText = { ru: string; kk?: string };
+import { catalogKk } from "./catalog-kk.js";
+
+export type LocalizedText = { ru: string; kk: string };
 
 export type AttributeOption = { value: string; label: LocalizedText };
 export type AttributeDefinition = {
@@ -24,7 +26,8 @@ export type CategoryNode = {
   children?: CategoryNode[];
 };
 
-const t = (ru: string, kk?: string): LocalizedText => ({ ru, kk });
+const catalogKkText = catalogKk as Record<string, string>;
+const t = (ru: string, kk?: string): LocalizedText => ({ ru, kk: kk ?? catalogKkText[ru] ?? ru });
 const option = (value: string, ru: string, kk?: string): AttributeOption => ({ value, label: t(ru, kk) });
 const select = (id: string, ru: string, options: AttributeOption[], required = false): AttributeDefinition => ({ id, label: t(ru), type: "select", options, required, filterable: true });
 const number = (id: string, ru: string, unit?: string, required = false): AttributeDefinition => ({ id, label: t(ru), type: "number", unit: unit ? t(unit) : undefined, required, filterable: true });

@@ -1,7 +1,7 @@
 {
-  "name": "Marketo — объявления Казахстана",
+  "name": "Marketo — Қазақстан хабарландырулары",
   "short_name": "Marketo",
-  "description": "Покупайте и продавайте товары и услуги по всему Казахстану.",
+  "description": "Қазақстан бойынша тауарлар мен қызметтерге арналған Marketo маркетплейсі.",
   "lang": "ru-KZ",
   "dir": "ltr",
   "id": "/",
@@ -20,6 +20,6 @@
   ],
   "shortcuts": [
     { "name": "Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-192.png", "sizes": "192x192" }] },
-    { "name": "Подать объявление", "short_name": "Подать", "url": "/publish", "icons": [{ "src": "/icons/marketo-192.png", "sizes": "192x192" }] }
+    { "name": "Хабарландыру беру", "short_name": "Жариялау", "url": "/publish", "icons": [{ "src": "/icons/marketo-192.png", "sizes": "192x192" }] }
   ]
 }

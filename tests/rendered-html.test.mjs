@@ -7,8 +7,8 @@ const { default: worker } = await import(workerUrl.href);
 const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-async function render(pathname) {
-  const response = await worker.fetch(new Request(`http://localhost${pathname}`, { headers: { accept: "text/html" } }), env, ctx);
+async function render(pathname, locale = "ru") {
+  const response = await worker.fetch(new Request(`http://localhost${pathname}`, { headers: { accept: "text/html", cookie: `marketo-locale=${locale}` } }), env, ctx);
   return { response, html: await response.text() };
 }
 
@@ -26,6 +26,25 @@ test("core routes render through the production worker", async () => {
     assert.equal(response.status, 200, pathname);
     assert.match(html, new RegExp(expected), pathname);
     assert.match(html, /class="back-button|marketo-kz|Marketo/, pathname);
+  }
+});
+
+test("Kazakh locale renders server-side without changing routes", async () => {
+  const routes = [
+    ["/", "Бүкіл Қазақстан бойынша сатып алыңыз және сатыңыз"],
+    ["/categories", "Барлық санаттар"],
+    ["/category/jobs", "Жұмыс"],
+    ["/category/services", "Қызметтер"],
+    ["/profile", "Профильді ашу үшін кіріңіз"],
+    ["/publish", "Хабарландыру беру"],
+    ["/notifications", "Әзірге хабарлама жоқ"],
+  ];
+  for (const [pathname, expected] of routes) {
+    const { response, html } = await render(pathname, "kk");
+    assert.equal(response.status, 200, pathname);
+    assert.match(html, /<html lang="kk">/, pathname);
+    assert.match(html, new RegExp(expected), pathname);
+    assert.match(html, /ҚАЗ/, pathname);
   }
 });
 

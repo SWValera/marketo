@@ -6,5 +6,5 @@ import { PublishForm } from "@/components/publish-form";
 export const metadata: Metadata = { title: "Разместить объявление", robots: { index: false, follow: false } };
 
 export default function PublishPage() {
-  return <><Header /><main className="page-shell subpage-main publish-page"><PublishForm /><p className="publish-security-note">Marketo проверяет объявления перед публикацией и никогда не запрашивает данные банковской карты для размещения.</p></main><MobileNav /></>;
+  return <><Header /><main className="page-shell subpage-main publish-page"><PublishForm /></main><MobileNav /></>;
 }

@@ -2,8 +2,10 @@
 
 import { RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n-provider";
 
 export function PwaRuntime() {
+  const { t } = useI18n();
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [updating, setUpdating] = useState(false);
 
@@ -55,8 +57,8 @@ export function PwaRuntime() {
   if (!waitingWorker) return null;
   return <aside className="pwa-update-toast" role="status" aria-live="polite">
     <span className="pwa-update-icon"><RefreshCw size={20} /></span>
-    <div><strong>Доступна новая версия Marketo</strong><small>Обновите приложение, чтобы увидеть последние изменения.</small></div>
-    <button type="button" className="pwa-update-action" disabled={updating} onClick={activateUpdate}>{updating ? "Обновляем…" : "Обновить"}</button>
-    <button type="button" className="pwa-update-close" onClick={() => setWaitingWorker(null)} aria-label="Напомнить позже"><X size={18} /></button>
+    <div><strong>{t("pwa.updateTitle")}</strong><small>{t("pwa.updateNote")}</small></div>
+    <button type="button" className="pwa-update-action" disabled={updating} onClick={activateUpdate}>{updating ? t("pwa.updating") : t("pwa.update")}</button>
+    <button type="button" className="pwa-update-close" onClick={() => setWaitingWorker(null)} aria-label={t("pwa.later")}><X size={18} /></button>
   </aside>;
 }

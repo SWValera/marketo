@@ -48,3 +48,10 @@ Repository shell files do not need the executable bit. npm calls every standalon
 - Draft publication data is stored only in the current browser until Supabase Auth, PostgreSQL and R2 adapters are connected.
 
 Runtime secrets belong in Cloudflare/Supabase environment settings. `.env*`, private keys, caches and build artifacts are ignored and must not be committed.
+
+## Russian / Kazakh interface
+
+- `lib/i18n/messages.ts` is the type-aligned RU/KK interface dictionary; `lib/catalog-kk.js` centralizes Kazakh catalog vocabulary.
+- `I18nProvider` and the global `LanguageSwitcher` update the visible interface on the current route and store the choice in the `marketo-locale` cookie and browser storage.
+- Long client forms (`/publish`, `/profile/edit`, `/login`) and catalog filters keep their current input and step while the language changes.
+- The root layout reads the cookie for SSR, sets the correct `<html lang>` and emits localized public metadata. The Supabase profile schema includes a validated `language` preference for signed-in synchronization.

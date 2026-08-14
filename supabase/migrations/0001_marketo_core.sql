@@ -35,6 +35,7 @@ create table if not exists public.category_attribute_options (
 create table if not exists public.profiles (
   id uuid primary key references auth.users on delete cascade, display_name text, avatar_url text,
   settlement_id uuid references public.settlements on delete set null, bio text, verified_at timestamptz,
+  language text not null default 'ru' check (language in ('ru', 'kk')),
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 create table if not exists public.listings (

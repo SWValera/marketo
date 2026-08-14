@@ -3,10 +3,11 @@
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PREVIOUS_ROUTE_KEY } from "@/components/navigation-history";
+import { useI18n } from "@/components/i18n-provider";
 
 export function BackButton({
   fallback,
-  label = "Назад",
+  label,
   className = "",
   onBack,
 }: {
@@ -16,6 +17,8 @@ export function BackButton({
   onBack?: () => void;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const accessibleLabel = label ?? t("common.back");
 
   function goBack() {
     if (onBack) {
@@ -29,9 +32,9 @@ export function BackButton({
   }
 
   return (
-    <button type="button" className={`back-button ${className}`.trim()} onClick={goBack} aria-label={label}>
+    <button type="button" className={`back-button ${className}`.trim()} onClick={goBack} aria-label={accessibleLabel}>
       <ChevronLeft size={21} aria-hidden="true" />
-      <span>{label}</span>
+      <span>{accessibleLabel}</span>
     </button>
   );
 }

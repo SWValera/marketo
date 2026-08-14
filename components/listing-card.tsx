@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import { useState } from "react";
 import type { ListingSummary } from "@/lib/data/types";
+import { useI18n } from "@/components/i18n-provider";
 
 export function ListingCard({ listing }: { listing: ListingSummary }) {
+  const { t } = useI18n();
   const [favorite, setFavorite] = useState(false);
   const placeholders: Record<string, string> = { transport: "🚙", "real-estate": "🏠", electronics: "📱", "home-garden": "🛋️", personal: "👕", jobs: "💼", services: "🛠️", hobby: "🚲", business: "🏪", animals: "🐾", free: "🎁", exchange: "🔄" };
   const placeholder = placeholders[listing.categorySlug] ?? "📦";
@@ -22,7 +24,7 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
       <button
         className={`favorite-button ${favorite ? "is-favorite" : ""}`}
         type="button"
-        aria-label={favorite ? "Удалить из избранного" : "Добавить в избранное"}
+        aria-label={favorite ? t("listing.removeFavorite") : t("listing.addFavorite")}
         aria-pressed={favorite}
         onClick={() => setFavorite((value) => !value)}
       >

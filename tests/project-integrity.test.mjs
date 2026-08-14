@@ -19,7 +19,7 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.match(worker, /postMessage\(\{ activated: true \}\)/);
   assert.match(runtime, /updateViaCache: "none"/);
   assert.match(runtime, /new MessageChannel\(\)/);
-  assert.match(runtime, /Доступна новая версия Marketo/);
+  assert.match(runtime, /pwa\.updateTitle/);
   assert.match(runtime, /4500/);
 });
 
@@ -53,6 +53,30 @@ test("category tree covers marketplace sections and context-specific attributes"
   assert.ok(catalog.getCategoryAttributes("jobs").some((item) => item.id === "employment"));
   assert.ok(!catalog.getCategoryAttributes("jobs").some((item) => item.id === "brand"));
   assert.ok(catalog.getCategoryAttributes("services").some((item) => item.id === "visit"));
+  const allNodes = [];
+  const visit = (nodes) => nodes.forEach((node) => { allNodes.push(node); if (node.children) visit(node.children); });
+  visit(catalog.categoryTree);
+  assert.ok(allNodes.every((node) => node.name.ru && node.name.kk));
+  assert.ok(allNodes.filter((node) => node.name.ru !== node.name.kk).length >= 120);
+  for (const set of Object.values(catalog.attributeSets)) for (const attribute of set) {
+    assert.ok(attribute.label.ru && attribute.label.kk);
+    for (const option of attribute.options ?? []) assert.ok(option.label.ru && option.label.kk);
+  }
+});
+
+test("Russian and Kazakh dictionaries stay type-aligned and locale preference is wired", async () => {
+  const { messages } = await import(new URL("lib/i18n/messages.ts", root));
+  assert.deepEqual(Object.keys(messages.kk).sort(), Object.keys(messages.ru).sort());
+  assert.ok(Object.values(messages.kk).every(Boolean));
+  const layout = await readFile(new URL("app/layout.tsx", root), "utf8");
+  const header = await readFile(new URL("components/header.tsx", root), "utf8");
+  const provider = await readFile(new URL("components/i18n-provider.tsx", root), "utf8");
+  const migration = await readFile(new URL("supabase/migrations/0001_marketo_core.sql", root), "utf8");
+  assert.match(layout, /<html lang=\{locale\}>/);
+  assert.match(header, /<LanguageSwitcher compact/);
+  assert.match(provider, /Max-Age=31536000/);
+  assert.match(provider, /router\.refresh\(\)/);
+  assert.match(migration, /language text not null default 'ru'/);
 });
 
 test("user-data repositories are honest empty adapters and mock modules are absent", async () => {
@@ -76,7 +100,7 @@ test("production CSS has shared mobile primitives and no compiled webfonts", asy
   const cssName = assetNames.find((name) => name.endsWith(".css"));
   assert.ok(cssName);
   const css = await readFile(new URL(`dist/client/assets/${cssName}`, root), "utf8");
-  for (const selector of [".app-page-header", ".back-button", ".location-sheet", ".publish-card", ".chat-index-shell", ".category-directory"]) assert.match(css, new RegExp(selector.replace(".", "\\.")));
+  for (const selector of [".app-page-header", ".back-button", ".location-sheet", ".publish-card", ".chat-index-shell", ".category-directory", ".language-switcher"]) assert.match(css, new RegExp(selector.replace(".", "\\.")));
   assert.equal(assetNames.some((name) => name.includes("_vinext_fonts")), false);
   const source = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(source, /overflow-x:\s*(?:hidden|clip)/);

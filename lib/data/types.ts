@@ -31,6 +31,7 @@ export type Profile = {
   cityId: string | null;
   bio: string | null;
   verified: boolean;
+  language: "ru" | "kk";
 };
 
 export type ChatSummary = {

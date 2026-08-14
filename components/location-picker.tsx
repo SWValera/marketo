@@ -4,6 +4,8 @@ import { Check, ChevronDown, MapPin, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { getRegion, getSettlement, popularSettlements, regions, settlements } from "@/lib/geography";
+import { useI18n } from "@/components/i18n-provider";
+import { localize } from "@/lib/i18n/config";
 
 const LOCATION_STORAGE_KEY = "marketo-location";
 const LOCATION_EVENT = "marketo:location-change";
@@ -39,6 +41,7 @@ export function LocationPicker({
   compact?: boolean;
   className?: string;
 }) {
+  const { locale, t } = useI18n();
   const fallback = allowAll ? "all" : "almaty";
   const storedSelection = useStoredLocation();
   const selected = value ?? (storedSelection === "all" ? fallback : storedSelection);
@@ -67,7 +70,7 @@ export function LocationPicker({
   }, [query]);
 
   const selectedSettlement = getSettlement(selected);
-  const displayName = selected === "all" ? "Весь Казахстан" : selectedSettlement?.name.ru ?? "Выберите город";
+  const displayName = selected === "all" ? t("common.allKazakhstan") : selectedSettlement ? localize(selectedSettlement.name, locale) : t("location.choose");
 
   function choose(cityId: string) {
     onChange?.(cityId);
@@ -87,18 +90,18 @@ export function LocationPicker({
       {open && createPortal(
         <div className="location-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
           <section className="location-sheet" role="dialog" aria-modal="true" aria-labelledby="location-title" onMouseDown={(event) => event.stopPropagation()}>
-            <header><div><span className="section-kicker">Казахстан</span><h2 id="location-title">Выберите город</h2><p>Поиск охватывает города всех 17 областей и трёх городов республиканского значения.</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Закрыть выбор города"><X size={21} /></button></header>
-            <label className="location-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Введите город или область" /></label>
-            {!query && <div className="popular-locations"><strong>Популярные города</strong><div>{popularSettlements.map((item) => <button type="button" key={item.id} onClick={() => choose(item.id)}>{item.name.ru}</button>)}</div></div>}
-            {allowAll && !query && <button type="button" className={`location-all ${selected === "all" ? "selected" : ""}`} onClick={() => choose("all")}><span><MapPin size={19} />Весь Казахстан</span>{selected === "all" && <Check size={18} />}</button>}
-            <div className="location-results" role="listbox" aria-label="Города Казахстана">
+            <header><div><span className="section-kicker">{t("common.kazakhstan")}</span><h2 id="location-title">{t("location.choose")}</h2><p>{t("location.searchHelp")}</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label={t("location.close")}><X size={21} /></button></header>
+            <label className="location-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("location.searchPlaceholder")} /></label>
+            {!query && <div className="popular-locations"><strong>{t("location.popular")}</strong><div>{popularSettlements.map((item) => <button type="button" key={item.id} onClick={() => choose(item.id)}>{localize(item.name, locale)}</button>)}</div></div>}
+            {allowAll && !query && <button type="button" className={`location-all ${selected === "all" ? "selected" : ""}`} onClick={() => choose("all")}><span><MapPin size={19} />{t("common.allKazakhstan")}</span>{selected === "all" && <Check size={18} />}</button>}
+            <div className="location-results" role="listbox" aria-label={t("location.citiesAria")}>
               {filtered.map((item) => {
                 const region = getRegion(item.regionId);
-                return <button type="button" role="option" aria-selected={selected === item.id} className={selected === item.id ? "selected" : ""} key={`${item.regionId}-${item.id}`} onClick={() => choose(item.id)}><span><strong>{item.name.ru}</strong><small>{region?.name.ru}</small></span>{selected === item.id && <Check size={18} />}</button>;
+                return <button type="button" role="option" aria-selected={selected === item.id} className={selected === item.id ? "selected" : ""} key={`${item.regionId}-${item.id}`} onClick={() => choose(item.id)}><span><strong>{localize(item.name, locale)}</strong><small>{region ? localize(region.name, locale) : ""}</small></span>{selected === item.id && <Check size={18} />}</button>;
               })}
-              {filtered.length === 0 && <div className="location-empty">Город не найден. Проверьте написание.</div>}
+              {filtered.length === 0 && <div className="location-empty">{t("location.notFound")}</div>}
             </div>
-            <footer>Справочник подготовлен по КАТО Республики Казахстан. Структура готова для районов, сёл и посёлков.</footer>
+            <footer>{t("location.source")}</footer>
           </section>
         </div>,
         document.body,

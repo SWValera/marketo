@@ -6,10 +6,14 @@ import { useEffect, useState } from "react";
 import { allSearchPlaceholder } from "@/lib/catalog-config";
 import { LocationPicker } from "@/components/location-picker";
 import { PwaInstall } from "@/components/pwa-install";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useI18n } from "@/components/i18n-provider";
+import { localize } from "@/lib/i18n/config";
 
 export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: string; searchPlaceholder?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const placeholder = searchPlaceholder ?? allSearchPlaceholder.ru;
+  const { locale, t } = useI18n();
+  const placeholder = searchPlaceholder ?? localize(allSearchPlaceholder, locale);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -21,7 +25,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link href="/" className="brand" aria-label="Marketo — главная">
+        <Link href="/" className="brand" aria-label={t("header.homeAria")}>
           <span className="brand-mark">M</span>
           <span>Marketo</span>
         </Link>
@@ -30,24 +34,25 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
 
         <form className="header-search" action="/search">
           <Search size={18} aria-hidden="true" />
-          <input name="q" aria-label="Поиск объявлений" placeholder={placeholder} />
+          <input name="q" aria-label={t("header.searchAria")} placeholder={placeholder} />
           {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
-          <button type="submit">Найти</button>
+          <button type="submit">{t("common.find")}</button>
         </form>
 
-        <nav className="header-actions" aria-label="Личный раздел">
-          <Link href="/favorites"><Heart size={20} /><span>Избранное</span></Link>
-          <Link href="/messages"><MessageCircle size={20} /><span>Чаты</span></Link>
-          <Link href="/notifications"><Bell size={20} /><span>Уведомления</span></Link>
-          <Link href="/profile"><UserRound size={20} /><span>Профиль</span></Link>
+        <nav className="header-actions" aria-label={t("nav.accountAria")}>
+          <Link href="/favorites"><Heart size={20} /><span>{t("nav.favorites")}</span></Link>
+          <Link href="/messages"><MessageCircle size={20} /><span>{t("nav.chats")}</span></Link>
+          <Link href="/notifications"><Bell size={20} /><span>{t("nav.notifications")}</span></Link>
+          <Link href="/profile"><UserRound size={20} /><span>{t("nav.profile")}</span></Link>
         </nav>
 
+        <LanguageSwitcher compact />
         <PwaInstall />
-        <Link className="publish-button" href="/publish">Разместить объявление</Link>
+        <Link className="publish-button" href="/publish">{t("header.publish")}</Link>
         <button
           type="button"
           className="menu-toggle"
-          aria-label="Открыть меню"
+          aria-label={menuOpen ? t("header.closeMenu") : t("header.openMenu")}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((value) => !value)}
         >
@@ -56,14 +61,15 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
       </div>
 
       {menuOpen && (
-        <><button className="mobile-menu-overlay" type="button" aria-label="Закрыть меню" onClick={() => setMenuOpen(false)} /><nav className="mobile-menu" aria-label="Мобильное меню">
+        <><button className="mobile-menu-overlay" type="button" aria-label={t("header.closeMenu")} onClick={() => setMenuOpen(false)} /><nav className="mobile-menu" aria-label={t("header.mobileMenu")}>
+          <LanguageSwitcher />
           <LocationPicker className="mobile-location-trigger" />
-          <Link href="/search" onClick={() => setMenuOpen(false)}>Каталог объявлений</Link>
-          <Link href="/favorites" onClick={() => setMenuOpen(false)}>Избранное</Link>
-          <Link href="/messages" onClick={() => setMenuOpen(false)}>Чаты</Link>
-          <Link href="/profile" onClick={() => setMenuOpen(false)}>Профиль</Link>
+          <Link href="/search" onClick={() => setMenuOpen(false)}>{t("header.catalog")}</Link>
+          <Link href="/favorites" onClick={() => setMenuOpen(false)}>{t("nav.favorites")}</Link>
+          <Link href="/messages" onClick={() => setMenuOpen(false)}>{t("nav.chats")}</Link>
+          <Link href="/profile" onClick={() => setMenuOpen(false)}>{t("nav.profile")}</Link>
           <PwaInstall />
-          <Link href="/publish" onClick={() => setMenuOpen(false)}>Разместить объявление</Link>
+          <Link href="/publish" onClick={() => setMenuOpen(false)}>{t("header.publish")}</Link>
         </nav></>
       )}
     </header>

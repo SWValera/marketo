@@ -3,19 +3,21 @@
 import Link from "next/link";
 import { Heart, Home, MessageCircle, Plus, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useI18n } from "@/components/i18n-provider";
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   const links = [
-    { href: "/", label: "Главная", icon: Home },
-    { href: "/favorites", label: "Избранное", icon: Heart },
-    { href: "/publish", label: "Подать", icon: Plus, publish: true },
-    { href: "/messages", label: "Чаты", icon: MessageCircle },
-    { href: "/profile", label: "Профиль", icon: UserRound },
+    { href: "/", label: t("common.home"), icon: Home },
+    { href: "/favorites", label: t("nav.favorites"), icon: Heart },
+    { href: "/publish", label: t("nav.publish"), icon: Plus, publish: true },
+    { href: "/messages", label: t("nav.chats"), icon: MessageCircle },
+    { href: "/profile", label: t("nav.profile"), icon: UserRound },
   ];
 
   return (
-    <nav className="mobile-bottom-nav" aria-label="Основная мобильная навигация">
+    <nav className="mobile-bottom-nav" aria-label={t("nav.mobileAria")}>
       {links.map(({ href, label, icon: Icon, publish }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return <Link href={href} className={`${publish ? "mobile-publish " : ""}${active ? "is-active" : ""}`} key={href}>

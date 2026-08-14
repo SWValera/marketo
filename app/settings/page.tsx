@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Settings } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/empty-state";
+import { getServerI18n } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Настройки", robots: { index: false, follow: false } };
 
-export default function SettingsPage() {
-  return <DashboardShell active="/settings" title="Настройки" description="Уведомления, приватность, язык и безопасность аккаунта."><EmptyState icon={<Settings size={30} />} title="Настройки доступны после входа" description="Marketo не показывает вымышленные параметры аккаунта. После подключения авторизации здесь появятся ваши реальные настройки." actionHref="/login" actionLabel="Войти в аккаунт" /></DashboardShell>;
+export default async function SettingsPage() {
+  const { t } = await getServerI18n();
+  return <DashboardShell active="/settings" title={t("settings.title")} description={t("settings.description")}><EmptyState icon={<Settings size={30} />} title={t("settings.empty")} description={t("settings.emptyNote")} actionHref="/login" actionLabel={t("settings.signIn")} /></DashboardShell>;
 }
