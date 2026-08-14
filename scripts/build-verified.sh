@@ -20,6 +20,12 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+for generated_dir in "${SITES_PROJECT_ROOT}/dist" "${SITES_PROJECT_ROOT}/.vinext"; do
+  if [[ -d "${generated_dir}" ]]; then
+    # Prevent stale client assets and transformed font imports from surviving builds.
+    find "${generated_dir}" -mindepth 1 -delete
+  fi
+done
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \

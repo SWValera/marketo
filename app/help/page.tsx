@@ -12,7 +12,7 @@ export default function HelpPage() {
         <Link className="help-card" href="/publish"><BookOpen size={24} /><strong>Как подать объявление</strong><span>Фото, описание, цена и правила публикации.</span></Link>
         <Link className="help-card" href="/messages"><MessageCircle size={24} /><strong>Покупки и общение</strong><span>Как договориться с продавцом и не пропустить ответ.</span></Link>
         <Link className="help-card" href="/help"><ShieldCheck size={24} /><strong>Безопасность сделки</strong><span>Защита аккаунта и признаки мошенничества.</span></Link>
-        <Link className="help-card" href="/messages"><CircleHelp size={24} /><strong>Написать в поддержку</strong><span>Обычно отвечаем в течение рабочего дня.</span></Link>
+        <Link className="help-card" href="/login"><CircleHelp size={24} /><strong>Связаться с поддержкой</strong><span>Канал поддержки будет доступен после подключения аккаунта.</span></Link>
       </section>
     </DashboardShell>
   );

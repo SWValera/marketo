@@ -2,17 +2,14 @@
 
 import Link from "next/link";
 import { Bell, Heart, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { allSearchPlaceholder, getCategoryBySlug } from "@/lib/catalog-config";
+import { allSearchPlaceholder } from "@/lib/catalog-config";
 import { LocationPicker } from "@/components/location-picker";
 import { PwaInstall } from "@/components/pwa-install";
 
-export function Header() {
+export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: string; searchPlaceholder?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const pathname = usePathname();
-  const categorySlug = pathname.startsWith("/category/") ? pathname.split("/")[2] : null;
-  const searchPlaceholder = getCategoryBySlug(categorySlug)?.searchPlaceholder.ru ?? allSearchPlaceholder.ru;
+  const placeholder = searchPlaceholder ?? allSearchPlaceholder.ru;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -33,7 +30,7 @@ export function Header() {
 
         <form className="header-search" action="/search">
           <Search size={18} aria-hidden="true" />
-          <input name="q" aria-label="Поиск объявлений" placeholder={searchPlaceholder} />
+          <input name="q" aria-label="Поиск объявлений" placeholder={placeholder} />
           {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
           <button type="submit">Найти</button>
         </form>

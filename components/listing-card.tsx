@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { useState } from "react";
-import type { Listing } from "@/lib/mock-data";
+import type { ListingSummary } from "@/lib/data/types";
 
-export function ListingCard({ listing }: { listing: Listing }) {
+export function ListingCard({ listing }: { listing: ListingSummary }) {
   const [favorite, setFavorite] = useState(false);
   const placeholders: Record<string, string> = { transport: "🚙", "real-estate": "🏠", electronics: "📱", "home-garden": "🛋️", personal: "👕", jobs: "💼", services: "🛠️", hobby: "🚲", business: "🏪", animals: "🐾", free: "🎁", exchange: "🔄" };
   const placeholder = placeholders[listing.categorySlug] ?? "📦";
@@ -16,8 +16,8 @@ export function ListingCard({ listing }: { listing: Listing }) {
       <Link href={href} className="listing-image-wrap" aria-label={listing.title}>
         <span className="listing-placeholder" aria-hidden="true">{placeholder}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="listing-image" src={listing.image} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} />
-        {listing.top && <span className="top-badge">TOP</span>}
+        {listing.imageUrl ? <img className="listing-image" src={listing.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
+        {listing.promoted && <span className="top-badge">TOP</span>}
       </Link>
       <button
         className={`favorite-button ${favorite ? "is-favorite" : ""}`}
@@ -29,10 +29,10 @@ export function ListingCard({ listing }: { listing: Listing }) {
         <Heart size={20} fill={favorite ? "currentColor" : "none"} />
       </button>
       <div className="listing-body">
-        <p className="listing-price">{listing.price}</p>
+        <p className="listing-price">{listing.priceLabel}</p>
         <Link href={href} className="listing-title">{listing.title}</Link>
-        <p className="listing-location">{listing.location}</p>
-        <p className="listing-time">{listing.time}</p>
+        <p className="listing-location">{listing.locationLabel}</p>
+        <p className="listing-time">{listing.publishedLabel}</p>
       </div>
     </article>
   );

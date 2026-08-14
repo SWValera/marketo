@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Search } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { chats } from "@/lib/chat-data";
+import { EmptyState } from "@/components/empty-state";
+import { chatRepository } from "@/lib/data/repositories";
 
 export const metadata: Metadata = { title: "Чаты", robots: { index: false, follow: false } };
 
-export default function MessagesPage() {
-  return <DashboardShell title="Чаты" description="Общайтесь с покупателями и продавцами внутри Marketo." active="/messages">
-    <section className="chat-index-shell">
-      <header><div><h2>Сообщения</h2><p>Все диалоги по вашим объявлениям и покупкам</p></div><label className="chat-search"><Search size={17} /><input aria-label="Поиск по чатам" placeholder="Найти диалог" /></label></header>
-      <div className="chat-index-list">
-        {chats.map((chat) => <Link href={`/messages/${chat.id}`} className="chat-row" key={chat.id}><span className={`chat-avatar ${chat.tone ?? ""}`}>{chat.initials}</span><span className="chat-row-copy"><strong>{chat.name}</strong><small>{chat.lastMessage}</small><em>{chat.listingTitle}</em></span><time>{chat.time}{chat.unread ? <b>{chat.unread}</b> : null}</time></Link>)}
-      </div>
-    </section>
-  </DashboardShell>;
+export default async function MessagesPage() {
+  const chats = await chatRepository.list();
+  return <DashboardShell title="Чаты" description="Общайтесь с покупателями и продавцами внутри Marketo." active="/messages"><section className="chat-index-shell"><header><div><h2>Сообщения</h2><p>{chats.total} диалогов</p></div></header><EmptyState icon={<MessageCircle size={30} />} title="Сообщений пока нет" description="Диалоги появятся здесь, когда вы напишете продавцу или получите ответ на объявление." actionHref="/search" actionLabel="Найти объявление" /></section></DashboardShell>;
 }

@@ -17,7 +17,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { PageHeader } from "@/components/page-header";
-import { categoryConfigs, getCategoryBySlug } from "@/lib/catalog-config";
+import { CategoryPicker } from "@/components/category-picker";
+import { getCategoryAttributes, getCategoryBySlug } from "@/lib/catalog-config";
 
 const steps = ["Категория", "Описание", "Фотографии", "Контакты"];
 
@@ -25,11 +26,11 @@ type PhotoPreview = { name: string; url: string };
 
 export function PublishForm() {
   const [step, setStep] = useState(0);
-  const [complete, setComplete] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [categorySlug, setCategorySlug] = useState("");
   const storedLocation = useStoredLocation();
   const [cityOverride, setCityOverride] = useState<string | null>(null);
-  const cityId = cityOverride ?? (storedLocation === "all" ? "almaty" : storedLocation);
+  const cityId = cityOverride ?? (storedLocation === "all" ? "" : storedLocation);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -37,9 +38,12 @@ export function PublishForm() {
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const photosRef = useRef<PhotoPreview[]>([]);
   const [error, setError] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
 
   const category = getCategoryBySlug(categorySlug);
-  const pageTitle = complete ? "Объявление отправлено" : `Подать объявление · ${steps[step]}`;
+  const categoryAttributes = getCategoryAttributes(categorySlug);
+  const pageTitle = draftSaved ? "Черновик сохранён" : `Подать объявление · ${steps[step]}`;
 
   useEffect(() => { photosRef.current = photos; }, [photos]);
   useEffect(() => () => photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url)), []);
@@ -52,11 +56,11 @@ export function PublishForm() {
 
   function validateAndContinue() {
     setError("");
-    if (step === 0 && !categorySlug) {
-      setError("Выберите категорию объявления.");
+    if (step === 0 && (!categorySlug || !cityId)) {
+      setError("Выберите точную категорию и город объявления.");
       return;
     }
-    if (step === 1 && (!title.trim() || !description.trim() || !price)) {
+    if (step === 1 && (!title.trim() || !description.trim() || (!price && category?.priceMode !== "free" && category?.priceMode !== "exchange"))) {
       setError("Заполните название, цену и описание.");
       return;
     }
@@ -94,7 +98,7 @@ export function PublishForm() {
   function reset() {
     photos.forEach((photo) => URL.revokeObjectURL(photo.url));
     setPhotos([]);
-    setComplete(false);
+    setDraftSaved(false);
     setStep(0);
     setCategorySlug("");
     setCityOverride(null);
@@ -102,6 +106,8 @@ export function PublishForm() {
     setDescription("");
     setPrice("");
     setAttributes({});
+    setContactName("");
+    setContactPhone("");
     setError("");
   }
 
@@ -111,15 +117,15 @@ export function PublishForm() {
         fallback="/profile"
         eyebrow="Новое объявление"
         title={pageTitle}
-        description={complete ? "Публикация сохранена и ожидает проверки." : `Шаг ${step + 1} из ${steps.length}. Перед отправкой вы сможете проверить данные.`}
-        onBack={step > 0 && !complete ? previousStep : undefined}
+        description={draftSaved ? "Данные сохранены только на этом устройстве. Публикация станет доступна после входа и подключения базы данных." : `Шаг ${step + 1} из ${steps.length}. Перед публикацией вы сможете проверить данные.`}
+        onBack={step > 0 && !draftSaved ? previousStep : undefined}
       />
 
-      {complete ? (
+      {draftSaved ? (
         <div className="publish-success">
           <span><Check size={30} /></span>
-          <h2>Объявление отправлено на модерацию</h2>
-          <p>Мы проверим публикацию и сообщим о результате в уведомлениях. Обычно это занимает несколько минут.</p>
+          <h2>Черновик сохранён на устройстве</h2>
+          <p>Marketo не показывает фиктивную публикацию: отправка на модерацию станет доступна после подключения авторизации и базы данных.</p>
           <div className="publish-summary">{summary.map((item) => <span key={item}>{item}</span>)}</div>
           <button type="button" onClick={reset}>Создать ещё одно</button>
         </div>
@@ -143,7 +149,7 @@ export function PublishForm() {
               <div className="form-grid">
                 <label className="form-field form-field-wide">
                   <span>Категория <b>*</b></span>
-                  <div className="select-wrap"><select value={categorySlug} onChange={(event) => { setCategorySlug(event.target.value); setAttributes({}); setError(""); }}><option value="" disabled>Выберите категорию</option>{categoryConfigs.map((item) => <option value={item.slug} key={item.slug}>{item.name.ru}</option>)}</select><ChevronDown size={18} /></div>
+                  <CategoryPicker value={categorySlug} onChange={(nextSlug) => { setCategorySlug(nextSlug); setAttributes({}); setError(""); }} />
                   <small>У каждой категории — свои характеристики и фильтры.</small>
                 </label>
                 <div className="form-field form-field-wide"><span>Город или населённый пункт <b>*</b></span><LocationPicker value={cityId} onChange={setCityOverride} allowAll={false} /><small>Поиск доступен по городам всех регионов Казахстана.</small></div>
@@ -153,16 +159,12 @@ export function PublishForm() {
 
           {step === 1 && (
             <div className="publish-panel">
-              <div className="panel-heading"><span><Tag size={22} /></span><div><h2>{category ? `Детали: ${category.name.ru}` : "Расскажите подробнее"}</h2><p>{category?.descriptionHint.ru ?? "Добавьте понятное название и честное описание."}</p></div></div>
+              <div className="panel-heading"><span><Tag size={22} /></span><div><h2>{category ? `Детали: ${category.name.ru}` : "Расскажите подробнее"}</h2><p>{category?.descriptionHint?.ru ?? "Добавьте понятное название и честное описание."}</p></div></div>
               <div className="form-grid">
-                <label className="form-field form-field-wide"><span>Название <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={category?.titlePlaceholder.ru ?? "Кратко опишите предложение"} maxLength={70} /><small>{title.length}/70 · заголовок будет виден в каталоге.</small></label>
-                <label className="form-field"><span>{categorySlug === "jobs" ? "Зарплата, ₸" : categorySlug === "services" ? "Цена от, ₸" : "Цена, ₸"} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label>
-                {category?.filters.map((filter) => filter.type === "select" ? (
-                  <label className="form-field" key={filter.id}><span>{filter.label.ru}</span><div className="select-wrap"><select value={String(attributes[filter.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [filter.id]: event.target.value }))}><option value="">Выберите значение</option>{filter.options?.map((option) => <option value={option.value} key={option.value}>{option.label.ru}</option>)}</select><ChevronDown size={18} /></div></label>
-                ) : (
-                  <label className="option-row form-field-wide" key={filter.id}><input type="checkbox" checked={Boolean(attributes[filter.id])} onChange={(event) => setAttributes((current) => ({ ...current, [filter.id]: event.target.checked }))} /><span><strong>{filter.label.ru}</strong><small>Отметьте, если это применимо к вашему объявлению.</small></span></label>
-                ))}
-                <label className="form-field form-field-wide"><span>Описание <b>*</b></span><textarea rows={7} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={category?.descriptionHint.ru ?? "Опишите предложение и важные детали"} /><small>Не указывайте телефон в описании — для него есть отдельный шаг.</small></label>
+                <label className="form-field form-field-wide"><span>Название <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={category?.titlePlaceholder?.ru ?? "Кратко опишите предложение"} maxLength={70} /><small>{title.length}/70 · заголовок будет виден в каталоге.</small></label>
+                {category?.priceMode !== "free" && category?.priceMode !== "exchange" ? <label className="form-field"><span>{category?.priceMode === "salary" ? "Зарплата, ₸" : category?.attributeSet === "service" ? "Цена от, ₸" : "Цена, ₸"} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label> : null}
+                {categoryAttributes.map((attribute) => attribute.type === "select" ? <label className="form-field" key={attribute.id}><span>{attribute.label.ru}{attribute.required ? " *" : ""}</span><div className="select-wrap"><select value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))}><option value="">Выберите значение</option>{attribute.options?.map((option) => <option value={option.value} key={option.value}>{option.label.ru}</option>)}</select><ChevronDown size={18} /></div></label> : attribute.type === "checkbox" ? <label className="option-row form-field-wide" key={attribute.id}><input type="checkbox" checked={Boolean(attributes[attribute.id])} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.checked }))} /><span><strong>{attribute.label.ru}</strong><small>Отметьте, если это применимо.</small></span></label> : <label className="form-field" key={attribute.id}><span>{attribute.label.ru}{attribute.unit?.ru ? `, ${attribute.unit.ru}` : ""}{attribute.required ? " *" : ""}</span><input inputMode={attribute.type === "number" ? "numeric" : "text"} value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))} /></label>)}
+                <label className="form-field form-field-wide"><span>Описание <b>*</b></span><textarea rows={7} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={category?.descriptionHint?.ru ?? "Опишите предложение и важные детали"} /><small>Не указывайте телефон в описании — для него есть отдельный шаг.</small></label>
               </div>
             </div>
           )}
@@ -180,8 +182,8 @@ export function PublishForm() {
             <div className="publish-panel">
               <div className="panel-heading"><span><Smartphone size={22} /></span><div><h2>Как с вами связаться?</h2><p>Проверьте контакты перед отправкой объявления.</p></div></div>
               <div className="form-grid">
-                <label className="form-field"><span>Имя <b>*</b></span><input defaultValue="Айдос" autoComplete="name" /></label>
-                <label className="form-field"><span>Телефон <b>*</b></span><input inputMode="tel" defaultValue="+7 700 123 45 67" autoComplete="tel" /></label>
+                <label className="form-field"><span>Имя <b>*</b></span><input value={contactName} onChange={(event) => setContactName(event.target.value)} autoComplete="name" placeholder="Как к вам обращаться" /></label>
+                <label className="form-field"><span>Телефон <b>*</b></span><input inputMode="tel" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} autoComplete="tel" placeholder="+7 700 000 00 00" /></label>
                 <label className="option-row form-field-wide"><input type="checkbox" defaultChecked /><span><strong>Разрешить сообщения в Marketo</strong><small>Покупатели смогут написать вам, не раскрывая номер телефона.</small></span></label>
                 <label className="option-row form-field-wide"><input type="checkbox" /><span><strong>Звонки только с 09:00 до 21:00</strong><small>Покажем покупателям удобное время для связи.</small></span></label>
               </div>
@@ -192,7 +194,7 @@ export function PublishForm() {
           {error && <div className="form-error" role="alert">{error}</div>}
           <div className="publish-controls">
             <button type="button" className="secondary-control" disabled={step === 0} onClick={previousStep}><ChevronLeft size={18} />Назад</button>
-            {step < steps.length - 1 ? <button type="button" className="primary-control" onClick={validateAndContinue}>Далее<ChevronRight size={18} /></button> : <button type="button" className="primary-control" onClick={() => setComplete(true)}>Отправить на модерацию<Check size={18} /></button>}
+            {step < steps.length - 1 ? <button type="button" className="primary-control" onClick={validateAndContinue}>Далее<ChevronRight size={18} /></button> : <button type="button" className="primary-control" onClick={() => { if (!contactName.trim() || contactPhone.replace(/\D/g, "").length < 10) { setError("Введите имя и корректный номер телефона."); return; } window.localStorage.setItem("marketo-listing-draft", JSON.stringify({ categorySlug, cityId, title, description, price, attributes, contactName, contactPhone })); setDraftSaved(true); }}>Сохранить черновик<Check size={18} /></button>}
           </div>
         </div>
       )}

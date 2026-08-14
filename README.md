@@ -17,7 +17,7 @@ npm run lint
 npm test
 ```
 
-`npm test` performs the production build, validates the Worker artifact and runs route, PWA, geography, category-context, CSS, shell-safety and Cloudflare-configuration checks.
+`npm test` performs the production build, validates the Worker artifact and runs route, PWA, geography, category-tree, empty-repository, CSS, shell-safety and Cloudflare-configuration checks.
 
 For the restricted Linux build environment used by this checkout, `npm run install:ci` is the hardened equivalent of `npm ci`. It creates only ignored, project-local runtime/cache directories.
 
@@ -42,7 +42,9 @@ Repository shell files do not need the executable bit. npm calls every standalon
 ## Product data
 
 - `lib/geography.ts` is the single RU/KK-ready Kazakhstan reference: country, 17 regions, three cities of republican significance and 90 cities from the current KATO classifier.
-- `lib/catalog-config.ts` is the single category context: localized names, search/title prompts, filters and dynamic publication attributes.
-- `lib/mock-data.ts` supplies coherent preview records until the corresponding Supabase reference tables and listing queries are enabled.
+- `lib/catalog-config.ts` is the single RU/KK-ready category tree: localized names, search/title prompts, filters and dynamic publication attributes for more than 200 category nodes.
+- `lib/data/repositories.ts` defines the frontend data boundary. Its current adapters return honest empty results; they never fabricate users, listings, chats, ratings or counters.
+- `supabase/migrations/0001_marketo_core.sql` documents the future PostgreSQL structure and RLS baseline. It is not executed by the current Cloudflare build.
+- Draft publication data is stored only in the current browser until Supabase Auth, PostgreSQL and R2 adapters are connected.
 
 Runtime secrets belong in Cloudflare/Supabase environment settings. `.env*`, private keys, caches and build artifacts are ignored and must not be committed.

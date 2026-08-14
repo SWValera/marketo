@@ -1,39 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BadgeCheck, Bell, ChevronRight, CircleHelp, Eye, FileText, Heart, MapPin, MessageCircle, PenLine, Settings, Star, UserRound } from "lucide-react";
+import { Bell, ChevronRight, CircleHelp, Heart, LogIn, MapPin, MessageCircle, PenLine, Settings, UserRound } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { ListingCard } from "@/components/listing-card";
-import { listings } from "@/lib/mock-data";
+import { EmptyState } from "@/components/empty-state";
+import { profileRepository } from "@/lib/data/repositories";
+import { getSettlement } from "@/lib/geography";
 
 export const metadata: Metadata = { title: "Профиль", robots: { index: false, follow: false } };
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const profile = await profileRepository.current();
+  const city = profile?.cityId ? getSettlement(profile.cityId) : undefined;
   const menu = [
-    { href: "/profile/edit", label: "Личные данные", note: "Имя, телефон и город", icon: UserRound },
-    { href: "/messages", label: "Чаты", note: "2 новых сообщения", icon: MessageCircle },
-    { href: "/notifications", label: "Уведомления", note: "Настройки и история", icon: Bell },
-    { href: "/settings", label: "Настройки", note: "Безопасность и язык", icon: Settings },
-    { href: "/help", label: "Помощь", note: "Поддержка и безопасность", icon: CircleHelp },
+    { href: "/favorites", label: "Избранное", note: "Сохранённые объявления", icon: Heart },
+    { href: "/messages", label: "Чаты", note: "Диалоги с продавцами и покупателями", icon: MessageCircle },
+    { href: "/notifications", label: "Уведомления", note: "История событий", icon: Bell },
+    { href: "/settings", label: "Настройки", note: "Безопасность, язык и уведомления", icon: Settings },
+    { href: "/help", label: "Помощь", note: "Правила и поддержка", icon: CircleHelp },
   ];
-  return <DashboardShell title="Профиль продавца" description="Управляйте объявлениями, контактами и настройками аккаунта." active="/profile">
-    <article className="dashboard-card profile-hero">
-      <div className="profile-avatar">А<span><BadgeCheck size={16} /></span></div>
-      <div className="profile-identity"><div className="profile-name-row"><h2>Айдос С.</h2><span className="verified-badge"><BadgeCheck size={14} /> Подтверждён</span></div><p><MapPin size={15} /> Алматы · на Marketo с апреля 2024 года</p><div className="profile-rating"><Star size={16} fill="currentColor" /> <strong>4,9</strong><span>18 отзывов</span></div></div>
-      <Link className="secondary-button" href="/profile/edit"><PenLine size={17} /> Редактировать</Link>
-    </article>
-    <section className="dashboard-stats" aria-label="Статистика профиля">
-      <article><span className="stat-icon"><FileText size={20} /></span><div><strong>3</strong><small>активных объявления</small></div></article>
-      <article><span className="stat-icon"><Eye size={20} /></span><div><strong>1 248</strong><small>просмотров</small></div></article>
-      <article><span className="stat-icon"><Heart size={20} /></span><div><strong>47</strong><small>добавили в избранное</small></div></article>
-      <article><span className="stat-icon"><Star size={20} /></span><div><strong>18</strong><small>отзывов</small></div></article>
-    </section>
-    <section className="dashboard-section">
-      <div className="dashboard-section-heading"><div><h2>Мои объявления</h2><p>3 активных объявления · 1 ожидает модерации</p></div><Link href="/publish" className="primary-action">Разместить объявление</Link></div>
-      <div className="listing-grid dashboard-listings">{listings.slice(0, 3).map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div>
-    </section>
-    <section className="dashboard-card profile-menu-card">
-      <h2>Аккаунт</h2>
-      <div className="profile-menu-list">{menu.map(({ href, label, note, icon: Icon }) => <Link href={href} key={label}><span><Icon size={20} /></span><div><strong>{label}</strong><small>{note}</small></div><ChevronRight size={19} /></Link>)}</div>
-    </section>
+  return <DashboardShell title="Профиль" description="Управляйте объявлениями, контактами и настройками аккаунта." active="/profile">
+    {!profile ? <EmptyState icon={<LogIn size={30} />} title="Войдите, чтобы открыть профиль" description="После подключения аккаунта здесь появятся ваши данные, объявления и статистика — без тестовых значений." actionHref="/login" actionLabel="Войти или зарегистрироваться" /> : <article className="dashboard-card profile-hero"><div className="profile-avatar"><UserRound size={24} /></div><div className="profile-identity"><div className="profile-name-row"><h2>{profile.displayName}</h2>{profile.verified ? <span className="verified-badge">Подтверждён</span> : null}</div>{city ? <p><MapPin size={15} /> {city.name.ru}</p> : null}{profile.bio ? <p>{profile.bio}</p> : null}</div><Link className="secondary-button" href="/profile/edit"><PenLine size={17} /> Редактировать</Link></article>}
+    <section className="dashboard-card profile-menu-card"><h2>Разделы аккаунта</h2><div className="profile-menu-list">{menu.map(({ href, label, note, icon: Icon }) => <Link href={href} key={label}><span><Icon size={20} /></span><div><strong>{label}</strong><small>{note}</small></div><ChevronRight size={19} /></Link>)}</div></section>
+    <section className="dashboard-section"><div className="dashboard-section-heading"><div><h2>Мои объявления</h2><p>Опубликованные и сохранённые черновики появятся после входа.</p></div><Link href="/publish" className="primary-action">Подать объявление</Link></div><EmptyState icon={<UserRound size={30} />} title="У вас пока нет объявлений" description="Создайте первое объявление — Marketo подберёт поля по выбранной категории." actionHref="/publish" actionLabel="Создать объявление" /></section>
   </DashboardShell>;
 }

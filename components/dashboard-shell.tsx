@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BadgeCheck, Bell, CircleHelp, Heart, LayoutDashboard, MessageCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, CircleHelp, Heart, LayoutDashboard, LogIn, MessageCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 import { PageHeader } from "@/components/page-header";
@@ -20,9 +20,9 @@ export function DashboardShell({ title, description, active, children }: { title
       <Header />
       <main className="page-shell dashboard-page">
         <aside className="dashboard-sidebar">
-          <Link href="/profile" className="dashboard-user">
-            <span className="dashboard-avatar">А</span>
-            <div><strong>Айдос</strong><small><BadgeCheck size={13} /> Профиль подтверждён</small></div>
+          <Link href="/login" className="dashboard-user">
+            <span className="dashboard-avatar"><UserRound size={20} /></span>
+            <div><strong>Войдите в Marketo</strong><small><LogIn size={13} /> Синхронизируйте данные</small></div>
           </Link>
           <nav className="dashboard-nav" aria-label="Личный кабинет">
             {dashboardLinks.map(({ href, label, icon: Icon }) => (
