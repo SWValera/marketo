@@ -25,8 +25,8 @@ test("PWA install always opens on platform choice", async () => {
 test("shell helpers never execute another shell helper directly", async () => {
   for (const file of ["build-verified.sh", "install-ci.sh", "validate-artifact.sh"]) {
     const source = await readFile(new URL(`scripts/${file}`, root), "utf8");
-    assert.doesNotMatch(source, /exec\s+"\$\{script_dir\}\/sites-env\.sh"/);
-    assert.match(source, /exec bash "\$\{script_dir\}\/sites-env\.sh"/);
+    assert.doesNotMatch(source, /^\s*(?:exec\s+)?"\$\{script_dir\}\/sites-env\.sh"/m);
+    assert.match(source, /source "\$\{script_dir\}\/sites-env\.sh"/);
   }
   const build = await readFile(new URL("scripts/build-verified.sh", root), "utf8");
   assert.match(build, /bash "\$\{script_dir\}\/validate-artifact\.sh"/);

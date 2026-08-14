@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Bell, Heart, LayoutDashboard, MessageCircle, ShieldCheck, UserRound } from "lucide-react";
+import { BadgeCheck, Bell, CircleHelp, Heart, LayoutDashboard, MessageCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 
@@ -18,13 +18,20 @@ export function DashboardShell({ title, description, active, children }: { title
       <Header />
       <main className="page-shell dashboard-page">
         <aside className="dashboard-sidebar">
-          <div className="dashboard-user"><span>А</span><div><strong>Айдос</strong><small>Тестовый профиль</small></div></div>
-          <nav aria-label="Личный кабинет">
+          <Link href="/profile" className="dashboard-user">
+            <span className="dashboard-avatar">А</span>
+            <div><strong>Айдос</strong><small><BadgeCheck size={13} /> Профиль подтверждён</small></div>
+          </Link>
+          <nav className="dashboard-nav" aria-label="Личный кабинет">
             {dashboardLinks.map(({ href, label, icon: Icon }) => (
-              <Link className={active === href ? "is-active" : ""} href={href} key={href}><Icon size={18} />{label}</Link>
+              <Link className={active === href ? "active" : ""} href={href} key={href}><Icon size={18} />{label}</Link>
             ))}
           </nav>
-          <Link className="dashboard-catalog-link" href="/search"><LayoutDashboard size={18} />Вернуться в каталог</Link>
+          <div className="dashboard-sidebar-footer">
+            <Link href="/settings"><Settings size={18} />Настройки</Link>
+            <Link href="/help"><CircleHelp size={18} />Помощь</Link>
+            <Link className="dashboard-catalog-link" href="/search"><LayoutDashboard size={18} />Вернуться в каталог</Link>
+          </div>
         </aside>
         <section className="dashboard-content">
           <header className="dashboard-heading"><span className="section-kicker">Личный кабинет</span><h1>{title}</h1><p>{description}</p></header>

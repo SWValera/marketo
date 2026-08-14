@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, ChevronDown, Heart, MapPin, Menu, MessageCircle, Search, UserRound } from "lucide-react";
+import { Bell, ChevronDown, Heart, MapPin, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { PwaInstall } from "@/components/pwa-install";
 
@@ -44,18 +44,18 @@ export function Header() {
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((value) => !value)}
         >
-          <Menu size={22} />
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
       {menuOpen && (
         <nav className="mobile-menu" aria-label="Мобильное меню">
-          <Link href="/search">Каталог объявлений</Link>
-          <Link href="/favorites">Избранное</Link>
-          <Link href="/messages">Чаты</Link>
-          <Link href="/profile">Профиль</Link>
+          <Link href="/search" onClick={() => setMenuOpen(false)}>Каталог объявлений</Link>
+          <Link href="/favorites" onClick={() => setMenuOpen(false)}>Избранное</Link>
+          <Link href="/messages" onClick={() => setMenuOpen(false)}>Чаты</Link>
+          <Link href="/profile" onClick={() => setMenuOpen(false)}>Профиль</Link>
           <PwaInstall />
-          <Link href="/publish">Разместить объявление</Link>
+          <Link href="/publish" onClick={() => setMenuOpen(false)}>Разместить объявление</Link>
         </nav>
       )}
     </header>
