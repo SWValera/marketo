@@ -2,87 +2,163 @@
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CategoryCascade } from "@/components/category-cascade";
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { PageHeader } from "@/components/page-header";
-import type { AttributeDefinition } from "@/lib/catalog-config";
-import type { LocalizedText } from "@/lib/catalog-config";
+import {
+  allSearchPlaceholder,
+  getCategoryAttributes,
+  getCategoryBySlug,
+  getCategoryPath,
+  getCategoryPresentation,
+  getCategoryRoot,
+  isCategoryWithin,
+  type LocalizedText,
+} from "@/lib/catalog-config";
 import type { ListingSummary } from "@/lib/data/types";
 import { getSettlement } from "@/lib/geography";
 import { useI18n } from "@/components/i18n-provider";
 import { localeTag, localize } from "@/lib/i18n/config";
 
-type CategoryOption = { slug: string; name: LocalizedText; depth: number };
+type FilterValue = string | boolean;
 
 export function CatalogClient({
-  initialQuery = "", initialCategorySlug = "", title, titleText,
-  placeholder, placeholderText, attributes = [], categories = [],
-  initialListings = [], fallback = "/",
+  initialQuery = "",
+  initialCategorySlug = "",
+  initialCityId,
+  initialMinPrice = "",
+  initialMaxPrice = "",
+  initialSort = "new",
+  initialDynamicFilters = {},
+  title,
+  titleText,
+  initialListings = [],
+  fallback = "/",
 }: {
-  initialQuery?: string; initialCategorySlug?: string; title?: string; titleText?: LocalizedText; placeholder?: string; placeholderText?: LocalizedText;
-  attributes?: AttributeDefinition[]; categories?: CategoryOption[];
-  initialListings?: ListingSummary[]; fallback?: string;
+  initialQuery?: string;
+  initialCategorySlug?: string;
+  initialCityId?: string;
+  initialMinPrice?: string;
+  initialMaxPrice?: string;
+  initialSort?: string;
+  initialDynamicFilters?: Record<string, FilterValue>;
+  title?: string;
+  titleText?: LocalizedText;
+  initialListings?: ListingSummary[];
+  fallback?: string;
 }) {
   const { locale, t } = useI18n();
   const [query, setQuery] = useState(initialQuery);
   const [categorySlug, setCategorySlug] = useState(initialCategorySlug);
   const storedLocation = useStoredLocation();
-  const [cityOverride, setCityOverride] = useState<string | null>(null);
+  const [cityOverride, setCityOverride] = useState<string | null>(initialCityId ?? null);
   const cityId = cityOverride ?? storedLocation;
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [sort, setSort] = useState("new");
+  const [minPrice, setMinPrice] = useState(initialMinPrice);
+  const [maxPrice, setMaxPrice] = useState(initialMaxPrice);
+  const [sort, setSort] = useState(initialSort);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<Record<string, string | boolean>>({});
+  const [dynamicFilters, setDynamicFilters] = useState<Record<string, FilterValue>>(initialDynamicFilters);
   const city = getSettlement(cityId);
+  const activeCategory = getCategoryBySlug(categorySlug);
+  const activeRoot = getCategoryRoot(categorySlug);
+  const activeAttributes = categorySlug ? getCategoryAttributes(categorySlug).filter((attribute) => attribute.filterable) : [];
+  const activePresentation = getCategoryPresentation(categorySlug);
+  const activePlaceholder = localize(activePresentation.searchPlaceholder ?? activeRoot?.searchPlaceholder ?? allSearchPlaceholder, locale);
 
   const result = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
+    const filterDefinitions = new Map(getCategoryAttributes(categorySlug).map((attribute) => [attribute.id, attribute]));
     return initialListings
-      .filter((item) => !normalizedQuery || item.title.toLocaleLowerCase("ru").includes(normalizedQuery))
-      .filter((item) => !categorySlug || item.categorySlug === categorySlug)
+      .filter((item) => !normalizedQuery || `${item.title} ${item.locationLabel}`.toLocaleLowerCase("ru").includes(normalizedQuery))
+      .filter((item) => isCategoryWithin(item.categorySlug, categorySlug))
       .filter((item) => cityId === "all" || item.cityId === cityId)
       .filter((item) => !minPrice || (item.priceAmount ?? 0) >= Number(minPrice))
       .filter((item) => !maxPrice || (item.priceAmount ?? 0) <= Number(maxPrice))
-      .sort((a, b) => sort === "cheap" ? (a.priceAmount ?? 0) - (b.priceAmount ?? 0) : sort === "expensive" ? (b.priceAmount ?? 0) - (a.priceAmount ?? 0) : Number(b.promoted) - Number(a.promoted));
-  }, [categorySlug, cityId, initialListings, maxPrice, minPrice, query, sort]);
+      .filter((item) => Object.entries(dynamicFilters).every(([key, value]) => {
+        if (value === "" || value === false) return true;
+        const listingValue = item.attributes?.[key];
+        if (typeof value === "boolean") return listingValue === value;
+        const definition = filterDefinitions.get(key);
+        if (definition?.type === "text") return String(listingValue ?? "").toLocaleLowerCase("ru").includes(String(value).toLocaleLowerCase("ru"));
+        if (definition?.type === "number") return Number(listingValue) === Number(value);
+        return String(listingValue ?? "") === String(value);
+      }))
+      .sort((a, b) => sort === "cheap"
+        ? (a.priceAmount ?? 0) - (b.priceAmount ?? 0)
+        : sort === "expensive"
+          ? (b.priceAmount ?? 0) - (a.priceAmount ?? 0)
+          : Number(b.promoted) - Number(a.promoted));
+  }, [categorySlug, cityId, dynamicFilters, initialListings, maxPrice, minPrice, query, sort]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (categorySlug) params.set("category", categorySlug);
     if (cityId !== "all") params.set("city", cityId);
+    if (minPrice) params.set("price_min", minPrice);
+    if (maxPrice) params.set("price_max", maxPrice);
+    if (sort !== "new") params.set("sort", sort);
+    for (const [key, value] of Object.entries(dynamicFilters)) if (value !== "" && value !== false) params.set(`f_${key}`, String(value));
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
-  }, [categorySlug, cityId, query]);
+  }, [categorySlug, cityId, dynamicFilters, maxPrice, minPrice, query, sort]);
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => event.key === "Escape" && setFiltersOpen(false);
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", close);
+    };
+  }, [filtersOpen]);
+
+  function changeCategory(slug: string) {
+    setCategorySlug(slug);
+    setDynamicFilters({});
+  }
 
   function resetFilters() {
-    setQuery(""); setCategorySlug(initialCategorySlug); setCityOverride("all");
-    setMinPrice(""); setMaxPrice(""); setSort("new"); setDynamicFilters({});
+    setQuery("");
+    setCategorySlug(initialCategorySlug);
+    setCityOverride("all");
+    setMinPrice("");
+    setMaxPrice("");
+    setSort("new");
+    setDynamicFilters({});
   }
 
   const activeChips = [
+    activeCategory ? getCategoryPath(activeCategory.slug).map((item) => localize(item.name, locale)).join(" → ") : null,
     city ? localize(city.name, locale) : null,
     minPrice ? `${t("catalog.from")} ${Number(minPrice).toLocaleString(localeTag(locale))} ₸` : null,
     maxPrice ? `${t("catalog.to")} ${Number(maxPrice).toLocaleString(localeTag(locale))} ₸` : null,
     ...Object.entries(dynamicFilters).filter(([, value]) => Boolean(value)).map(([key, value]) => {
-      const filter = attributes.find((item) => item.id === key);
+      const filter = activeAttributes.find((item) => item.id === key);
       const option = filter?.options?.find((item) => item.value === value);
-      return option ? localize(option.label, locale) : localize(filter?.label, locale);
+      return option ? localize(option.label, locale) : filter ? `${localize(filter.label, locale)}: ${value === true ? t("common.yes") : String(value)}` : null;
     }),
   ].filter(Boolean) as string[];
 
+  const pageTitle = activeCategory ? localize(activeCategory.name, locale) : titleText ? localize(titleText, locale) : title ?? t("catalog.allListings");
+
   return <>
-    <PageHeader fallback={fallback} eyebrow={t("categories.eyebrow")} title={titleText ? localize(titleText, locale) : title ?? t("catalog.allListings")} description={`${result.length} ${t("catalog.listings")} · ${city ? localize(city.name, locale) : t("catalog.wholeCountry")}`} />
+    <PageHeader fallback={fallback} eyebrow={t("categories.eyebrow")} title={pageTitle} description={`${result.length} ${t("catalog.listings")} · ${city ? localize(city.name, locale) : t("catalog.wholeCountry")}`} />
     <div className="catalog-layout">
-      <button className="filter-mobile-toggle" type="button" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={18} /> {t("catalog.filters")} {activeChips.length > 0 && <b>{activeChips.length}</b>}</button>
-      <aside className={`filters-panel ${filtersOpen ? "is-open" : ""}`} aria-label={t("catalog.filters")}>
+      <button className="filter-mobile-toggle" type="button" onClick={() => setFiltersOpen(true)} aria-expanded={filtersOpen}>
+        <SlidersHorizontal size={18} /> {t("catalog.filters")} {activeChips.length > 0 && <b>{activeChips.length}</b>}
+      </button>
+      {filtersOpen ? <button className="filters-overlay" type="button" onClick={() => setFiltersOpen(false)} aria-label={t("catalog.closeFilters")} /> : null}
+      <aside className={`filters-panel ${filtersOpen ? "is-open" : ""}`} aria-label={t("catalog.filters")} role={filtersOpen ? "dialog" : undefined} aria-modal={filtersOpen || undefined}>
         <div className="filters-title"><div><strong>{t("catalog.filters")}</strong><small>{t("catalog.filterHint")}</small></div><button type="button" onClick={() => setFiltersOpen(false)} aria-label={t("catalog.closeFilters")}><X size={21} /></button></div>
-        <label>{t("common.search")}<span className="filter-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholderText ? localize(placeholderText, locale) : placeholder ?? t("header.searchPlaceholder")} /></span></label>
-        <label>{t("catalog.category")}<select value={categorySlug} onChange={(event) => { setCategorySlug(event.target.value); setDynamicFilters({}); }}><option value="">{t("catalog.allCategories")}</option>{categories.map((item) => <option value={item.slug} key={item.slug}>{`${"— ".repeat(item.depth)}${localize(item.name, locale)}`}</option>)}</select></label>
+        <label>{t("common.search")}<span className="filter-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={activePlaceholder} /></span></label>
+        <CategoryCascade value={categorySlug} onChange={changeCategory} />
         <div className="filter-location"><span>{t("catalog.location")}</span><LocationPicker value={cityId} onChange={setCityOverride} /></div>
         <div className="price-fields"><label>{t("catalog.priceFrom")}<input inputMode="numeric" value={minPrice} onChange={(event) => setMinPrice(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label><label>{t("catalog.to")}<input inputMode="numeric" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value.replace(/\D/g, ""))} placeholder="15 000 000" /></label></div>
-        {attributes.filter((attribute) => attribute.filterable).map((attribute) => attribute.type === "select" ? <label key={attribute.id}>{localize(attribute.label, locale)}<select value={String(dynamicFilters[attribute.id] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.id]: event.target.value }))}><option value="">{t("common.notImportant")}</option>{attribute.options?.map((item) => <option value={item.value} key={item.value}>{localize(item.label, locale)}</option>)}</select></label> : attribute.type === "checkbox" ? <label className="check-row" key={attribute.id}><input type="checkbox" checked={Boolean(dynamicFilters[attribute.id])} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.id]: event.target.checked }))} /> {localize(attribute.label, locale)}</label> : null)}
+        {activeAttributes.map((attribute) => attribute.type === "select" ? <label key={attribute.id}>{localize(attribute.label, locale)}<select value={String(dynamicFilters[attribute.id] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.id]: event.target.value }))}><option value="">{t("common.notImportant")}</option>{attribute.options?.map((item) => <option value={item.value} key={item.value}>{localize(item.label, locale)}</option>)}</select></label> : attribute.type === "checkbox" ? <label className="check-row" key={attribute.id}><input type="checkbox" checked={Boolean(dynamicFilters[attribute.id])} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.id]: event.target.checked }))} /> {localize(attribute.label, locale)}</label> : <label key={attribute.id}>{localize(attribute.label, locale)}<input type={attribute.type === "number" ? "number" : "text"} inputMode={attribute.type === "number" ? "numeric" : undefined} value={String(dynamicFilters[attribute.id] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.id]: event.target.value }))} /></label>)}
         <button className="filter-apply" type="button" onClick={() => setFiltersOpen(false)}>{t("catalog.show", { count: result.length })}</button>
         <button className="reset-button" type="button" onClick={resetFilters}>{t("catalog.reset")}</button>
       </aside>

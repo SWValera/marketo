@@ -24,11 +24,11 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: { capable: true, title: "Marketo", statusBarStyle: "default" },
     icons: {
       icon: [
-        { url: "/favicon.svg", type: "image/svg+xml" },
-        { url: "/icons/marketo-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/marketo-favicon-v2.svg", type: "image/svg+xml" },
+        { url: "/icons/marketo-pwa-192-v2.png", sizes: "192x192", type: "image/png" },
       ],
       apple: [{ url: "/icons/marketo-180.png", sizes: "180x180", type: "image/png" }],
-      shortcut: "/favicon.svg",
+      shortcut: "/marketo-favicon-v2.svg",
     },
   };
 }

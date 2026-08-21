@@ -147,11 +147,14 @@ export function PwaInstall() {
                     </button>
                   </>
                 ) : (
-                  <ol>
-                    <li><span className="instruction-icon"><MoreVertical size={18} /></span><div>{t("pwa.androidStep1")}</div></li>
-                    <li><span className="instruction-icon"><Download size={18} /></span><div>{t("pwa.androidStep2")}</div></li>
-                    <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.androidStep3")}</div></li>
-                  </ol>
+                  <>
+                    <ol>
+                      <li><span className="instruction-icon"><MoreVertical size={18} /></span><div>{t("pwa.androidStep1")}</div></li>
+                      <li><span className="instruction-icon"><Download size={18} /></span><div>{t("pwa.androidStep2")}</div></li>
+                      <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.androidStep3")}</div></li>
+                    </ol>
+                    <p className="install-note">{t("pwa.androidStandaloneNote")}</p>
+                  </>
                 )}
               </div>
             )}

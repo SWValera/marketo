@@ -18,6 +18,7 @@ test("core routes render through the production worker", async () => {
     ["/category/jobs", "Работа"], ["/category/services", "Услуги"], ["/category/cars", "Легковые автомобили"],
     ["/profile", "Войдите, чтобы открыть профиль"], ["/profile/edit", "Редактировать профиль"],
     ["/favorites", "В избранном пока пусто"], ["/messages", "Сообщений пока нет"],
+    ["/messages/new?listing=listing-id", "Войдите, чтобы написать продавцу"],
     ["/notifications", "Уведомлений пока нет"], ["/publish", "Подать объявление"], ["/login", "Добро пожаловать"],
     ["/settings", "Настройки"], ["/help", "Помощь"], ["/admin", "Очередь модерации пуста"], ["/offline", "Нет подключения"],
   ];

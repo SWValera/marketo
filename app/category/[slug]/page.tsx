@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { CatalogClient } from "@/components/catalog-client";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
-import { categoryOptions, getCategoryAttributes, getCategoryBySlug, getCategoryParent, getCategoryPath } from "@/lib/catalog-config";
+import { allSearchPlaceholder, getCategoryBySlug, getCategoryParent, getCategoryPath, getCategoryRoot } from "@/lib/catalog-config";
+import { parseCatalogSearchParams, type CatalogSearchParams } from "@/lib/catalog-search-params";
 import { listingRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
@@ -22,17 +23,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   } : {};
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CategoryPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<CatalogSearchParams> }) {
   const { slug } = await params;
   const category = getCategoryBySlug(slug);
   if (!category) notFound();
+  const parsed = parseCatalogSearchParams(await searchParams);
+  const filteredCategory = getCategoryBySlug(parsed.categorySlug) ?? category;
+  const rootCategory = getCategoryRoot(filteredCategory.slug);
   const listings = await listingRepository.list();
   const { locale, t } = await getServerI18n();
   const parent = getCategoryParent(category.slug);
   const path = getCategoryPath(category.slug);
-  return <><Header categorySlug={category.slug} searchPlaceholder={localize(category.searchPlaceholder, locale)} /><main className="page-shell subpage-main">
+  return <><Header categorySlug={filteredCategory.slug} searchPlaceholder={localize(filteredCategory.searchPlaceholder ?? rootCategory?.searchPlaceholder ?? allSearchPlaceholder, locale)} /><main className="page-shell subpage-main">
     <nav className="breadcrumbs" aria-label={t("categories.eyebrow")}><Link href="/">{t("common.home")}</Link>{path.map((item) => <span key={item.slug}>/ <Link href={`/category/${item.slug}`}>{localize(item.name, locale)}</Link></span>)}</nav>
     {category.children?.length ? <section className="subcategory-strip" aria-label={`${t("categories.refine")}: ${localize(category.name, locale)}`}><strong>{t("categories.refine")}</strong><div>{category.children.map((child) => <Link href={`/category/${child.slug}`} key={child.slug}>{localize(child.name, locale)}</Link>)}</div></section> : null}
-    <CatalogClient initialCategorySlug={category.slug} title={localize(category.name, locale)} placeholder={localize(category.searchPlaceholder, locale)} attributes={getCategoryAttributes(category.slug)} categories={categoryOptions.filter((item) => item.depth === 0).map((item) => ({ slug: item.slug, name: item.name, depth: item.depth }))} initialListings={listings.items} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
+    <CatalogClient initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={parsed.dynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
   </main><MobileNav /></>;
 }

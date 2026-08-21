@@ -1,25 +1,29 @@
 {
-  "name": "Marketo — Қазақстан хабарландырулары",
+  "name": "Marketo — объявления Казахстана",
   "short_name": "Marketo",
-  "description": "Қазақстан бойынша тауарлар мен қызметтерге арналған Marketo маркетплейсі.",
+  "description": "Товары, услуги, работа и недвижимость по всему Казахстану.",
   "lang": "ru-KZ",
   "dir": "ltr",
-  "id": "/",
-  "start_url": "/?source=pwa",
+  "id": "/marketo-pwa-v1",
+  "start_url": "/?source=pwa&mode=standalone",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "categories": ["shopping", "lifestyle"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": "navigate-existing" },
+  "handle_links": "preferred",
   "icons": [
-    { "src": "/icons/marketo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/marketo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/marketo-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/marketo-pwa-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/marketo-pwa-maskable-192-v2.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/marketo-pwa-maskable-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-192.png", "sizes": "192x192" }] },
-    { "name": "Хабарландыру беру", "short_name": "Жариялау", "url": "/publish", "icons": [{ "src": "/icons/marketo-192.png", "sizes": "192x192" }] }
+    { "name": "Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Подать объявление", "short_name": "Подать", "url": "/publish", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

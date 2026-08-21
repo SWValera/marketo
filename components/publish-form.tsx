@@ -14,11 +14,11 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { PageHeader } from "@/components/page-header";
 import { CategoryPicker } from "@/components/category-picker";
-import { getCategoryAttributes, getCategoryBySlug } from "@/lib/catalog-config";
+import { getCategoryAttributes, getCategoryBySlug, getCategoryPath, getCategoryPresentation } from "@/lib/catalog-config";
 import { useI18n } from "@/components/i18n-provider";
 import { localeTag, localize } from "@/lib/i18n/config";
 
@@ -45,16 +45,18 @@ export function PublishForm() {
 
   const category = getCategoryBySlug(categorySlug);
   const categoryAttributes = getCategoryAttributes(categorySlug);
+  const categoryPresentation = getCategoryPresentation(categorySlug);
+  const categoryPath = getCategoryPath(categorySlug);
   const pageTitle = draftSaved ? t("publish.draftSaved") : t("publish.pageTitle", { step: steps[step] });
 
   useEffect(() => { photosRef.current = photos; }, [photos]);
   useEffect(() => () => photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url)), []);
 
-  const summary = useMemo(() => [
-    category ? localize(category.name, locale) : "",
+  const summary = [
+    category ? categoryPath.map((item) => localize(item.name, locale)).join(" → ") : "",
     title,
     price ? `${Number(price).toLocaleString(localeTag(locale))} ₸` : "",
-  ].filter(Boolean), [category, locale, price, title]);
+  ].filter(Boolean);
 
   function validateAndContinue() {
     setError("");
@@ -62,7 +64,7 @@ export function PublishForm() {
       setError(t("publish.categoryCityError"));
       return;
     }
-    if (step === 1 && (!title.trim() || !description.trim() || (!price && category?.priceMode !== "free" && category?.priceMode !== "exchange"))) {
+    if (step === 1 && (!title.trim() || !description.trim() || (!price && categoryPresentation.priceMode !== "free" && categoryPresentation.priceMode !== "exchange"))) {
       setError(t("publish.detailsError"));
       return;
     }
@@ -161,12 +163,12 @@ export function PublishForm() {
 
           {step === 1 && (
             <div className="publish-panel">
-              <div className="panel-heading"><span><Tag size={22} /></span><div><h2>{category ? t("publish.details", { category: localize(category.name, locale) }) : t("publish.more")}</h2><p>{category?.descriptionHint ? localize(category.descriptionHint, locale) : t("publish.moreNote")}</p></div></div>
+              <div className="panel-heading"><span><Tag size={22} /></span><div><h2>{category ? t("publish.details", { category: localize(category.name, locale) }) : t("publish.more")}</h2><p>{categoryPresentation.descriptionHint ? localize(categoryPresentation.descriptionHint, locale) : t("publish.moreNote")}</p></div></div>
               <div className="form-grid">
-                <label className="form-field form-field-wide"><span>{t("publish.title")} <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={category?.titlePlaceholder ? localize(category.titlePlaceholder, locale) : t("publish.titlePlaceholder")} maxLength={70} /><small>{t("publish.titleCounter", { count: title.length })}</small></label>
-                {category?.priceMode !== "free" && category?.priceMode !== "exchange" ? <label className="form-field"><span>{category?.priceMode === "salary" ? t("publish.salary") : category?.attributeSet === "service" ? t("publish.priceFrom") : t("publish.price")} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label> : null}
+                <label className="form-field form-field-wide"><span>{t("publish.title")} <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={categoryPresentation.titlePlaceholder ? localize(categoryPresentation.titlePlaceholder, locale) : t("publish.titlePlaceholder")} maxLength={70} /><small>{t("publish.titleCounter", { count: title.length })}</small></label>
+                {categoryPresentation.priceMode !== "free" && categoryPresentation.priceMode !== "exchange" ? <label className="form-field"><span>{categoryPresentation.priceMode === "salary" ? t("publish.salary") : category?.attributeSet === "service" ? t("publish.priceFrom") : t("publish.price")} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label> : null}
                 {categoryAttributes.map((attribute) => attribute.type === "select" ? <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.required ? " *" : ""}</span><div className="select-wrap"><select value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))}><option value="">{t("common.selectValue")}</option>{attribute.options?.map((option) => <option value={option.value} key={option.value}>{localize(option.label, locale)}</option>)}</select><ChevronDown size={18} /></div></label> : attribute.type === "checkbox" ? <label className="option-row form-field-wide" key={attribute.id}><input type="checkbox" checked={Boolean(attributes[attribute.id])} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.checked }))} /><span><strong>{localize(attribute.label, locale)}</strong><small>{t("publish.applicable")}</small></span></label> : <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attribute.required ? " *" : ""}</span><input inputMode={attribute.type === "number" ? "numeric" : "text"} value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))} /></label>)}
-                <label className="form-field form-field-wide"><span>{t("publish.stepDescriptionName")} <b>*</b></span><textarea rows={7} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={category?.descriptionHint ? localize(category.descriptionHint, locale) : t("publish.descriptionPlaceholder")} /><small>{t("publish.noPhone")}</small></label>
+                <label className="form-field form-field-wide"><span>{t("publish.stepDescriptionName")} <b>*</b></span><textarea rows={7} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={categoryPresentation.descriptionHint ? localize(categoryPresentation.descriptionHint, locale) : t("publish.descriptionPlaceholder")} /><small>{t("publish.noPhone")}</small></label>
               </div>
             </div>
           )}

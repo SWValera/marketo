@@ -1,5 +1,7 @@
-const CACHE_NAME = "marketo-static-v4";
-const APP_SHELL = ["/offline", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE_NAME = "marketo-static-v5";
+// The manifest and HTML intentionally stay out of the precache so Android and
+// installed PWAs receive deployment updates instead of a stale app identity.
+const APP_SHELL = ["/offline"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

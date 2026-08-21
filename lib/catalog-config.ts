@@ -31,13 +31,14 @@ const t = (ru: string, kk?: string): LocalizedText => ({ ru, kk: kk ?? catalogKk
 const option = (value: string, ru: string, kk?: string): AttributeOption => ({ value, label: t(ru, kk) });
 const select = (id: string, ru: string, options: AttributeOption[], required = false): AttributeDefinition => ({ id, label: t(ru), type: "select", options, required, filterable: true });
 const number = (id: string, ru: string, unit?: string, required = false): AttributeDefinition => ({ id, label: t(ru), type: "number", unit: unit ? t(unit) : undefined, required, filterable: true });
-const text = (id: string, ru: string, required = false): AttributeDefinition => ({ id, label: t(ru), type: "text", required, filterable: false });
+const text = (id: string, ru: string, required = false, filterable = false): AttributeDefinition => ({ id, label: t(ru), type: "text", required, filterable });
 const checkbox = (id: string, ru: string): AttributeDefinition => ({ id, label: t(ru), type: "checkbox", filterable: true });
 
 export const attributeSets = {
   goods: [select("condition", "Состояние", [option("new", "Новое", "Жаңа"), option("used", "Б/у", "Қолданылған")], true)],
   car: [
     select("brand", "Марка", [option("toyota", "Toyota"), option("hyundai", "Hyundai"), option("kia", "Kia"), option("chevrolet", "Chevrolet"), option("lexus", "Lexus"), option("lada", "Lada"), option("other", "Другая")], true),
+    text("model", "Модель автомобиля", false, true),
     number("year", "Год выпуска", "год", true), number("mileage", "Пробег", "км"),
     select("fuel", "Топливо", [option("petrol", "Бензин"), option("diesel", "Дизель"), option("hybrid", "Гибрид"), option("electric", "Электро")]),
     select("transmission", "Коробка передач", [option("automatic", "Автомат"), option("manual", "Механика"), option("variator", "Вариатор"), option("robot", "Робот")]),
@@ -46,7 +47,13 @@ export const attributeSets = {
   ],
   moto: [number("year", "Год выпуска", "год"), number("engine", "Объём двигателя", "см³"), number("mileage", "Пробег", "км")],
   parts: [select("condition", "Состояние", [option("new", "Новое"), option("used", "Б/у")], true), select("partType", "Тип детали", [option("original", "Оригинал"), option("analogue", "Аналог"), option("used-original", "Оригинал Б/у")]), text("compatibility", "Марка и модель транспорта")],
-  phone: [select("brand", "Бренд", [option("apple", "Apple"), option("samsung", "Samsung"), option("xiaomi", "Xiaomi"), option("honor", "Honor"), option("other", "Другой")], true), select("memory", "Память", [option("64", "64 ГБ"), option("128", "128 ГБ"), option("256", "256 ГБ"), option("512", "512 ГБ и больше")]), select("condition", "Состояние", [option("new", "Новое"), option("used", "Б/у"), option("parts", "На запчасти")], true)],
+  phone: [
+    select("brand", "Бренд", [option("apple", "Apple"), option("samsung", "Samsung"), option("xiaomi", "Xiaomi"), option("honor", "Honor"), option("other", "Другой")], true),
+    text("model", "Модель", true, true),
+    select("memory", "Память", [option("64", "64 ГБ"), option("128", "128 ГБ"), option("256", "256 ГБ"), option("512", "512 ГБ и больше")]),
+    select("color", "Цвет", [option("black", "Чёрный"), option("white", "Белый"), option("blue", "Синий"), option("green", "Зелёный"), option("gold", "Золотистый"), option("other", "Другой")]),
+    select("condition", "Состояние", [option("new", "Новое"), option("used", "Б/у"), option("parts", "На запчасти")], true),
+  ],
   computer: [select("deviceType", "Тип устройства", [option("laptop", "Ноутбук"), option("desktop", "Компьютер"), option("component", "Комплектующее")]), select("condition", "Состояние", [option("new", "Новое"), option("used", "Б/у")], true), text("model", "Модель / характеристики")],
   property: [select("deal", "Тип сделки", [option("sale", "Продажа"), option("rent", "Долгосрочная аренда"), option("daily", "Посуточная аренда")], true), select("propertyType", "Тип объекта", [option("flat", "Квартира"), option("house", "Дом"), option("room", "Комната"), option("land", "Участок"), option("commercial", "Коммерческая недвижимость"), option("garage", "Гараж / паркинг")], true), number("rooms", "Количество комнат"), number("area", "Площадь", "м²", true), number("floor", "Этаж"), number("floors", "Этажность дома"), select("condition", "Состояние", [option("new", "Новостройка"), option("good", "Хорошее"), option("repair", "Требует ремонта")])],
   job: [select("employment", "Тип занятости", [option("full", "Полная"), option("part", "Частичная"), option("temporary", "Временная"), option("internship", "Стажировка")], true), select("schedule", "График", [option("5-2", "5/2"), option("2-2", "2/2"), option("shift", "Вахта"), option("flexible", "Гибкий")]), select("experience", "Опыт", [option("none", "Без опыта"), option("1", "От 1 года"), option("3", "От 3 лет"), option("6", "От 6 лет")]), checkbox("remote", "Удалённая работа"), select("payPeriod", "Период оплаты", [option("month", "В месяц"), option("shift", "За смену"), option("hour", "За час")])],
@@ -67,7 +74,7 @@ export const categoryTree: CategoryNode[] = [
     slug: "transport", name: t("Транспорт", "Көлік"), icon: "car", tone: "blue", attributeSet: "car",
     searchPlaceholder: t("Марка, модель или вид транспорта", "Көлік маркасы, моделі немесе түрі"), titlePlaceholder: t("Например, Toyota Camry 2020"), descriptionHint: t("Укажите состояние, пробег, комплектацию и историю обслуживания."),
     children: [
-      group("cars", "Легковые автомобили", "Жеңіл автомобильдер", [leaf("cars-sedan", "Седаны", "car"), leaf("cars-suv", "Кроссоверы и внедорожники", "car"), leaf("cars-hatchback", "Хэтчбеки", "car"), leaf("cars-wagon", "Универсалы", "car"), leaf("cars-minivan", "Минивэны", "car"), leaf("cars-pickup", "Пикапы", "car")], "car"),
+      group("cars", "Легковые автомобили", "Жеңіл автомобильдер", [leaf("cars-sedan", "Седаны", "car"), leaf("cars-suv", "Кроссоверы и внедорожники", "car"), leaf("cars-hatchback", "Хэтчбеки", "car"), leaf("cars-wagon", "Универсалы", "car"), leaf("cars-minivan", "Минивэны", "car"), leaf("cars-coupe", "Купе", "car"), leaf("cars-cabriolet", "Кабриолеты", "car"), leaf("cars-pickup", "Пикапы", "car")], "car"),
       group("motorcycles", "Мотоциклы и мототехника", "Мотоциклдер", [leaf("road-motorcycles", "Дорожные мотоциклы", "moto"), leaf("scooters", "Скутеры и мопеды", "moto"), leaf("atv", "Квадроциклы и багги", "moto"), leaf("snowmobiles", "Снегоходы", "moto")], "moto"),
       group("commercial-transport", "Коммерческий транспорт", "Коммерциялық көлік", [leaf("trucks", "Грузовые автомобили", "car"), leaf("buses", "Автобусы", "car"), leaf("minibuses", "Микроавтобусы", "car"), leaf("trailers", "Прицепы и полуприцепы", "goods")]),
       group("special-transport", "Спецтехника", "Арнайы техника", [leaf("construction-machinery", "Строительная техника", "business"), leaf("road-machinery", "Дорожная техника", "business"), leaf("warehouse-machinery", "Погрузчики и складская техника", "business"), leaf("municipal-machinery", "Коммунальная техника", "business")]),
@@ -143,10 +150,38 @@ export const categoryOptions = [...categoryIndex.values()].map(({ node, parent, 
   parentSlug: parent?.slug,
   rootSlug: root.slug,
   depth: getCategoryPath(node.slug).length - 1,
+  hasChildren: Boolean(node.children?.length),
+  path: getCategoryPath(node.slug).map((item) => item.slug),
+}));
+export type CategoryReference = {
+  id: string;
+  parentId: string | null;
+  slug: string;
+  nameRu: string;
+  nameKk: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+/**
+ * Database-ready reference projection. The UI consumes the tree above today;
+ * Supabase can later return the same parent-child contract without changing selectors.
+ */
+export const categoryReferences: CategoryReference[] = categoryOptions.map((item, index) => ({
+  id: item.slug,
+  parentId: item.parentSlug ?? null,
+  slug: item.slug,
+  nameRu: item.name.ru,
+  nameKk: item.name.kk,
+  sortOrder: index,
+  isActive: true,
 }));
 export function getCategoryBySlug(slug?: string | null) { return slug ? categoryIndex.get(slug)?.node : undefined; }
 export function getCategoryRoot(slug?: string | null) { return slug ? categoryIndex.get(slug)?.root : undefined; }
 export function getCategoryParent(slug?: string | null) { return slug ? categoryIndex.get(slug)?.parent : undefined; }
+export function getCategoryChildren(parentSlug?: string | null) {
+  return parentSlug ? getCategoryBySlug(parentSlug)?.children ?? [] : categoryTree;
+}
 export function getCategoryPath(slug?: string | null) {
   const path: CategoryNode[] = [];
   let current = slug ? categoryIndex.get(slug) : undefined;
@@ -163,6 +198,45 @@ export function getCategoryAttributes(slug?: string | null): AttributeDefinition
     current = current.parent ? categoryIndex.get(current.parent.slug) : undefined;
   }
   return attributeSets.goods;
+}
+export function getCategoryPresentation(slug?: string | null) {
+  let current = slug ? categoryIndex.get(slug) : undefined;
+  let searchPlaceholder: LocalizedText | undefined;
+  let titlePlaceholder: LocalizedText | undefined;
+  let descriptionHint: LocalizedText | undefined;
+  let priceMode: CategoryNode["priceMode"];
+  while (current) {
+    searchPlaceholder ??= current.node.searchPlaceholder;
+    titlePlaceholder ??= current.node.titlePlaceholder;
+    descriptionHint ??= current.node.descriptionHint;
+    priceMode ??= current.node.priceMode;
+    current = current.parent ? categoryIndex.get(current.parent.slug) : undefined;
+  }
+  return { searchPlaceholder, titlePlaceholder, descriptionHint, priceMode: priceMode ?? "price" };
+}
+export function getCategoryDescendantSlugs(slug?: string | null): string[] {
+  const root = getCategoryBySlug(slug);
+  if (!root) return [];
+  const descendants: string[] = [];
+  const visit = (node: CategoryNode) => {
+    descendants.push(node.slug);
+    node.children?.forEach(visit);
+  };
+  visit(root);
+  return descendants;
+}
+export function isCategoryWithin(candidateSlug: string, selectedSlug?: string | null) {
+  return !selectedSlug || getCategoryPath(candidateSlug).some((item) => item.slug === selectedSlug);
+}
+export function searchCategoryOptions(query: string, limit = 40) {
+  const normalized = query.trim().toLocaleLowerCase("ru");
+  if (!normalized) return [];
+  return categoryOptions
+    .filter((item) => {
+      const path = getCategoryPath(item.slug).map((node) => `${node.name.ru} ${node.name.kk}`).join(" ");
+      return path.toLocaleLowerCase("ru").includes(normalized);
+    })
+    .slice(0, limit);
 }
 export function getCategoryByName(name?: string | null) {
   if (!name) return undefined;

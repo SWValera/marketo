@@ -16,12 +16,16 @@ export type ListingSummary = {
   categorySlug: string;
   cityId: string;
   promoted: boolean;
+  /** Category-defined values returned by the listing repository when available. */
+  attributes?: Record<string, string | number | boolean>;
 };
 
 export type ListingDetail = ListingSummary & {
   description: string;
   attributes: Record<string, string | number | boolean>;
   sellerId: string;
+  /** Public contact returned only when the listing access policy allows it. */
+  contactPhone?: string | null;
 };
 
 export type Profile = {
