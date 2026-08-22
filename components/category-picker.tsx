@@ -3,29 +3,40 @@
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "@/components/i18n-provider";
+import { localize } from "@/lib/i18n/config";
 import {
+  createCategoryCatalogView,
   getCategoryBySlug,
   getCategoryChildren,
   getCategoryParent,
   getCategoryPath,
-  searchCategoryOptions,
-} from "@/lib/catalog-config";
-import { useI18n } from "@/components/i18n-provider";
-import { localize } from "@/lib/i18n/config";
+  searchCategoryReferences,
+} from "@/lib/reference-data/catalog";
+import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/reference-data/types";
 
-export function CategoryPicker({ value, onChange }: { value: string; onChange: (slug: string) => void }) {
+export function CategoryPicker({
+  value,
+  onChange,
+  catalog,
+}: {
+  value: string;
+  onChange: (slug: string) => void;
+  catalog: ReferenceDataEnvelope<CategoryReferenceData>;
+}) {
   const { locale, t } = useI18n();
+  const view = useMemo(() => createCategoryCatalogView(catalog.data), [catalog.data]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [parentSlug, setParentSlug] = useState<string | null>(null);
-  const selected = getCategoryBySlug(value);
-  const selectedPath = getCategoryPath(value);
-  const currentParent = getCategoryBySlug(parentSlug);
-  const currentItems = getCategoryChildren(parentSlug);
-  const searchResults = useMemo(() => searchCategoryOptions(query), [query]);
+  const selected = getCategoryBySlug(view, value);
+  const selectedPath = getCategoryPath(view, value);
+  const currentParent = getCategoryBySlug(view, parentSlug);
+  const currentItems = getCategoryChildren(view, parentSlug);
+  const searchResults = useMemo(() => searchCategoryReferences(view, query), [query, view]);
 
   function openPicker() {
-    const selectedParent = getCategoryParent(value);
+    const selectedParent = getCategoryParent(view, value);
     setParentSlug(selectedParent?.slug ?? null);
     setQuery("");
     setOpen(true);
@@ -37,9 +48,9 @@ export function CategoryPicker({ value, onChange }: { value: string; onChange: (
   }
 
   function choose(slug: string) {
-    const item = getCategoryBySlug(slug);
+    const item = getCategoryBySlug(view, slug);
     if (!item) return;
-    if (item.children?.length) {
+    if (getCategoryChildren(view, item).length > 0) {
       setParentSlug(item.slug);
       setQuery("");
       return;
@@ -50,7 +61,7 @@ export function CategoryPicker({ value, onChange }: { value: string; onChange: (
 
   function goBack() {
     setQuery("");
-    setParentSlug(getCategoryParent(parentSlug)?.slug ?? null);
+    setParentSlug(getCategoryParent(view, parentSlug)?.slug ?? null);
   }
 
   useEffect(() => {
@@ -65,7 +76,7 @@ export function CategoryPicker({ value, onChange }: { value: string; onChange: (
     };
   }, [open]);
 
-  const visibleItems = query.trim() ? searchResults.map((item) => getCategoryBySlug(item.slug)!).filter(Boolean) : currentItems;
+  const visibleItems = query.trim() ? searchResults : currentItems;
 
   return <>
     <button type="button" className="category-picker-trigger" onClick={openPicker} aria-haspopup="dialog">
@@ -90,19 +101,20 @@ export function CategoryPicker({ value, onChange }: { value: string; onChange: (
             <Search size={19} />
             <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("categories.search")} />
           </label>
-          {!query && parentSlug ? <div className="category-level-path">{getCategoryPath(parentSlug).map((item) => <span key={item.slug}>{localize(item.name, locale)}</span>)}</div> : null}
+          {!query && parentSlug ? <div className="category-level-path">{getCategoryPath(view, parentSlug).map((item) => <span key={item.id}>{localize(item.name, locale)}</span>)}</div> : null}
           <div className="category-picker-results" role="listbox" aria-label={t("categories.choose")}>{visibleItems.map((item) => {
-            const path = getCategoryPath(item.slug);
-            const hasChildren = Boolean(item.children?.length);
-            return <button type="button" role="option" aria-selected={item.slug === value} className={item.slug === value ? "selected" : ""} key={item.slug} onClick={() => choose(item.slug)}>
+            const path = getCategoryPath(view, item);
+            const children = getCategoryChildren(view, item);
+            const hasChildren = children.length > 0;
+            return <button type="button" role="option" aria-selected={item.slug === value} className={item.slug === value ? "selected" : ""} key={item.id} onClick={() => choose(item.slug)}>
               <span>
                 <strong>{localize(item.name, locale)}</strong>
-                {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.sections", { count: item.children?.length ?? 0 })}</small> : <small>{t("categories.exact")}</small>}
+                {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.sections", { count: children.length })}</small> : <small>{t("categories.exact")}</small>}
               </span>
               {item.slug === value ? <Check size={18} /> : hasChildren ? <ChevronRight size={19} /> : null}
             </button>;
           })}</div>
-          {visibleItems.length === 0 ? <div className="category-picker-empty">{t("categories.notFound")}</div> : null}
+          {visibleItems.length === 0 ? <div className="category-picker-empty">{catalog.status === "ready" ? t("categories.notFound") : t("reference.categoriesUnavailable")}</div> : null}
         </section>
       </div>,
       document.body,

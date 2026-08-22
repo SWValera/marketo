@@ -3,17 +3,15 @@
 import Link from "next/link";
 import { Bell, Heart, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { allSearchPlaceholder } from "@/lib/catalog-config";
 import { LocationPicker } from "@/components/location-picker";
 import { PwaInstall } from "@/components/pwa-install";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/i18n-provider";
-import { localize } from "@/lib/i18n/config";
 
 export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: string; searchPlaceholder?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { locale, t } = useI18n();
-  const placeholder = searchPlaceholder ?? localize(allSearchPlaceholder, locale);
+  const { t } = useI18n();
+  const placeholder = searchPlaceholder ?? t("header.searchPlaceholder");
 
   useEffect(() => {
     if (!menuOpen) return;

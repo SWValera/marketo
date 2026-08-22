@@ -3,9 +3,15 @@
 import { Check, ChevronDown, MapPin, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { getRegion, getSettlement, popularSettlements, regions, settlements } from "@/lib/geography";
 import { useI18n } from "@/components/i18n-provider";
+import { useReferenceGeography } from "@/components/reference-geography-provider";
 import { localize } from "@/lib/i18n/config";
+import {
+  getFeaturedSettlements,
+  getRegion,
+  getSettlement,
+  searchSettlements,
+} from "@/lib/reference-data/geography";
 
 const LOCATION_STORAGE_KEY = "marketo-location";
 const LOCATION_EVENT = "marketo:location-change";
@@ -20,12 +26,14 @@ function subscribeToLocation(callback: () => void) {
 }
 
 function readStoredLocation() {
-  const stored = window.localStorage.getItem(LOCATION_STORAGE_KEY);
-  return stored && (stored === "all" || getSettlement(stored)) ? stored : "all";
+  return window.localStorage.getItem(LOCATION_STORAGE_KEY) || "all";
 }
 
 export function useStoredLocation() {
-  return useSyncExternalStore(subscribeToLocation, readStoredLocation, () => "all");
+  const { data } = useReferenceGeography();
+  const stored = useSyncExternalStore(subscribeToLocation, readStoredLocation, () => "all");
+  if (stored === "all") return stored;
+  return getSettlement(data, stored)?.id ?? "all";
 }
 
 export function LocationPicker({
@@ -42,9 +50,11 @@ export function LocationPicker({
   className?: string;
 }) {
   const { locale, t } = useI18n();
-  const fallback = allowAll ? "all" : "almaty";
+  const geography = useReferenceGeography();
   const storedSelection = useStoredLocation();
-  const selected = value ?? (storedSelection === "all" ? fallback : storedSelection);
+  const requestedSelection = value ?? storedSelection;
+  const requestedSettlement = getSettlement(geography.data, requestedSelection);
+  const selected = requestedSelection === "all" && allowAll ? "all" : requestedSettlement?.id ?? "";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -60,23 +70,27 @@ export function LocationPicker({
     };
   }, [open]);
 
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase("ru");
-    if (!normalized) return settlements;
-    return settlements.filter((item) => {
-      const region = getRegion(item.regionId);
-      return `${item.name.ru} ${item.name.kk} ${region?.name.ru ?? ""} ${region?.name.kk ?? ""}`.toLocaleLowerCase("ru").includes(normalized);
-    });
-  }, [query]);
+  const filtered = useMemo(
+    () => searchSettlements(geography.data, query),
+    [geography.data, query],
+  );
+  const featured = useMemo(
+    () => getFeaturedSettlements(geography.data),
+    [geography.data],
+  );
 
-  const selectedSettlement = getSettlement(selected);
-  const displayName = selected === "all" ? t("common.allKazakhstan") : selectedSettlement ? localize(selectedSettlement.name, locale) : t("location.choose");
+  const selectedSettlement = getSettlement(geography.data, selected);
+  const displayName = selected === "all"
+    ? t("common.allKazakhstan")
+    : selectedSettlement
+      ? localize(selectedSettlement.name, locale)
+      : t("location.choose");
 
-  function choose(cityId: string) {
-    onChange?.(cityId);
-    if (!value) {
-      window.localStorage.setItem(LOCATION_STORAGE_KEY, cityId);
-      window.dispatchEvent(new CustomEvent(LOCATION_EVENT, { detail: cityId }));
+  function choose(settlementId: string) {
+    onChange?.(settlementId);
+    if (value === undefined) {
+      window.localStorage.setItem(LOCATION_STORAGE_KEY, settlementId);
+      window.dispatchEvent(new CustomEvent(LOCATION_EVENT, { detail: settlementId }));
     }
     setOpen(false);
     setQuery("");
@@ -92,14 +106,14 @@ export function LocationPicker({
           <section className="location-sheet" role="dialog" aria-modal="true" aria-labelledby="location-title" onMouseDown={(event) => event.stopPropagation()}>
             <header><div><span className="section-kicker">{t("common.kazakhstan")}</span><h2 id="location-title">{t("location.choose")}</h2><p>{t("location.searchHelp")}</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label={t("location.close")}><X size={21} /></button></header>
             <label className="location-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("location.searchPlaceholder")} /></label>
-            {!query && <div className="popular-locations"><strong>{t("location.popular")}</strong><div>{popularSettlements.map((item) => <button type="button" key={item.id} onClick={() => choose(item.id)}>{localize(item.name, locale)}</button>)}</div></div>}
-            {allowAll && !query && <button type="button" className={`location-all ${selected === "all" ? "selected" : ""}`} onClick={() => choose("all")}><span><MapPin size={19} />{t("common.allKazakhstan")}</span>{selected === "all" && <Check size={18} />}</button>}
+            {!query && featured.length > 0 ? <div className="popular-locations"><strong>{t("location.popular")}</strong><div>{featured.map((item) => <button type="button" key={item.id} onClick={() => choose(item.id)}>{localize(item.name, locale)}</button>)}</div></div> : null}
+            {allowAll && !query ? <button type="button" className={`location-all ${selected === "all" ? "selected" : ""}`} onClick={() => choose("all")}><span><MapPin size={19} />{t("common.allKazakhstan")}</span>{selected === "all" && <Check size={18} />}</button> : null}
             <div className="location-results" role="listbox" aria-label={t("location.citiesAria")}>
               {filtered.map((item) => {
-                const region = getRegion(item.regionId);
-                return <button type="button" role="option" aria-selected={selected === item.id} className={selected === item.id ? "selected" : ""} key={`${item.regionId}-${item.id}`} onClick={() => choose(item.id)}><span><strong>{localize(item.name, locale)}</strong><small>{region ? localize(region.name, locale) : ""}</small></span>{selected === item.id && <Check size={18} />}</button>;
+                const region = getRegion(geography.data, item.regionId);
+                return <button type="button" role="option" aria-selected={selected === item.id} className={selected === item.id ? "selected" : ""} key={item.id} onClick={() => choose(item.id)}><span><strong>{localize(item.name, locale)}</strong><small>{region ? localize(region.name, locale) : ""}</small></span>{selected === item.id && <Check size={18} />}</button>;
               })}
-              {filtered.length === 0 && <div className="location-empty">{t("location.notFound")}</div>}
+              {filtered.length === 0 ? <div className="location-empty">{geography.status === "ready" ? t("location.notFound") : t("reference.geographyUnavailable")}</div> : null}
             </div>
             <footer>{t("location.source")}</footer>
           </section>
@@ -109,5 +123,3 @@ export function LocationPicker({
     </>
   );
 }
-
-export { regions };

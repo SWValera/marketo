@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
-import { categoryOptions } from "@/lib/catalog-config";
+import { createCategoryCatalogView, getCategoryDepth } from "@/lib/reference-data/catalog";
+import { getCategoryReferences } from "@/lib/reference-data/server";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = "https://marketo.kz";
+  const catalog = await getCategoryReferences();
+  const view = createCategoryCatalogView(catalog.data);
   return [
     { url: base, changeFrequency: "daily", priority: 1 },
     { url: `${base}/categories`, changeFrequency: "weekly", priority: 0.9 },
-    ...categoryOptions.map((category) => ({ url: `${base}/category/${category.slug}`, changeFrequency: "daily" as const, priority: category.depth === 0 ? 0.8 : 0.7 })),
+    ...view.items.map((category) => ({ url: `${base}/category/${category.slug}`, changeFrequency: "daily" as const, priority: getCategoryDepth(view, category) === 0 ? 0.8 : 0.7 })),
   ];
 }

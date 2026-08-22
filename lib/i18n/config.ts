@@ -1,6 +1,6 @@
-import type { LocalizedText } from "@/lib/catalog-config";
-import type { LocalizedName } from "@/lib/geography";
 import type { Locale } from "@/lib/i18n/messages";
+
+export type LocalizedValue = { ru: string; kk: string };
 
 export const DEFAULT_LOCALE: Locale = "ru";
 export const LOCALE_COOKIE = "marketo-locale";
@@ -11,7 +11,7 @@ export function normalizeLocale(value: string | null | undefined): Locale {
   return value === "kk" ? "kk" : DEFAULT_LOCALE;
 }
 
-export function localize(value: LocalizedText | LocalizedName | undefined, locale: Locale) {
+export function localize(value: LocalizedValue | null | undefined, locale: Locale) {
   if (!value) return "";
   return value[locale] || value.ru;
 }

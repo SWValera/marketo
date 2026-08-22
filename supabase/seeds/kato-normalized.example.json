@@ -1,0 +1,15 @@
+[
+  {
+    "katoCode": "REPLACE_WITH_OFFICIAL_CODE",
+    "parentKatoCode": null,
+    "regionCode": "akmola",
+    "slug": "reviewed-stable-slug",
+    "nameRu": "Название из официального справочника",
+    "nameKk": "Ресми анықтамалықтағы атауы",
+    "kind": "district",
+    "isSelectable": false,
+    "isActive": true,
+    "sortOrder": 10,
+    "sourceUpdatedAt": "2026-07-17"
+  }
+]

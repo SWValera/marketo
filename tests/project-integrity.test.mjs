@@ -50,7 +50,7 @@ test("PWA install always opens on explicit iPhone or Android choice", async () =
   assert.match(source, /pwa\.androidStandaloneNote/);
 });
 
-test("Kazakhstan geography is a nationwide typed reference", async () => {
+test("Kazakhstan geography provides a nationwide region and major-city bootstrap", async () => {
   const { KAZAKHSTAN, regions, settlements } = await import(new URL("lib/geography.ts", root));
   assert.equal(KAZAKHSTAN.iso2, "KZ");
   assert.equal(KAZAKHSTAN.currency, "KZT");
@@ -95,21 +95,49 @@ test("category tree covers marketplace sections and context-specific attributes"
   }
 });
 
-test("mobile category selection renders one level and catalog filters share the same tree", async () => {
+test("mobile category selection renders one Supabase-backed level and catalog filters share the same tree", async () => {
   const picker = await readFile(new URL("components/category-picker.tsx", root), "utf8");
   const cascade = await readFile(new URL("components/category-cascade.tsx", root), "utf8");
   const catalog = await readFile(new URL("components/catalog-client.tsx", root), "utf8");
-  assert.match(picker, /getCategoryChildren\(parentSlug\)/);
-  assert.match(picker, /searchCategoryOptions\(query\)/);
-  assert.match(picker, /item\.children\?\.length[\s\S]*setParentSlug\(item\.slug\)/);
+  assert.match(picker, /getCategoryChildren\(view, parentSlug\)/);
+  assert.match(picker, /searchCategoryReferences\(view, query\)/);
+  assert.match(picker, /getCategoryChildren\(view, item\)\.length > 0[\s\S]*setParentSlug\(item\.slug\)/);
   assert.doesNotMatch(picker, /categoryOptions\.map|item\.depth|paddingLeft/);
-  assert.match(cascade, /categoryTree\.map/);
-  assert.match(cascade, /parent\.children\.map/);
+  assert.match(cascade, /getRootCategories\(view\)/);
+  assert.match(cascade, /getCategoryChildren\(view, parent\)/);
   assert.match(catalog, /<CategoryCascade/);
-  assert.match(catalog, /isCategoryWithin\(item\.categorySlug, categorySlug\)/);
+  assert.match(catalog, /isCategoryWithin\(catalogView, item\.categorySlug, categorySlug\)/);
   assert.match(catalog, /item\.attributes\?\.\[key\]/);
   assert.match(catalog, /params\.set\(`f_\$\{key\}`/);
   assert.match(catalog, /document\.body\.style\.overflow = "hidden"/);
+});
+
+test("application UI reads reference data through Supabase adapters, never seed modules", async () => {
+  const sourceFiles = [
+    "app/page.tsx",
+    "app/categories/page.tsx",
+    "app/search/page.tsx",
+    "app/category/[slug]/page.tsx",
+    "app/publish/page.tsx",
+    "components/catalog-client.tsx",
+    "components/category-cascade.tsx",
+    "components/category-picker.tsx",
+    "components/location-picker.tsx",
+    "components/publish-form.tsx",
+  ];
+  for (const file of sourceFiles) {
+    const source = await readFile(new URL(file, root), "utf8");
+    assert.doesNotMatch(source, /@\/lib\/(?:catalog-config|geography)/, file);
+  }
+  const server = await readFile(new URL("lib/reference-data/server.ts", root), "utf8");
+  const geographyQueries = await readFile(new URL("lib/data/supabase/geography.ts", root), "utf8");
+  const categoryQueries = await readFile(new URL("lib/data/supabase/categories.ts", root), "utf8");
+  const attributeRoute = await readFile(new URL("app/api/reference/categories/[id]/attributes/route.ts", root), "utf8");
+  for (const table of ["countries", "regions", "settlements"]) assert.match(geographyQueries, new RegExp(`from\\(\"${table}\"\\)`));
+  for (const table of ["categories", "category_attributes", "category_attribute_options"]) assert.match(categoryQueries, new RegExp(`from\\(\"${table}\"\\)`));
+  assert.match(server, /createSupabasePublicServerClient/);
+  assert.match(attributeRoute, /getCategoryAttributeReferences/);
+  assert.doesNotMatch([server, geographyQueries, categoryQueries, attributeRoute].join("\n"), /service_role|SUPABASE_SECRET_KEY|createSupabaseAdminClient/i);
 });
 
 test("home search and primary mobile calls to action navigate to real routes", async () => {
@@ -142,12 +170,12 @@ test("Russian and Kazakh dictionaries stay type-aligned and locale preference is
   const layout = await readFile(new URL("app/layout.tsx", root), "utf8");
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
   const provider = await readFile(new URL("components/i18n-provider.tsx", root), "utf8");
-  const migration = await readFile(new URL("supabase/migrations/0001_marketo_core.sql", root), "utf8");
+  const migration = await readFile(new URL("supabase/migrations/0003_profiles_and_roles.sql", root), "utf8");
   assert.match(layout, /<html lang=\{locale\}>/);
   assert.match(header, /<LanguageSwitcher compact/);
   assert.match(provider, /Max-Age=31536000/);
   assert.match(provider, /router\.refresh\(\)/);
-  assert.match(migration, /language text not null default 'ru'/);
+  assert.match(migration, /language_code varchar\(10\) not null default 'ru'/);
 });
 
 test("user-data repositories are honest empty adapters and mock modules are absent", async () => {
@@ -180,19 +208,38 @@ test("production CSS has shared mobile primitives and no compiled webfonts", asy
   assert.match(source, /select[\s\S]{0,180}appearance:\s*none/);
 });
 
-test("shell helpers do not depend on executable bits", async () => {
-  for (const file of ["build-verified.sh", "install-ci.sh", "validate-artifact.sh"]) {
-    const source = await readFile(new URL(`scripts/${file}`, root), "utf8");
-    assert.match(source, /source "\$\{script_dir\}\/sites-env\.sh"/);
-    assert.doesNotMatch(source, /^\s*(?:exec\s+)?"\$\{script_dir\}\/sites-env\.sh"/m);
-  }
-  const build = await readFile(new URL("scripts/build-verified.sh", root), "utf8");
-  assert.match(build, /bash "\$\{script_dir\}\/validate-artifact\.sh"/);
+test("npm build chain is cross-platform and independent of shell scripts", async () => {
   const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
-  for (const command of Object.values(pkg.scripts)) if (/\.sh\b/.test(command)) assert.match(command, /^(?:bash|source|\.)\s/);
-  for (const file of ["build-verified.sh", "install-ci.sh", "sites-env.sh", "validate-artifact.sh"]) {
-    const source = await readFile(new URL(`scripts/${file}`, root), "utf8");
-    for (const line of source.split("\n").filter((item) => /"\$\{script_dir\}\/[^\s"]+\.sh"/.test(item))) assert.match(line, /\b(?:source|bash)\s+"\$\{script_dir\}\//);
+  const expectedScripts = {
+    "install:ci": "node scripts/install-ci.mjs",
+    build: "node scripts/build-verified.mjs",
+    test: "node scripts/test.mjs",
+    "validate:artifact": "node scripts/validate-artifact.mjs",
+  };
+  for (const [name, command] of Object.entries(expectedScripts)) assert.equal(pkg.scripts[name], command);
+  for (const [name, command] of Object.entries(pkg.scripts)) {
+    assert.doesNotMatch(command, /(?:^|\s)(?:bash|sh|source)(?:\s|$)|\.sh\b|&&|\|\||tests\/\*/, `${name} must not require a POSIX shell`);
+  }
+  for (const file of ["build-verified.mjs", "install-ci.mjs", "run-with-sites-env.mjs", "test.mjs", "validate-artifact.mjs", "lib/sites-runtime.mjs"]) {
+    await access(new URL(`scripts/${file}`, root));
+  }
+  const runtime = await readFile(new URL("scripts/lib/sites-runtime.mjs", root), "utf8");
+  const installer = await readFile(new URL("scripts/install-ci.mjs", root), "utf8");
+  const build = await readFile(new URL("scripts/build-verified.mjs", root), "utf8");
+  assert.match(runtime, /WRANGLER_LOG_PATH/);
+  assert.match(runtime, /npm_config_cache/);
+  assert.match(installer, /integrity/);
+  assert.match(installer, /install\.lock/);
+  assert.match(build, /SITES_BUILD_TIMEOUT/);
+});
+
+test("local runtime scripts set Wrangler logging cross-platform", async () => {
+  const pkg = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
+  assert.equal(pkg.devDependencies["cross-env"], "10.1.0");
+  assert.match(pkg.scripts.dev, /^cross-env WRANGLER_LOG_PATH=\S+ vite$/);
+  assert.match(pkg.scripts.start, /^cross-env WRANGLER_LOG_PATH=\S+ vinext start$/);
+  for (const command of [pkg.scripts.dev, pkg.scripts.start]) {
+    assert.doesNotMatch(command, /^WRANGLER_LOG_PATH=/);
   }
 });
 
@@ -204,4 +251,25 @@ test("Cloudflare compatibility flag has one production source", async () => {
   assert.doesNotMatch(vite, /nodejs_compat|compatibility_flags/);
   assert.deepEqual(generated.compatibility_flags, ["nodejs_compat"]);
   assert.equal(generated.assets.binding, "ASSETS");
+});
+
+test("repository source contains no committed credential values", async () => {
+  const ignoredSegments = new Set([".git", ".next", ".sites-runtime", ".vinext", ".wrangler", "dist", "node_modules"]);
+  const candidates = (await readdir(root, { recursive: true }))
+    .map((name) => name.replaceAll("\\", "/"))
+    .filter((name) => !name.split("/").some((segment) => ignoredSegments.has(segment)))
+    .filter((name) => /(?:^|\/)(?:\.env\.example|[^/]+\.(?:ts|tsx|js|mjs|cjs|json|jsonc|sql|md|sh|yml|yaml))$/.test(name));
+  const credentialPatterns = [
+    /sb_secret_[A-Za-z0-9_-]{20,}/,
+    /eyJ[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/,
+    /postgres(?:ql)?:\/\/[^:\s/]+:[^@\s/]+@/i,
+    /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+    /^(?!\s*#)\s*(?:CLOUDFLARE_API_TOKEN|R2_SECRET_ACCESS_KEY|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|POSTGRES_PASSWORD)\s*=\s*(?![^\r\n]*(?:REPLACE|YOUR_|EXAMPLE|<))[^\r\n]{16,}$/im,
+  ];
+  const unsafeFiles = [];
+  for (const name of candidates) {
+    const source = await readFile(new URL(name, root), "utf8").catch(() => "");
+    if (credentialPatterns.some((pattern) => pattern.test(source))) unsafeFiles.push(name);
+  }
+  assert.deepEqual(unsafeFiles, [], `credential-like values found in: ${unsafeFiles.join(", ")}`);
 });

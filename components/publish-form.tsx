@@ -14,18 +14,27 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { PageHeader } from "@/components/page-header";
 import { CategoryPicker } from "@/components/category-picker";
-import { getCategoryAttributes, getCategoryBySlug, getCategoryPath, getCategoryPresentation } from "@/lib/catalog-config";
+import { useCategoryAttributes } from "@/components/use-category-attributes";
+import {
+  createCategoryCatalogView,
+  getCategoryBySlug,
+  getCategoryPath,
+  getCategoryPresentation,
+  getCategoryRoot,
+} from "@/lib/reference-data/catalog";
+import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/reference-data/types";
 import { useI18n } from "@/components/i18n-provider";
 import { localeTag, localize } from "@/lib/i18n/config";
 
 type PhotoPreview = { name: string; url: string };
 
-export function PublishForm() {
+export function PublishForm({ catalog }: { catalog: ReferenceDataEnvelope<CategoryReferenceData> }) {
   const { locale, t } = useI18n();
+  const catalogView = useMemo(() => createCategoryCatalogView(catalog.data), [catalog.data]);
   const steps = [t("publish.stepCategory"), t("publish.stepDescriptionName"), t("publish.stepPhotos"), t("publish.stepContacts")];
   const [step, setStep] = useState(0);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -43,10 +52,12 @@ export function PublishForm() {
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
 
-  const category = getCategoryBySlug(categorySlug);
-  const categoryAttributes = getCategoryAttributes(categorySlug);
-  const categoryPresentation = getCategoryPresentation(categorySlug);
-  const categoryPath = getCategoryPath(categorySlug);
+  const category = getCategoryBySlug(catalogView, categorySlug);
+  const categoryRoot = getCategoryRoot(catalogView, category);
+  const categoryAttributeState = useCategoryAttributes(category?.id);
+  const categoryAttributes = categoryAttributeState.data.attributes;
+  const categoryPresentation = getCategoryPresentation(catalogView, category);
+  const categoryPath = getCategoryPath(catalogView, category);
   const pageTitle = draftSaved ? t("publish.draftSaved") : t("publish.pageTitle", { step: steps[step] });
 
   useEffect(() => { photosRef.current = photos; }, [photos]);
@@ -66,6 +77,18 @@ export function PublishForm() {
     }
     if (step === 1 && (!title.trim() || !description.trim() || (!price && categoryPresentation.priceMode !== "free" && categoryPresentation.priceMode !== "exchange"))) {
       setError(t("publish.detailsError"));
+      return;
+    }
+    if (step === 1 && categoryAttributeState.status === "loading") {
+      setError(t("reference.attributesLoading"));
+      return;
+    }
+    if (step === 1 && categoryAttributeState.status === "error") {
+      setError(t("reference.attributesUnavailable"));
+      return;
+    }
+    if (step === 1 && categoryAttributes.some((attribute) => attribute.required && !attributes[attribute.key])) {
+      setError(t("publish.requiredAttributesError"));
       return;
     }
     setStep((value) => Math.min(steps.length - 1, value + 1));
@@ -153,7 +176,7 @@ export function PublishForm() {
               <div className="form-grid">
                 <label className="form-field form-field-wide">
                   <span>{t("publish.stepCategory")} <b>*</b></span>
-                  <CategoryPicker value={categorySlug} onChange={(nextSlug) => { setCategorySlug(nextSlug); setAttributes({}); setError(""); }} />
+                  <CategoryPicker value={categorySlug} catalog={catalog} onChange={(nextSlug) => { setCategorySlug(nextSlug); setAttributes({}); setError(""); }} />
                   <small>{t("publish.categoryHint")}</small>
                 </label>
                 <div className="form-field form-field-wide"><span>{t("publish.city")} <b>*</b></span><LocationPicker value={cityId} onChange={setCityOverride} allowAll={false} /><small>{t("publish.cityHint")}</small></div>
@@ -166,8 +189,10 @@ export function PublishForm() {
               <div className="panel-heading"><span><Tag size={22} /></span><div><h2>{category ? t("publish.details", { category: localize(category.name, locale) }) : t("publish.more")}</h2><p>{categoryPresentation.descriptionHint ? localize(categoryPresentation.descriptionHint, locale) : t("publish.moreNote")}</p></div></div>
               <div className="form-grid">
                 <label className="form-field form-field-wide"><span>{t("publish.title")} <b>*</b></span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={categoryPresentation.titlePlaceholder ? localize(categoryPresentation.titlePlaceholder, locale) : t("publish.titlePlaceholder")} maxLength={70} /><small>{t("publish.titleCounter", { count: title.length })}</small></label>
-                {categoryPresentation.priceMode !== "free" && categoryPresentation.priceMode !== "exchange" ? <label className="form-field"><span>{categoryPresentation.priceMode === "salary" ? t("publish.salary") : category?.attributeSet === "service" ? t("publish.priceFrom") : t("publish.price")} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label> : null}
-                {categoryAttributes.map((attribute) => attribute.type === "select" ? <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.required ? " *" : ""}</span><div className="select-wrap"><select value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))}><option value="">{t("common.selectValue")}</option>{attribute.options?.map((option) => <option value={option.value} key={option.value}>{localize(option.label, locale)}</option>)}</select><ChevronDown size={18} /></div></label> : attribute.type === "checkbox" ? <label className="option-row form-field-wide" key={attribute.id}><input type="checkbox" checked={Boolean(attributes[attribute.id])} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.checked }))} /><span><strong>{localize(attribute.label, locale)}</strong><small>{t("publish.applicable")}</small></span></label> : <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attribute.required ? " *" : ""}</span><input inputMode={attribute.type === "number" ? "numeric" : "text"} value={String(attributes[attribute.id] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.id]: event.target.value }))} /></label>)}
+                {categoryPresentation.priceMode !== "free" && categoryPresentation.priceMode !== "exchange" ? <label className="form-field"><span>{categoryPresentation.priceMode === "salary" ? t("publish.salary") : categoryRoot?.slug === "services" ? t("publish.priceFrom") : t("publish.price")} <b>*</b></span><input inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="150 000" /></label> : null}
+                {categoryAttributeState.status === "loading" ? <p className="filter-reference-state form-field-wide">{t("reference.attributesLoading")}</p> : null}
+                {categoryAttributeState.status === "error" ? <p className="filter-reference-state is-error form-field-wide">{t("reference.attributesUnavailable")}</p> : null}
+                {categoryAttributes.map((attribute) => attribute.dataType === "select" || attribute.dataType === "multiselect" ? <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.required ? " *" : ""}</span><div className="select-wrap"><select value={String(attributes[attribute.key] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.key]: event.target.value }))}><option value="">{t("common.selectValue")}</option>{attribute.options.map((option) => <option value={option.value} key={option.id}>{localize(option.label, locale)}</option>)}</select><ChevronDown size={18} /></div></label> : attribute.dataType === "boolean" ? <label className="option-row form-field-wide" key={attribute.id}><input type="checkbox" checked={Boolean(attributes[attribute.key])} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.key]: event.target.checked }))} /><span><strong>{localize(attribute.label, locale)}</strong><small>{t("publish.applicable")}</small></span></label> : <label className="form-field" key={attribute.id}><span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attribute.required ? " *" : ""}</span><input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" || attribute.dataType === "range" ? "number" : "text"} inputMode={attribute.dataType === "number" || attribute.dataType === "range" ? "numeric" : "text"} value={String(attributes[attribute.key] ?? "")} onChange={(event) => setAttributes((current) => ({ ...current, [attribute.key]: event.target.value }))} /></label>)}
                 <label className="form-field form-field-wide"><span>{t("publish.stepDescriptionName")} <b>*</b></span><textarea rows={7} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={categoryPresentation.descriptionHint ? localize(categoryPresentation.descriptionHint, locale) : t("publish.descriptionPlaceholder")} /><small>{t("publish.noPhone")}</small></label>
               </div>
             </div>

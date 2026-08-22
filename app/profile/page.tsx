@@ -4,16 +4,21 @@ import { Bell, ChevronRight, CircleHelp, Heart, LogIn, MapPin, MessageCircle, Pe
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/empty-state";
 import { profileRepository } from "@/lib/data/repositories";
-import { getSettlement } from "@/lib/geography";
 import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
+import { getSettlement } from "@/lib/reference-data/geography";
+import { getGeographyReferences } from "@/lib/reference-data/server";
 
 export const metadata: Metadata = { title: "Профиль", robots: { index: false, follow: false } };
 
 export default async function ProfilePage() {
-  const profile = await profileRepository.current();
-  const { locale, t } = await getServerI18n();
-  const city = profile?.cityId ? getSettlement(profile.cityId) : undefined;
+  const [profile, geography, i18n] = await Promise.all([
+    profileRepository.current(),
+    getGeographyReferences(),
+    getServerI18n(),
+  ]);
+  const { locale, t } = i18n;
+  const city = profile?.cityId ? getSettlement(geography.data, profile.cityId) : undefined;
   const menu = [
     { href: "/favorites", label: t("nav.favorites"), note: t("profile.favoritesNote"), icon: Heart },
     { href: "/messages", label: t("nav.chats"), note: t("profile.chatsNote"), icon: MessageCircle },

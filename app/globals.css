@@ -538,6 +538,8 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .category-cascade { display: grid; gap: 13px; margin-bottom: 16px; }.category-cascade label { display: grid; gap: 7px; color: #344054; font-size: 12px; font-weight: 700; }
 .filters-panel input, .filters-panel select, .catalog-toolbar select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #dfe3e8; border-radius: 10px; outline: none; background: white; color: var(--ink); }
 .filters-panel input:focus, .filters-panel select:focus, .catalog-toolbar select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.filter-reference-state { margin: 0 0 16px; padding: 11px 13px; border: 1px solid #dfe9e2; border-radius: 11px; background: #f5faf6; color: #496255; font-size: 12px; font-weight: 650; }
+.filter-reference-state.is-error { border-color: #f0bcbc; background: #fff4f4; color: #9f2828; }
 .filter-search { display: flex; align-items: center; border: 1px solid #dfe3e8; border-radius: 10px; color: #98a2b3; }
 .filter-search:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
 .filter-search svg { margin-left: 11px; flex: 0 0 auto; }

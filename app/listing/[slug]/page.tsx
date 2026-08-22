@@ -8,10 +8,11 @@ import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 import { PageHeader } from "@/components/page-header";
 import { ListingActions } from "@/components/listing-actions";
-import { getCategoryAttributes, getCategoryBySlug } from "@/lib/catalog-config";
 import { listingRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
+import { createCategoryCatalogView, getCategoryBySlug } from "@/lib/reference-data/catalog";
+import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -23,13 +24,15 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const listing = await listingRepository.findBySlug(slug);
   if (!listing) notFound();
-  const category = getCategoryBySlug(listing.categorySlug);
+  const catalog = await getCategoryReferences();
+  const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), listing.categorySlug);
+  const categoryAttributes = category ? await getCategoryAttributeReferences(category.id) : undefined;
   const { locale, t } = await getServerI18n();
-  const characteristics = getCategoryAttributes(listing.categorySlug).flatMap((attribute) => {
-    const raw = listing.attributes[attribute.id];
+  const characteristics = (categoryAttributes?.data.attributes ?? []).flatMap((attribute) => {
+    const raw = listing.attributes[attribute.key];
     if (raw === undefined || raw === false || raw === "") return [];
-    const option = attribute.options?.find((item) => item.value === raw);
-    const value = attribute.type === "checkbox" ? t("common.yes") : option ? localize(option.label, locale) : String(raw);
+    const option = attribute.options.find((item) => item.value === raw);
+    const value = attribute.dataType === "boolean" ? t("common.yes") : option ? localize(option.label, locale) : String(raw);
     return [{ label: localize(attribute.label, locale), value: `${value}${attribute.unit ? ` ${localize(attribute.unit, locale)}` : ""}` }];
   });
   const fallback = `/category/${listing.categorySlug}`;

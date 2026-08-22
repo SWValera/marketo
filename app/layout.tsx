@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { PwaRuntime } from "@/components/pwa-runtime";
 import { NavigationHistory } from "@/components/navigation-history";
 import { I18nProvider } from "@/components/i18n-provider";
+import { ReferenceGeographyProvider } from "@/components/reference-geography-provider";
 import { getLocale, getServerI18n } from "@/lib/i18n/server";
+import { getGeographyReferences } from "@/lib/reference-data/server";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,6 +38,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#16a34a" };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const locale = await getLocale();
-  return <html lang={locale}><body><I18nProvider initialLocale={locale}>{children}<NavigationHistory /><PwaRuntime /></I18nProvider></body></html>;
+  const [locale, geography] = await Promise.all([getLocale(), getGeographyReferences()]);
+  return <html lang={locale}><body><I18nProvider initialLocale={locale}><ReferenceGeographyProvider value={geography}>{children}<NavigationHistory /><PwaRuntime /></ReferenceGeographyProvider></I18nProvider></body></html>;
 }
