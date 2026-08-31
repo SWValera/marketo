@@ -4,10 +4,19 @@ import { getServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
 export const dynamic = "force-dynamic";
 
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function GET() {
   try {
     const { url, publishableKey } = getServerSupabasePublicConfig();
     const endpoint = `${url}/rest/v1/categories?select=id,slug,name_ru&is_active=eq.true&limit=1`;
+    const keyFingerprint = {
+      length: publishableKey.length,
+      sha256: await sha256(publishableKey),
+    };
 
     let nativeFetch: unknown;
     try {
@@ -62,6 +71,7 @@ export async function GET() {
     return NextResponse.json(
       {
         projectHost: new URL(url).hostname,
+        keyFingerprint,
         nativeFetch,
         supabaseJs,
       },
