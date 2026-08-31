@@ -1,5 +1,10 @@
 # Marketo v1.0 — финальный аудит Supabase foundation
 
+> Исторический snapshot от 21 августа 2026 года. Все статусы, числа и выводы
+> ниже относятся только к той дате. Актуальное локальное состояние 2026-08-28
+> описано в `docs/RECOVERY_STATE_AUDIT_2026-08-28.md`,
+> `docs/SUPABASE_ARCHITECTURE.md` и `supabase/MIGRATION_MANIFEST.md`.
+
 Дата: 21 августа 2026 года  
 Область проверки: локальная кодовая база и чистая PostgreSQL-совместимая тестовая БД.  
 Удалённый production Supabase: **NOT EXECUTED / НЕ ИЗМЕНЯЛСЯ**.  
@@ -363,4 +368,3 @@ SQL digests: `supabase/CHECKSUMS.sha256`.
 **только** `supabase/migrations/0001_extensions_and_helpers.sql`, проверить, что
 транзакция завершилась без ошибки, и остановиться. Не запускать 0002–0012 и seed
 до проверки результата первой migration.
-

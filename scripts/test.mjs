@@ -21,7 +21,12 @@ async function main() {
     .map((name) => join(testDirectory, name));
   if (testFiles.length === 0) throw new Error("No test files were found.");
 
-  await runProcess(process.execPath, ["--test", ...testFiles], {
+  await runProcess(process.execPath, [
+    "--import",
+    new URL("./lib/register-cloudflare-node-shim.mjs", import.meta.url).href,
+    "--test",
+    ...testFiles,
+  ], {
     environment,
     cwd: projectRoot,
     label: "Node test suite",

@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "Marketo",
     },
     robots: { index: true, follow: true },
-    manifest: "/manifest.webmanifest",
+    manifest: "https://marketo.arshavin-ivan-mail-ru.workers.dev/manifest.webmanifest",
     appleWebApp: { capable: true, title: "Marketo", statusBarStyle: "default" },
     icons: {
       icon: [

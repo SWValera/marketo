@@ -82,6 +82,7 @@ export type CategoryAttributeDataType =
 export type ReferenceAttributeOption = {
   id: string;
   attributeId: string;
+  parentOptionId: string | null;
   value: string;
   label: LocalizedText;
   sortOrder: number;
@@ -99,6 +100,10 @@ export type ReferenceCategoryAttribute = {
   searchable: boolean;
   inheritsToChildren: boolean;
   validation: unknown;
+  filterMode: "exact" | "range" | "search";
+  optionsLoadMode: "eager" | "deferred";
+  dependsOnKey: string | null;
+  visible: boolean;
   sortOrder: number;
   options: ReferenceAttributeOption[];
 };

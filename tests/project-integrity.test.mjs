@@ -44,10 +44,18 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
 
 test("PWA install always opens on explicit iPhone or Android choice", async () => {
   const source = await readFile(new URL("components/pwa-install.tsx", root), "utf8");
+  const { messages } = await import(new URL("lib/i18n/messages.ts", root));
   assert.match(source, /const showInstall[\s\S]*setChoice\(null\)[\s\S]*setOpen\(true\)/);
   assert.match(source, /setChoice\("ios"\)/);
   assert.match(source, /setChoice\("android"\)/);
   assert.match(source, /pwa\.androidStandaloneNote/);
+  for (const platform of ["iphone", "android"]) {
+    for (let step = 1; step <= 6; step += 1) assert.match(source, new RegExp(`pwa\\.${platform}Step${step}`));
+  }
+  assert.match(messages.ru["pwa.iphoneNote"], /WhatsApp.*Telegram.*Safari/);
+  assert.match(messages.kk["pwa.iphoneNote"], /WhatsApp.*Telegram.*Safari/);
+  assert.match(messages.ru["pwa.androidStep2"], /⋮.*правом верхнем углу/);
+  assert.match(messages.kk["pwa.androidStep2"], /жоғарғы оң жақ.*⋮/);
 });
 
 test("Kazakhstan geography provides a nationwide region and major-city bootstrap", async () => {
@@ -79,7 +87,7 @@ test("category tree covers marketplace sections and context-specific attributes"
   assert.deepEqual(catalog.getCategoryChildren("cars").map((item) => item.slug).slice(0, 2), ["cars-sedan", "cars-suv"]);
   assert.equal(catalog.categoryReferences.find((item) => item.slug === "cars-suv").parentId, "cars");
   assert.deepEqual(catalog.searchCategoryOptions("седан").map((item) => item.slug), ["cars-sedan"]);
-  assert.deepEqual(catalog.searchCategoryOptions("ноутбук").map((item) => item.slug), ["laptops"]);
+  assert.deepEqual(catalog.searchCategoryOptions("ноутбук").map((item) => item.slug), ["computer-laptop-repair", "laptops"]);
   assert.equal(catalog.getCategoryPresentation("jobs-logistics").priceMode, "salary");
   assert.equal(catalog.getCategoryPresentation("free-home").priceMode, "free");
   assert.ok(catalog.getCategoryAttributes("smartphones").some((item) => item.id === "model" && item.filterable));
@@ -99,6 +107,7 @@ test("mobile category selection renders one Supabase-backed level and catalog fi
   const picker = await readFile(new URL("components/category-picker.tsx", root), "utf8");
   const cascade = await readFile(new URL("components/category-cascade.tsx", root), "utf8");
   const catalog = await readFile(new URL("components/catalog-client.tsx", root), "utf8");
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(picker, /getCategoryChildren\(view, parentSlug\)/);
   assert.match(picker, /searchCategoryReferences\(view, query\)/);
   assert.match(picker, /getCategoryChildren\(view, item\)\.length > 0[\s\S]*setParentSlug\(item\.slug\)/);
@@ -107,9 +116,33 @@ test("mobile category selection renders one Supabase-backed level and catalog fi
   assert.match(cascade, /getCategoryChildren\(view, parent\)/);
   assert.match(catalog, /<CategoryCascade/);
   assert.match(catalog, /isCategoryWithin\(catalogView, item\.categorySlug, categorySlug\)/);
-  assert.match(catalog, /item\.attributes\?\.\[key\]/);
+  assert.match(catalog, /item\.attributes\?\.\[attributeKey\]/);
   assert.match(catalog, /params\.set\(`f_\$\{key\}`/);
   assert.match(catalog, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(picker, /window\.visualViewport/);
+  assert.match(picker, /body\.style\.position = "fixed"/);
+  assert.match(picker, /addEventListener\("resize", syncVisualViewport\)/);
+  assert.doesNotMatch(picker, /autoFocus/);
+  assert.match(css, /--category-picker-viewport-height/);
+  assert.match(css, /\.category-picker-results \{ min-height: 0;/);
+});
+
+test("mobile publish actions stay in document flow and passenger-car fields are normalized", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  const publish = await readFile(new URL("components/publish-form.tsx", root), "utf8");
+  const { attributeSets } = await import(new URL("lib/catalog-config.ts", root));
+  const { passengerVehicleBrands } = await import(new URL("lib/reference-data/vehicle-brands.ts", root));
+  assert.match(css, /\.publish-controls \{ position: static; bottom: auto; z-index: auto; box-shadow: none; \}/);
+  assert.match(publish, /publish-controls/);
+  assert.match(publish, /publish\.title/);
+  assert.equal(passengerVehicleBrands.length, 141);
+  assert.equal(new Set(passengerVehicleBrands.map((item) => item.value)).size, passengerVehicleBrands.length);
+  assert.equal(passengerVehicleBrands.at(-1)?.value, "other");
+  assert.deepEqual(attributeSets.passengerCar.map((attribute) => attribute.id), [
+    "brand", "model", "year", "mileage", "transmission", "fuel", "drive", "engine_volume", "condition",
+  ]);
+  assert.equal(attributeSets.passengerCar.filter((attribute) => attribute.id === "brand").length, 1);
+  assert.equal(attributeSets.passengerCar.some((attribute) => attribute.id === "body"), false);
 });
 
 test("application UI reads reference data through Supabase adapters, never seed modules", async () => {
@@ -140,11 +173,14 @@ test("application UI reads reference data through Supabase adapters, never seed 
   assert.doesNotMatch([server, geographyQueries, categoryQueries, attributeRoute].join("\n"), /service_role|SUPABASE_SECRET_KEY|createSupabaseAdminClient/i);
 });
 
-test("home search and primary mobile calls to action navigate to real routes", async () => {
+test("home search, City Premium Showcase and primary calls to action navigate to real routes", async () => {
   const home = await readFile(new URL("app/page.tsx", root), "utf8");
+  const showcase = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
   assert.match(home, /<Link href="\/publish" className="primary-action"/);
-  assert.match(home, /<Link href="\/search" className="secondary-action"/);
+  assert.match(home, /<CityPremiumShowcase \/>/);
+  assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} listings=\{listingsPanel\} \/>/);
+  assert.match(showcase, /href=\{`\/listing\/\$\{item\.listingId\}-\$\{item\.slug\}`\}/);
   assert.match(header, /<form className="header-search" action="\/search">/);
   assert.match(header, /<input name="q"/);
   assert.match(header, /<button type="submit">/);
@@ -178,13 +214,19 @@ test("Russian and Kazakh dictionaries stay type-aligned and locale preference is
   assert.match(migration, /language_code varchar\(10\) not null default 'ru'/);
 });
 
-test("user-data repositories are honest empty adapters and mock modules are absent", async () => {
-  const { listingRepository, profileRepository, chatRepository, notificationRepository, moderationRepository } = await import(new URL("lib/data/repositories.ts", root));
-  assert.deepEqual(await listingRepository.list(), { items: [], total: 0, nextCursor: null });
-  assert.equal(await profileRepository.current(), null);
-  assert.equal((await chatRepository.list()).total, 0);
-  assert.equal((await notificationRepository.list()).total, 0);
-  assert.equal((await moderationRepository.list()).total, 0);
+test("listing reads use Supabase while disconnected user domains stay honest and mock modules stay absent", async () => {
+  const repositories = await readFile(new URL("lib/data/repositories.ts", root), "utf8");
+  const listings = await readFile(new URL("lib/data/supabase/listings.ts", root), "utf8");
+  assert.match(repositories, /listPublishedListingCards\(createSupabasePublicServerClient\(\), filters\)/);
+  assert.match(repositories, /const client = createSupabasePublicServerClient\(\)/);
+  assert.match(repositories, /getListingDetailByRouteKey\(client, slug\)/);
+  assert.match(repositories, /hydrateAttributes\(rows\.map\(\(row\) => row\.id\), locale\)/);
+  assert.match(listings, /from\("listing_attribute_values"\)/);
+  assert.match(listings, /from\("listing_attribute_option_values"\)/);
+  for (const adapter of ["profileRepository", "chatRepository", "notificationRepository", "moderationRepository"]) {
+    assert.match(repositories, new RegExp(`export const ${adapter} =`));
+  }
+  assert.doesNotMatch(repositories, /Айдос|Нурлан|Марина|Руслан|78 000|4,9|18 отзыв/);
   await assert.rejects(access(new URL("lib/mock-data.ts", root)));
   await assert.rejects(access(new URL("lib/chat-data.ts", root)));
   const sourceFiles = ["app/page.tsx", "app/profile/page.tsx", "app/messages/page.tsx", "app/notifications/page.tsx", "app/admin/page.tsx", "components/publish-form.tsx"];
@@ -213,14 +255,14 @@ test("npm build chain is cross-platform and independent of shell scripts", async
   const expectedScripts = {
     "install:ci": "node scripts/install-ci.mjs",
     build: "node scripts/build-verified.mjs",
-    test: "node scripts/test.mjs",
+    test: "node scripts/run-with-sites-env.mjs --node scripts/test.mjs",
     "validate:artifact": "node scripts/validate-artifact.mjs",
   };
   for (const [name, command] of Object.entries(expectedScripts)) assert.equal(pkg.scripts[name], command);
   for (const [name, command] of Object.entries(pkg.scripts)) {
     assert.doesNotMatch(command, /(?:^|\s)(?:bash|sh|source)(?:\s|$)|\.sh\b|&&|\|\||tests\/\*/, `${name} must not require a POSIX shell`);
   }
-  for (const file of ["build-verified.mjs", "install-ci.mjs", "run-with-sites-env.mjs", "test.mjs", "validate-artifact.mjs", "lib/sites-runtime.mjs"]) {
+  for (const file of ["build-verified.mjs", "install-ci.mjs", "run-with-sites-env.mjs", "test.mjs", "validate-artifact.mjs", "lib/node-runtime.mjs", "lib/sites-runtime.mjs"]) {
     await access(new URL(`scripts/${file}`, root));
   }
   const runtime = await readFile(new URL("scripts/lib/sites-runtime.mjs", root), "utf8");

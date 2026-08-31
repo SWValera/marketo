@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createSitesEnvironment, reportFailure } from "./lib/sites-runtime.mjs";
+import "./lib/register-cloudflare-node-shim.mjs";
 
 async function isFile(path) {
   try {

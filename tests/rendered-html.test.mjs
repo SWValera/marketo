@@ -39,12 +39,12 @@ const referenceTables = {
     { id: ids.electronics, parent_id: null, slug: "electronics", name_ru: "Электроника", name_kk: "Электроника", icon_key: "laptop", tone_key: "violet", search_placeholder_ru: "Например, iPhone 15", search_placeholder_kk: "Мысалы, iPhone 15", title_placeholder_ru: null, title_placeholder_kk: null, description_hint_ru: null, description_hint_kk: null, price_mode: "price", sort_order: 40 },
   ],
   category_attributes: [
-    { id: ids.carBrand, category_id: ids.cars, key: "brand", label_ru: "Марка", label_kk: "Маркасы", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, sort_order: 10 },
-    { id: ids.jobEmployment, category_id: ids.jobs, key: "employment", label_ru: "Тип занятости", label_kk: "Жұмыспен қамту түрі", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, sort_order: 10 },
-    { id: ids.serviceVisit, category_id: ids.services, key: "visit", label_ru: "Выезд к клиенту", label_kk: "Клиентке бару", data_type: "boolean", unit_ru: null, unit_kk: null, is_required: false, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, sort_order: 10 },
+    { id: ids.carBrand, category_id: ids.cars, key: "brand", label_ru: "Марка", label_kk: "Маркасы", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
+    { id: ids.jobEmployment, category_id: ids.jobs, key: "employment", label_ru: "Тип занятости", label_kk: "Жұмыспен қамту түрі", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
+    { id: ids.serviceVisit, category_id: ids.services, key: "visit", label_ru: "Выезд к клиенту", label_kk: "Клиентке бару", data_type: "boolean", unit_ru: null, unit_kk: null, is_required: false, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
   ],
   category_attribute_options: [
-    { id: ids.carBrandToyota, attribute_id: ids.carBrand, value: "toyota", label_ru: "Toyota", label_kk: "Toyota", sort_order: 10 },
+    { id: ids.carBrandToyota, attribute_id: ids.carBrand, parent_option_id: null, value: "toyota", label_ru: "Toyota", label_kk: "Toyota", sort_order: 10 },
   ],
 };
 
@@ -77,13 +77,13 @@ async function render(pathname, locale = "ru") {
 
 test("core routes render through the production worker", async () => {
   const routes = [
-    ["/", "Покупайте и продавайте"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
+    ["/", "Лучшее рядом с вами"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
     ["/category/jobs", "Работа"], ["/category/services", "Услуги"], ["/category/cars", "Легковые автомобили"],
-    ["/profile", "Войдите, чтобы открыть профиль"], ["/profile/edit", "Редактировать профиль"],
+    ["/profile", "Войдите, чтобы открыть профиль"],
     ["/favorites", "В избранном пока пусто"], ["/messages", "Сообщений пока нет"],
     ["/messages/new?listing=listing-id", "Войдите, чтобы написать продавцу"],
-    ["/notifications", "Уведомлений пока нет"], ["/publish", "Подать объявление"], ["/login", "Добро пожаловать"],
-    ["/settings", "Настройки"], ["/help", "Помощь"], ["/admin", "Очередь модерации пуста"], ["/offline", "Нет подключения"],
+    ["/notifications", "Уведомлений пока нет"], ["/login", "Добро пожаловать"],
+    ["/settings", "Настройки"], ["/help", "Помощь"], ["/offline", "Нет подключения"],
   ];
   for (const [pathname, expected] of routes) {
     const { response, html } = await render(pathname);
@@ -95,12 +95,11 @@ test("core routes render through the production worker", async () => {
 
 test("Kazakh locale renders server-side without changing routes", async () => {
   const routes = [
-    ["/", "Бүкіл Қазақстан бойынша сатып алыңыз және сатыңыз"],
+    ["/", "Жаныңыздағы үздік ұсыныстар"],
     ["/categories", "Барлық санаттар"],
     ["/category/jobs", "Жұмыс"],
     ["/category/services", "Қызметтер"],
     ["/profile", "Профильді ашу үшін кіріңіз"],
-    ["/publish", "Хабарландыру беру"],
     ["/notifications", "Әзірге хабарлама жоқ"],
   ];
   for (const [pathname, expected] of routes) {
@@ -112,8 +111,93 @@ test("Kazakh locale renders server-side without changing routes", async () => {
   }
 });
 
+test("anonymous profile exposes explicit Auth actions and no account-only or moderation sections", async () => {
+  const { response, html } = await render("/profile");
+  assert.equal(response.status, 200);
+  assert.match(html, />Войти</);
+  assert.match(html, />Зарегистрироваться</);
+  assert.match(html, />Восстановить пароль</);
+  assert.match(html, /href="\/login\?mode=login(?:&amp;|&)next=\/profile"/);
+  assert.match(html, /href="\/login\?mode=register(?:&amp;|&)next=\/profile"/);
+  assert.match(html, /href="\/login\?mode=recover(?:&amp;|&)next=\/profile"/);
+  assert.doesNotMatch(html, /Мои объявления/);
+  assert.doesNotMatch(html, />Модерация</);
+});
+
+test("invalid callback cannot create an open redirect", async () => {
+  const { response } = await render("/auth/callback?next=https://evil.example/steal");
+  assert.equal(response.status, 307);
+  const location = new URL(response.headers.get("location"), "http://localhost");
+  assert.equal(location.pathname, "/login");
+  assert.equal(location.searchParams.get("auth_error"), "invalid");
+  assert.equal(location.searchParams.get("next"), "/profile");
+});
+
+test("protected pages redirect anonymous users to login in both locales", async () => {
+  for (const locale of ["ru", "kk"]) {
+    for (const [pathname, expectedNext] of [
+      ["/publish", "/publish"],
+      ["/profile/edit", "/profile/edit"],
+      ["/admin", "/admin"],
+      [`/admin/${ids.country}`, `/admin/${ids.country}`],
+    ]) {
+      const { response } = await render(pathname, locale);
+      assert.equal(response.status, 307, `${locale} ${pathname}`);
+      const location = new URL(response.headers.get("location"), "http://localhost");
+      assert.equal(location.pathname, "/login", `${locale} ${pathname}`);
+      assert.equal(location.searchParams.get("next"), expectedNext, `${locale} ${pathname}`);
+    }
+  }
+});
+
+test("anonymous moderation mutation is denied by the production worker", async () => {
+  const response = await worker.fetch(new Request(`http://localhost/api/admin/listings/${ids.country}/moderate`, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json", origin: "http://localhost" },
+    body: JSON.stringify({ decision: "approve" }),
+  }), env, ctx);
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "authentication_required" });
+});
+
+test("owner mutations reject cross-origin requests before Auth and allow same-origin requests to reach Auth", async () => {
+  const routes = [
+    { pathname: "/api/listings", method: "POST", body: "{}" },
+    { pathname: `/api/listings/${ids.country}`, method: "PATCH", body: "{}" },
+    { pathname: `/api/listings/${ids.country}/submit`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/archive`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/sold`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/images`, method: "POST" },
+  ];
+  for (const route of routes) {
+    const crossOrigin = await worker.fetch(new Request(`http://localhost${route.pathname}`, {
+      method: route.method,
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        origin: "https://evil.example",
+      },
+      ...(route.body ? { body: route.body } : {}),
+    }), env, ctx);
+    assert.equal(crossOrigin.status, 403, route.pathname);
+    assert.deepEqual(await crossOrigin.json(), { error: "cross_origin_request_denied" }, route.pathname);
+
+    const sameOrigin = await worker.fetch(new Request(`http://localhost${route.pathname}`, {
+      method: route.method,
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        origin: "http://localhost",
+      },
+      ...(route.body ? { body: route.body } : {}),
+    }), env, ctx);
+    assert.equal(sameOrigin.status, 401, route.pathname);
+    assert.deepEqual(await sameOrigin.json(), { error: "authentication_required" }, route.pathname);
+  }
+});
+
 test("unknown user-data and unknown application routes use the designed 404 state", async () => {
-  for (const pathname of ["/listing/not-real", "/seller/not-real", "/messages/not-real", "/admin/not-real", "/route-that-does-not-exist"]) {
+  for (const pathname of ["/listing/not-real", "/seller/not-real", "/messages/not-real", "/route-that-does-not-exist"]) {
     const { response, html } = await render(pathname);
     assert.equal(response.status, 404, pathname);
     assert.match(html, /Страница не найдена/, pathname);

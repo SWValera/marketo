@@ -1,5 +1,9 @@
 # Supabase reference-data integration
 
+> Historical Phase A snapshot. The current 2026-08-28 runtime also includes
+> Auth/profile, real listing/R2 and City Premium cutovers; see
+> `docs/MOCK_TO_SUPABASE_PLAN.md` and `docs/SUPABASE_ARCHITECTURE.md`.
+
 ## Scope
 
 This phase connects only public reference data. Auth, profiles, listings,
@@ -32,8 +36,9 @@ boundary. No service/secret key is imported by the reference layer.
 5. Public reference results are cached for five minutes in a warm Worker
    isolate. The attribute endpoint also emits short shared-cache headers.
 
-The 1519 option rows are therefore not serialized into every page or rendered
-in the mobile DOM.
+The complete option set is therefore not serialized into every page or rendered
+in the mobile DOM. Passenger-car brand options are maintained by the reference
+seed/migration and only the chosen category is fetched.
 
 ## Environment
 
@@ -65,7 +70,8 @@ sample. It performs no INSERT, UPDATE, DELETE, RPC or SQL migration.
 
 ## Seed source boundary
 
-`lib/geography.ts` and `lib/catalog-config.ts` remain only because
+`lib/geography.ts`, `lib/catalog-config.ts` and
+`lib/reference-data/vehicle-brands.ts` remain only because
 `scripts/generate-reference-seeds.mjs` uses them to regenerate the reviewed SQL
 seed deterministically. A project-integrity test rejects any import of those
 files from application routes and UI components.

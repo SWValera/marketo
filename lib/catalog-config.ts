@@ -1,4 +1,7 @@
 import { catalogKk } from "./catalog-kk.js";
+import { applyContextualCategoryPresentation } from "./catalog-presentation.ts";
+import { passengerVehicleBrands } from "./reference-data/vehicle-brands.ts";
+import { applyMasterCatalogExtensions } from "./reference-data/master-catalog/index.ts";
 
 export type LocalizedText = { ru: string; kk: string };
 
@@ -24,6 +27,8 @@ export type CategoryNode = {
   attributeSet?: keyof typeof attributeSets;
   priceMode?: "price" | "salary" | "free" | "exchange";
   children?: CategoryNode[];
+  schemaProfiles?: string[];
+  intentionalFallback?: boolean;
 };
 
 const catalogKkText = catalogKk as Record<string, string>;
@@ -44,6 +49,17 @@ export const attributeSets = {
     select("transmission", "Коробка передач", [option("automatic", "Автомат"), option("manual", "Механика"), option("variator", "Вариатор"), option("robot", "Робот")]),
     select("drive", "Привод", [option("front", "Передний"), option("rear", "Задний"), option("all", "Полный")]),
     select("body", "Кузов", [option("sedan", "Седан"), option("suv", "Кроссовер / внедорожник"), option("hatch", "Хэтчбек"), option("wagon", "Универсал"), option("minivan", "Минивэн"), option("pickup", "Пикап")]),
+  ],
+  passengerCar: [
+    select("brand", "Марка", passengerVehicleBrands, true),
+    text("model", "Модель автомобиля", true, true),
+    number("year", "Год выпуска", "год", true),
+    number("mileage", "Пробег", "км"),
+    select("transmission", "Коробка передач", [option("automatic", "Автомат"), option("manual", "Механика"), option("variator", "Вариатор"), option("robot", "Робот")]),
+    select("fuel", "Топливо", [option("petrol", "Бензин"), option("diesel", "Дизель"), option("hybrid", "Гибрид"), option("electric", "Электро")]),
+    select("drive", "Привод", [option("front", "Передний"), option("rear", "Задний"), option("all", "Полный")]),
+    number("engine_volume", "Объём двигателя", "л"),
+    select("condition", "Состояние автомобиля", [option("new", "Новое", "Жаңа"), option("used", "С пробегом", "Жүрілген"), option("needs-repair", "Требует ремонта", "Жөндеуді қажет етеді")], true),
   ],
   moto: [number("year", "Год выпуска", "год"), number("engine", "Объём двигателя", "см³"), number("mileage", "Пробег", "км")],
   parts: [select("condition", "Состояние", [option("new", "Новое"), option("used", "Б/у")], true), select("partType", "Тип детали", [option("original", "Оригинал"), option("analogue", "Аналог"), option("used-original", "Оригинал Б/у")]), text("compatibility", "Марка и модель транспорта")],
@@ -69,12 +85,12 @@ export const attributeSets = {
 const leaf = (slug: string, ru: string, attributeSet?: CategoryNode["attributeSet"]): CategoryNode => ({ slug, name: t(ru), attributeSet });
 const group = (slug: string, ru: string, kk: string | undefined, children: CategoryNode[], attributeSet?: CategoryNode["attributeSet"]): CategoryNode => ({ slug, name: t(ru, kk), children, attributeSet });
 
-export const categoryTree: CategoryNode[] = [
+const baseCategoryTree: CategoryNode[] = [
   {
     slug: "transport", name: t("Транспорт", "Көлік"), icon: "car", tone: "blue", attributeSet: "car",
     searchPlaceholder: t("Марка, модель или вид транспорта", "Көлік маркасы, моделі немесе түрі"), titlePlaceholder: t("Например, Toyota Camry 2020"), descriptionHint: t("Укажите состояние, пробег, комплектацию и историю обслуживания."),
     children: [
-      group("cars", "Легковые автомобили", "Жеңіл автомобильдер", [leaf("cars-sedan", "Седаны", "car"), leaf("cars-suv", "Кроссоверы и внедорожники", "car"), leaf("cars-hatchback", "Хэтчбеки", "car"), leaf("cars-wagon", "Универсалы", "car"), leaf("cars-minivan", "Минивэны", "car"), leaf("cars-coupe", "Купе", "car"), leaf("cars-cabriolet", "Кабриолеты", "car"), leaf("cars-pickup", "Пикапы", "car")], "car"),
+      group("cars", "Легковые автомобили", "Жеңіл автомобильдер", [leaf("cars-sedan", "Седаны", "passengerCar"), leaf("cars-suv", "Кроссоверы и внедорожники", "passengerCar"), leaf("cars-hatchback", "Хэтчбеки", "passengerCar"), leaf("cars-wagon", "Универсалы", "passengerCar"), leaf("cars-minivan", "Минивэны", "passengerCar"), leaf("cars-coupe", "Купе", "passengerCar"), leaf("cars-cabriolet", "Кабриолеты", "passengerCar"), leaf("cars-pickup", "Пикапы", "passengerCar")], "passengerCar"),
       group("motorcycles", "Мотоциклы и мототехника", "Мотоциклдер", [leaf("road-motorcycles", "Дорожные мотоциклы", "moto"), leaf("scooters", "Скутеры и мопеды", "moto"), leaf("atv", "Квадроциклы и багги", "moto"), leaf("snowmobiles", "Снегоходы", "moto")], "moto"),
       group("commercial-transport", "Коммерческий транспорт", "Коммерциялық көлік", [leaf("trucks", "Грузовые автомобили", "car"), leaf("buses", "Автобусы", "car"), leaf("minibuses", "Микроавтобусы", "car"), leaf("trailers", "Прицепы и полуприцепы", "goods")]),
       group("special-transport", "Спецтехника", "Арнайы техника", [leaf("construction-machinery", "Строительная техника", "business"), leaf("road-machinery", "Дорожная техника", "business"), leaf("warehouse-machinery", "Погрузчики и складская техника", "business"), leaf("municipal-machinery", "Коммунальная техника", "business")]),
@@ -129,6 +145,10 @@ export const categoryTree: CategoryNode[] = [
   { slug: "free", name: t("Отдам бесплатно", "Тегін беремін"), icon: "gift", tone: "green", attributeSet: "free", priceMode: "free", searchPlaceholder: t("Что хотите забрать?"), titlePlaceholder: t("Например, книги в хорошем состоянии"), descriptionHint: t("Честно опишите состояние и условия передачи."), children: [leaf("free-home", "Для дома", "free"), leaf("free-clothes", "Одежда и обувь", "free"), leaf("free-kids", "Детское", "free"), leaf("free-electronics", "Электроника", "free"), leaf("free-other", "Другое", "free")] },
   { slug: "exchange", name: t("Обмен", "Айырбас"), icon: "repeat", tone: "teal", attributeSet: "exchange", priceMode: "exchange", searchPlaceholder: t("Что хотите обменять?"), titlePlaceholder: t("Например, обменяю ноутбук на смартфон"), descriptionHint: t("Опишите предмет, его состояние и желаемые варианты обмена."), children: [leaf("exchange-transport", "Транспорт", "exchange"), leaf("exchange-property", "Недвижимость", "exchange"), leaf("exchange-electronics", "Электроника", "exchange"), leaf("exchange-other", "Другое", "exchange")] },
 ];
+
+export const categoryTree: CategoryNode[] = applyContextualCategoryPresentation(
+  applyMasterCatalogExtensions(baseCategoryTree),
+);
 
 type CategoryIndexEntry = { node: CategoryNode; parent?: CategoryNode; root: CategoryNode };
 const categoryIndex = new Map<string, CategoryIndexEntry>();

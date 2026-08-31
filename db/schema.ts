@@ -167,6 +167,10 @@ export const categoryAttributes = pgTable("category_attributes", {
   isSearchable: boolean("is_searchable").notNull().default(false),
   inheritsToChildren: boolean("inherits_to_children").notNull().default(true),
   validation: jsonb("validation").notNull().default({}),
+  filterMode: text("filter_mode").notNull().default("exact"),
+  optionsLoadMode: text("options_load_mode").notNull().default("eager"),
+  dependsOnKey: text("depends_on_key"),
+  isVisible: boolean("is_visible").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
@@ -182,6 +186,7 @@ export const categoryAttributeOptions = pgTable("category_attribute_options", {
   value: text("value").notNull(),
   labelRu: text("label_ru").notNull(),
   labelKk: text("label_kk").notNull(),
+  parentOptionId: uuid("parent_option_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
@@ -190,6 +195,11 @@ export const categoryAttributeOptions = pgTable("category_attribute_options", {
   unique("category_attribute_options_attribute_value_unique").on(table.attributeId, table.value),
   unique("category_attribute_options_attribute_sort_unique").on(table.attributeId, table.sortOrder),
   unique("category_attribute_options_attribute_id_id_unique").on(table.attributeId, table.id),
+  foreignKey({
+    name: "category_attribute_options_parent_option_id_fkey",
+    columns: [table.parentOptionId],
+    foreignColumns: [table.id],
+  }).onDelete("restrict"),
 ]);
 
 export const listings = pgTable("listings", {
@@ -265,6 +275,102 @@ export const listingImages = pgTable("listing_images", {
   mimeType: text("mime_type"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (table) => [unique("listing_images_listing_sort_unique").on(table.listingId, table.sortOrder)]);
+
+export const cityPremiumSettings = pgTable("city_premium_settings", {
+  settlementId: uuid("settlement_id").primaryKey().references(() => settlements.id, { onDelete: "cascade" }),
+  capacity: smallint("capacity").notNull().default(15),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+});
+
+export const cityPremiumAccounts = pgTable("city_premium_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerId: uuid("owner_id").notNull(),
+  displayName: text("display_name").notNull(),
+  status: text("status").notNull().default("active"),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("city_premium_accounts_owner_status_idx").on(table.ownerId, table.status, table.id),
+]);
+
+export const cityPremiumOrders = pgTable("city_premium_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => cityPremiumAccounts.id, { onDelete: "restrict" }),
+  settlementId: uuid("settlement_id").notNull().references(() => settlements.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("draft"),
+  paymentStatus: text("payment_status").notNull().default("unbilled"),
+  amountMinor: bigint("amount_minor", { mode: "number" }),
+  currencyCode: char("currency_code", { length: 3 }).notNull().default("KZT"),
+  paymentProvider: text("payment_provider"),
+  externalPaymentReference: text("external_payment_reference"),
+  startsAt: timestamptz("starts_at").notNull(),
+  endsAt: timestamptz("ends_at").notNull(),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (table) => [
+  unique("city_premium_orders_id_account_unique").on(table.id, table.accountId),
+  index("city_premium_orders_account_status_window_idx").on(table.accountId, table.status, table.startsAt, table.endsAt, table.id),
+  unique("city_premium_orders_provider_reference_unique").on(table.paymentProvider, table.externalPaymentReference),
+]);
+
+export const cityPremiumPlacements = pgTable("city_premium_placements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  settlementId: uuid("settlement_id").notNull().references(() => settlements.id, { onDelete: "cascade" }),
+  listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => cityPremiumAccounts.id, { onDelete: "restrict" }),
+  orderId: uuid("order_id"),
+  status: text("status").notNull().default("active"),
+  startsAt: timestamptz("starts_at").notNull(),
+  endsAt: timestamptz("ends_at").notNull(),
+  priority: smallint("priority").notNull().default(0),
+  rotationWeight: numeric("rotation_weight", { precision: 8, scale: 4 }).notNull().default("1.0000"),
+  rotationMetadata: jsonb("rotation_metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (table) => [
+  unique("city_premium_placements_listing_unique").on(table.settlementId, table.listingId),
+  index("city_premium_placements_active_window_idx").on(table.settlementId, table.status, table.startsAt, table.endsAt, table.id),
+  index("city_premium_placements_account_status_idx").on(table.accountId, table.status, table.startsAt, table.endsAt, table.id),
+  index("city_premium_placements_order_idx").on(table.orderId),
+  index("city_premium_placements_rotation_config_idx").on(table.settlementId, table.status, table.priority, table.rotationWeight, table.id),
+  foreignKey({
+    name: "city_premium_placements_order_account_fk",
+    columns: [table.orderId, table.accountId],
+    foreignColumns: [cityPremiumOrders.id, cityPremiumOrders.accountId],
+  }).onDelete("restrict"),
+]);
+
+export const cityPremiumEvents = pgTable("city_premium_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  placementId: uuid("placement_id").notNull().references(() => cityPremiumPlacements.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => cityPremiumAccounts.id, { onDelete: "restrict" }),
+  eventType: text("event_type").notNull(),
+  occurredAt: timestamptz("occurred_at").notNull().defaultNow(),
+  deduplicationKey: text("deduplication_key"),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("city_premium_events_placement_occurred_idx").on(table.placementId, table.occurredAt, table.id),
+  index("city_premium_events_account_occurred_idx").on(table.accountId, table.occurredAt, table.eventType),
+  unique("city_premium_events_deduplication_unique").on(table.placementId, table.eventType, table.deduplicationKey),
+]);
+
+export const cityPremiumDailyMetrics = pgTable("city_premium_daily_metrics", {
+  placementId: uuid("placement_id").notNull().references(() => cityPremiumPlacements.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => cityPremiumAccounts.id, { onDelete: "restrict" }),
+  metricDate: date("metric_date", { mode: "string" }).notNull(),
+  impressions: bigint("impressions", { mode: "number" }).notNull().default(0),
+  clicks: bigint("clicks", { mode: "number" }).notNull().default(0),
+  lastEventAt: timestamptz("last_event_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.placementId, table.metricDate] }),
+  index("city_premium_daily_metrics_account_date_idx").on(table.accountId, table.metricDate, table.placementId),
+]);
 
 export const favorites = pgTable("favorites", {
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -369,6 +475,8 @@ export const schemaTables = {
   listingAttributeValues,
   listingAttributeOptionValues,
   listingImages,
+  cityPremiumSettings,
+  cityPremiumPlacements,
   favorites,
   conversations,
   conversationParticipants,

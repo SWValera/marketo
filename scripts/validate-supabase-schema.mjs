@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasIgnoredSourceSegment } from "./lib/source-paths.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const migrationDir = resolve(root, "supabase/migrations");
@@ -18,7 +19,43 @@ const expectedMigrations = [
   "0010_rls_and_grants.sql",
   "0011_indexes_and_search.sql",
   "0012_realtime.sql",
+  "0013_passenger_vehicle_reference.sql",
+  "0014_category_attribute_metadata.sql",
+  "0015_category_attribute_normalization.sql",
+  "0016_listing_attribute_roundtrip.sql",
+  "0017_master_catalog.sql",
+  "0018_auth_profile_flow.sql",
+  "0019_city_premium_showcase.sql",
+  "0020_targeted_catalog_and_premium_foundation.sql",
+  "0021_auth_role_rpc_hardening.sql",
+  "0022_active_staff_moderation_hardening.sql",
+  "0023_owner_listing_draft_lifecycle.sql",
 ];
+
+const immutableMigrationHashes = {
+  "0001_extensions_and_helpers.sql": "7dcab9ccf19dcd177cdf983cd08cd33dc2b70777b5b30d5211214d789daa2794",
+  "0002_geography.sql": "a593251fdd0949b274bbd4273896b317d9605c5e8ccbc291693c729082445279",
+  "0003_profiles_and_roles.sql": "5c1fb78ae4673ee5f7447eb6d4540ca8117c252aa017c6b35a2c9bd604eaccf3",
+  "0004_categories_and_attributes.sql": "258cc44c6fcab6b4b36e0c8f38b0c9345a775b534567f3392576e36df4f22481",
+  "0005_listings.sql": "3f0f76aee09e3e17b7b591f9abe8ac5eb52ddcb8b3e1eba2ddc008132b207cad",
+  "0006_favorites.sql": "603228c772df46ff426834b0f7cea9d04c849dd5461ee7d24b655929d649c05e",
+  "0007_chat.sql": "992fb539a58b9d94a3c174b0bbc37cb381a447023571cdd92c1286b6ca890761",
+  "0008_notifications.sql": "3d77b3ee01748a2a840b2ceb96e3d2eaf02c5dbaab295a55766bcce12dd6676e",
+  "0009_reports_moderation_and_audit.sql": "90097872d3db866efdf2b5afde048ff539bb835e715759df87d48bd313cb449f",
+  "0010_rls_and_grants.sql": "f5ea5ba7bc18f38aa1682c3e0f94f42f80391a240a88791b2ffb43359efd27a9",
+  "0011_indexes_and_search.sql": "f7fafd8b55e1eef2f8294ade5dc2fff99cfc0b4df82089c31990f9719a5d6867",
+  "0012_realtime.sql": "5f1734796bc10b1240c8757448d24123e4da6fcbd97d18460124ae25718683b2",
+  "0013_passenger_vehicle_reference.sql": "68f61cb60b8513b82fdb93a9aa449120df669e5810ef66978203f18a7bc7da52",
+  "0014_category_attribute_metadata.sql": "74089f52f979c0b3bfdc103b39f35c1cea68c05187692e3fd2167ba110ccccc9",
+  "0015_category_attribute_normalization.sql": "b04773a20e2ac8fa6e58f7231a37104b5cc49767fb77e4dcb44ea173ed0599af",
+  "0016_listing_attribute_roundtrip.sql": "54b739c3103648f5e3349ba74c82afab4cd72de4c2b350af333af14ec0152b5e",
+  "0017_master_catalog.sql": "8db55b8f9489bf3a2f6789c852c99a1097db46355a10487e9747787ee3027566",
+  "0018_auth_profile_flow.sql": "116669344b23e2674d4181b7aee976c1a7608f2500245be21d93764841e008a2",
+  "0019_city_premium_showcase.sql": "61381f5e84b7d67ce2e4223f2fcb7f8266850294ad383413be212dd714885df4",
+  "0020_targeted_catalog_and_premium_foundation.sql": "aefcd0e8b0a1386fa0d637eb52b83f6c9e905e407ec820fe2957ef67eb51a757",
+  "0021_auth_role_rpc_hardening.sql": "c26bd4b8730b669d2ef2964e5912dc41b2fc057e4b06204d4164426dfb5048a3",
+  "0022_active_staff_moderation_hardening.sql": "9bb9b82b96e5668125e636643449409a840b1df82d5e17cfc8e4fefdc6d9be91",
+};
 
 const failures = [];
 const check = (condition, message) => { if (!condition) failures.push(message); };
@@ -27,6 +64,10 @@ check(JSON.stringify(files) === JSON.stringify(expectedMigrations), "Migration f
 
 const migrations = new Map();
 for (const file of files) migrations.set(file, await readFile(resolve(migrationDir, file), "utf8"));
+for (const [file, expectedHash] of Object.entries(immutableMigrationHashes)) {
+  const actualHash = createHash("sha256").update(migrations.get(file) ?? "").digest("hex");
+  check(actualHash === expectedHash, `Immutable migration changed: ${file}.`);
+}
 const allSql = [...migrations.values()].join("\n");
 for (const [file, sql] of migrations) {
   check(/^\s*--[\s\S]*?\bbegin;/i.test(sql), `${file} must start a transaction.`);
@@ -34,7 +75,7 @@ for (const [file, sql] of migrations) {
 }
 
 const createdTables = [...allSql.matchAll(/create table public\.([a-z_]+)/gi)].map((match) => match[1]);
-const rlsSql = migrations.get("0010_rls_and_grants.sql") ?? "";
+const rlsSql = [...migrations.values()].join("\n");
 const rlsTables = [...rlsSql.matchAll(/alter table public\.([a-z_]+) enable row level security/gi)].map((match) => match[1]);
 check(new Set(createdTables).size === createdTables.length, "A public table is created more than once.");
 check(
@@ -82,11 +123,81 @@ check(!/raw_user_meta_data\s*->>\s*'(?:status|role|verified_at|is_verified|admin
 
 const seed = await readFile(resolve(root, "supabase/seeds/001_marketo_reference.sql"), "utf8");
 check(/Contains no users, listings, chats/.test(seed), "Reference seed provenance header is missing.");
-check(/initial Marketo reference taxonomy/i.test(seed), "Reference seed must identify the category taxonomy as initial/reviewable.");
+check(/reviewed Marketo v1\.0 reference taxonomy/i.test(seed), "Reference seed must identify the category taxonomy as reviewed.");
 check(/90-city bootstrap/i.test(seed), "Reference seed must identify geography as a 90-city bootstrap.");
 check(!/insert into public\.(?:profiles|profile_private|listings|favorites|conversations|messages|notifications|reports)\b/i.test(seed), "Reference seed contains product/user data.");
-check((seed.match(/insert into public\.categories \(/g) ?? []).length === 228, "Reference seed category count drifted from the frontend contract.");
+check((seed.match(/insert into public\.categories \(/g) ?? []).length === 1356, "Reference seed category count drifted from the Master Catalog contract.");
 check((seed.match(/insert into public\.settlements \(/g) ?? []).length === 90, "Reviewed city baseline must contain exactly 90 cities.");
+check(/filter_mode text not null default 'exact'/.test(allSql), "Category filter-mode metadata is missing.");
+check(/parent_option_id uuid/.test(allSql), "Dependent option parent relation is missing.");
+check(/create or replace function public\.create_listing_draft/.test(allSql), "Atomic listing draft roundtrip RPC is missing.");
+check(/create_listing_draft[\s\S]{0,900}security invoker/i.test(migrations.get("0016_listing_attribute_roundtrip.sql") ?? ""), "Listing draft RPC must remain SECURITY INVOKER.");
+const masterCatalogSql = migrations.get("0017_master_catalog.sql") ?? "";
+check(/create or replace function public\.search_catalog_listing_cards/.test(masterCatalogSql), "Master Catalog buyer-filter RPC is missing.");
+check(/search_catalog_listing_cards[\s\S]{0,900}security invoker/i.test(masterCatalogSql), "Master Catalog buyer-filter RPC must remain SECURITY INVOKER.");
+check(/attribute\.is_filterable/.test(masterCatalogSql), "Master Catalog RPC does not enforce filterable seller metadata.");
+const authProfileSql = migrations.get("0018_auth_profile_flow.sql") ?? "";
+check(/create or replace function public\.get_my_account_profile/.test(authProfileSql), "Authenticated account-profile read RPC is missing.");
+check(/create or replace function public\.update_my_account_profile/.test(authProfileSql), "Atomic account-profile update RPC is missing.");
+check(/update_my_account_profile[\s\S]{0,5000}actor_id uuid := \(select auth\.uid\(\)\)[\s\S]{0,5000}where profile\.id = actor_id/.test(authProfileSql), "Profile update is not bound to auth.uid().");
+const premiumSql = migrations.get("0019_city_premium_showcase.sql") ?? "";
+check(/capacity smallint not null default 15/.test(premiumSql), "City Premium default capacity is not 15.");
+check(/city premium capacity exceeded/.test(premiumSql), "City Premium capacity guard is missing.");
+check(/create or replace function public\.get_city_premium_placements/.test(premiumSql), "City Premium active-placement RPC is missing.");
+check(/get_city_premium_placements[\s\S]{0,1500}security invoker/i.test(premiumSql), "City Premium public RPC must remain SECURITY INVOKER.");
+const targetedCorrectionSql = migrations.get("0020_targeted_catalog_and_premium_foundation.sql") ?? "";
+check(/catalog_count <> 1356/.test(targetedCorrectionSql), "Targeted migration has no 1356-category shrink guard.");
+check(/search_placeholder_ru = resolved\.search_ru/.test(targetedCorrectionSql), "Contextual RU/KK catalog metadata update is missing.");
+check(/create table public\.city_premium_accounts/.test(targetedCorrectionSql), "Premium account ownership foundation is missing.");
+check(/create table public\.city_premium_orders/.test(targetedCorrectionSql), "Payment-neutral Premium order foundation is missing.");
+check(/payment_status text not null default 'unbilled'/.test(targetedCorrectionSql), "Payment-neutral status field is missing.");
+check(/priority smallint not null default 0/.test(targetedCorrectionSql), "Premium priority metadata is missing.");
+check(/rotation_weight numeric\(8,4\) not null default 1\.0000/.test(targetedCorrectionSql), "Premium rotation weight metadata is missing.");
+check(/create table public\.city_premium_events/.test(targetedCorrectionSql), "Raw Premium analytics events are missing.");
+check(/event_type in \('impression', 'click'\)/.test(targetedCorrectionSql), "Premium impression/click event contract is missing.");
+check(/create table public\.city_premium_daily_metrics/.test(targetedCorrectionSql), "Premium daily aggregate foundation is missing.");
+check(/city_premium_events_account_owner_read/.test(targetedCorrectionSql) && /city_premium_daily_metrics_account_owner_read/.test(targetedCorrectionSql), "Premium analytics RLS is not account-scoped.");
+check(!/10[ _]?000/.test(targetedCorrectionSql), "Premium correction hardcodes a commercial price.");
+check(!/insert into public\.city_premium_placements/i.test(targetedCorrectionSql), "Targeted correction creates fake Premium placements.");
+const authRpcHardeningSql = migrations.get("0021_auth_role_rpc_hardening.sql") ?? "";
+check(/revoke execute on all functions in schema public from public, anon/i.test(authRpcHardeningSql), "Public RPC EXECUTE defaults are not revoked from PUBLIC and anon.");
+check(/revoke execute on all functions in schema private from public, anon/i.test(authRpcHardeningSql), "Private RPC EXECUTE defaults are not revoked from PUBLIC and anon.");
+for (const signature of [
+  "public.get_my_account_profile()",
+  "public.update_my_account_profile(text, text, varchar, uuid, text)",
+]) {
+  const escaped = signature.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  check(new RegExp(`revoke execute on function ${escaped} from public, anon`, "i").test(authRpcHardeningSql), `${signature} is not explicitly revoked from PUBLIC and anon.`);
+  check(new RegExp(`grant execute on function ${escaped} to authenticated`, "i").test(authRpcHardeningSql), `${signature} is not explicitly authenticated-only.`);
+}
+check(/grant execute on function public\.search_catalog_listing_cards[\s\S]{0,240}to anon, authenticated, service_role/i.test(authRpcHardeningSql), "Catalog search is missing from the anonymous RPC allowlist.");
+check(/grant execute on function public\.get_city_premium_placements[\s\S]{0,180}to anon, authenticated, service_role/i.test(authRpcHardeningSql), "City Premium read is missing from the anonymous RPC allowlist.");
+const moderationHardeningSql = migrations.get("0022_active_staff_moderation_hardening.sql") ?? "";
+check(/join public\.profiles as profile on profile\.id = role_row\.user_id[\s\S]{0,300}profile\.status = 'active'/i.test(moderationHardeningSql), "Staff roles are not bound to an active profile.");
+for (const policy of [
+  "listings_authenticated_read",
+  "listing_attribute_values_authenticated_read",
+  "listing_attribute_options_authenticated_read",
+  "listing_images_authenticated_read",
+]) {
+  check(new RegExp(`drop policy if exists ${policy}[\\s\\S]{0,2200}private\\.has_any_role\\(array\\['moderator', 'admin'\\]\\)`, "i").test(moderationHardeningSql), `${policy} is not restricted to moderation staff.`);
+}
+check(/normalized_reason not in \([\s\S]{0,500}'other'/i.test(moderationHardeningSql), "Moderation reason codes have no stable allowlist.");
+check(/char_length\(normalized_note\) > 2000/i.test(moderationHardeningSql), "Moderation notes have no bounded length.");
+check(/revoke execute on function public\.moderate_listing\(uuid, text, text, text\) from public, anon/i.test(moderationHardeningSql), "Moderation RPC is not revoked from PUBLIC and anon.");
+check(/grant execute on function public\.moderate_listing\(uuid, text, text, text\) to authenticated/i.test(moderationHardeningSql), "Moderation RPC is not granted to authenticated sessions.");
+const ownerLifecycleSql = migrations.get("0023_owner_listing_draft_lifecycle.sql") ?? "";
+check(/create or replace function public\.update_listing_draft\(/i.test(ownerLifecycleSql), "Atomic owner draft update RPC is missing.");
+check(/update_listing_draft[\s\S]{0,1200}security invoker/i.test(ownerLifecycleSql), "Owner draft update RPC must remain SECURITY INVOKER.");
+check(/listing\.owner_id = actor_id[\s\S]{0,180}listing\.status in \('draft', 'rejected'\)[\s\S]{0,180}for update/i.test(ownerLifecycleSql), "Owner draft update is not owner-bound, state-bound and row-locked.");
+check(/delete from public\.listing_attribute_option_values[\s\S]{0,300}delete from public\.listing_attribute_values/i.test(ownerLifecycleSql), "Owner draft update does not replace old typed attributes atomically.");
+check(/revoke all on function public\.update_listing_draft[\s\S]{0,300}from public, anon, service_role/i.test(ownerLifecycleSql), "Owner draft update privileges are not explicitly revoked.");
+check(/grant execute on function public\.update_listing_draft[\s\S]{0,300}to authenticated/i.test(ownerLifecycleSql), "Owner draft update is not authenticated-only.");
+check(/create or replace function public\.get_my_listing_moderation_feedback/i.test(ownerLifecycleSql), "Safe owner rejection-feedback RPC is missing.");
+check(/get_my_listing_moderation_feedback[\s\S]{0,900}security definer[\s\S]{0,200}set search_path = ''/i.test(ownerLifecycleSql), "Owner feedback RPC must have a fixed empty search path.");
+check(!/returns table\([^)]*(?:moderator_id|note|metadata)/i.test(ownerLifecycleSql), "Owner feedback RPC exposes staff-only moderation data.");
+check(/revoke all on function public\.get_my_listing_moderation_feedback\(uuid\)[\s\S]{0,120}from public, anon, service_role/i.test(ownerLifecycleSql), "Owner feedback RPC privileges are not explicitly revoked.");
+check(/grant execute on function public\.get_my_listing_moderation_feedback\(uuid\)\s*to authenticated/i.test(ownerLifecycleSql), "Owner feedback RPC is not authenticated-only.");
 
 const drizzleConfig = await readFile(resolve(root, "drizzle.config.ts"), "utf8");
 const databaseTypes = await readFile(resolve(root, "lib/supabase/database.types.ts"), "utf8");
@@ -144,7 +255,7 @@ const credentialPatterns = [
 ];
 const ignoredSourceSegments = new Set([".git", ".next", ".sites-runtime", ".vinext", ".wrangler", "dist", "node_modules"]);
 const sourceNames = (await readdir(root, { recursive: true }))
-  .filter((name) => !name.split("/").some((segment) => ignoredSourceSegments.has(segment)))
+  .filter((name) => !hasIgnoredSourceSegment(name, ignoredSourceSegments))
   .filter((name) => /(?:^|\/)(?:\.env\.example|[^/]+\.(?:ts|tsx|js|mjs|cjs|json|jsonc|sql|md|sh|yml|yaml))$/.test(name));
 for (const name of sourceNames) {
   const source = await readFile(resolve(root, name), "utf8").catch(() => "");

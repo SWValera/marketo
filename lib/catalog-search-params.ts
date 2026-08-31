@@ -6,11 +6,14 @@ const safeReference = (value: string) => /^[a-z0-9-]{1,80}$/i.test(value) ? valu
 export function parseCatalogSearchParams(params: CatalogSearchParams) {
   const city = first(params.city);
   const sort = first(params.sort);
+  const normalizedSort: "new" | "cheap" | "expensive" = sort === "cheap" || sort === "expensive" ? sort : "new";
   const dynamicFilters: Record<string, string | boolean> = {};
   for (const [key, rawValue] of Object.entries(params)) {
-    if (!key.startsWith("f_") || !rawValue) continue;
-    const value = first(rawValue);
-    dynamicFilters[key.slice(2)] = value === "true" ? true : value;
+    const attributeKey = key.slice(2);
+    if (!key.startsWith("f_") || !rawValue || !/^[a-z][A-Za-z0-9_]{0,79}$/.test(attributeKey)) continue;
+    if (Object.keys(dynamicFilters).length >= 40) break;
+    const value = first(rawValue).slice(0, 200);
+    if (value) dynamicFilters[attributeKey] = value === "true" ? true : value;
   }
   return {
     query: first(params.q).slice(0, 200),
@@ -18,7 +21,7 @@ export function parseCatalogSearchParams(params: CatalogSearchParams) {
     cityId: city === "all" ? city : safeReference(city) || undefined,
     minPrice: first(params.price_min).replace(/\D/g, ""),
     maxPrice: first(params.price_max).replace(/\D/g, ""),
-    sort: ["new", "cheap", "expensive"].includes(sort) ? sort : "new",
+    sort: normalizedSort,
     dynamicFilters,
   };
 }

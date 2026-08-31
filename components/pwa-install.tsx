@@ -126,10 +126,12 @@ export function PwaInstall() {
                 <button className="change-platform" type="button" onClick={() => setChoice(null)}>← {t("pwa.otherPhone")}</button>
                 <h3>{t("pwa.iphoneTitle")}</h3>
                 <ol>
-                  <li><span className="instruction-icon">1</span><div>{t("pwa.iphoneOpen")}</div></li>
-                  <li><span className="instruction-icon"><Share size={18} /></span><div>{t("pwa.iphoneStep1")}</div></li>
-                  <li><span className="instruction-icon">＋</span><div>{t("pwa.iphoneStep2")}</div></li>
-                  <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.iphoneStep3")}</div></li>
+                  <li><span className="instruction-icon">1</span><div>{t("pwa.iphoneStep1")}</div></li>
+                  <li><span className="instruction-icon"><Share size={18} /></span><div>{t("pwa.iphoneStep2")}</div></li>
+                  <li><span className="instruction-icon">3</span><div>{t("pwa.iphoneStep3")}</div></li>
+                  <li><span className="instruction-icon">＋</span><div>{t("pwa.iphoneStep4")}</div></li>
+                  <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.iphoneStep5")}</div></li>
+                  <li><span className="instruction-icon">6</span><div>{t("pwa.iphoneStep6")}</div></li>
                 </ol>
                 <p className="install-note">{t("pwa.iphoneNote")}</p>
               </div>
@@ -139,23 +141,18 @@ export function PwaInstall() {
               <div className="install-instructions">
                 <button className="change-platform" type="button" onClick={() => setChoice(null)}>← {t("pwa.otherPhone")}</button>
                 <h3>{t("pwa.androidTitle")}</h3>
-                {installPrompt ? (
-                  <>
-                    <p>{t("pwa.androidReady")}</p>
-                    <button className="android-install-action" type="button" onClick={installOnAndroid}>
-                      <Download size={18} /> {t("pwa.androidInstall")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <ol>
-                      <li><span className="instruction-icon"><MoreVertical size={18} /></span><div>{t("pwa.androidStep1")}</div></li>
-                      <li><span className="instruction-icon"><Download size={18} /></span><div>{t("pwa.androidStep2")}</div></li>
-                      <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.androidStep3")}</div></li>
-                    </ol>
-                    <p className="install-note">{t("pwa.androidStandaloneNote")}</p>
-                  </>
-                )}
+                <ol>
+                  <li><span className="instruction-icon">1</span><div>{t("pwa.androidStep1")}</div></li>
+                  <li><span className="instruction-icon"><MoreVertical size={18} /></span><div>{t("pwa.androidStep2")}</div></li>
+                  <li><span className="instruction-icon">3</span><div>{t("pwa.androidStep3")}</div></li>
+                  <li><span className="instruction-icon"><Download size={18} /></span><div>{t("pwa.androidStep4")}</div></li>
+                  <li><span className="instruction-icon"><Check size={18} /></span><div>{t("pwa.androidStep5")}</div></li>
+                  <li><span className="instruction-icon">6</span><div>{t("pwa.androidStep6")}</div></li>
+                </ol>
+                {installPrompt ? <button className="android-install-action" type="button" onClick={installOnAndroid}>
+                  <Download size={18} /> {t("pwa.androidInstall")}
+                </button> : null}
+                <p className="install-note">{t("pwa.androidStandaloneNote")}</p>
               </div>
             )}
           </section>

@@ -23,9 +23,60 @@ export type ListingSummary = {
 export type ListingDetail = ListingSummary & {
   description: string;
   attributes: Record<string, string | number | boolean>;
+  /** Localized display labels for option-backed attributes. */
+  attributeDisplayValues?: Record<string, string>;
   sellerId: string;
+  sellerName: string;
   /** Public contact returned only when the listing access policy allows it. */
   contactPhone?: string | null;
+};
+
+export type ListingStatus = "draft" | "pending" | "active" | "rejected" | "archived" | "sold" | "expired" | "deleted";
+
+export type MyListingSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  priceLabel: string;
+  priceAmount: number | null;
+  currencyCode: string;
+  cityLabel: string;
+  categoryLabel: string;
+  status: Exclude<ListingStatus, "deleted">;
+  createdAt: string;
+  updatedAt: string;
+  updatedLabel: string;
+  publishedAt: string | null;
+  imageUrl: string | null;
+  rejectionReasonCode: string | null;
+  rejectedAt: string | null;
+};
+
+export type OwnerDraftImage = {
+  id: string;
+  url: string;
+  sortOrder: number;
+};
+
+export type OwnerDraftBundle = {
+  id: string;
+  slug: string;
+  status: "draft" | "rejected";
+  categoryId: string;
+  categorySlug: string;
+  settlementId: string;
+  title: string;
+  description: string;
+  price: number | null;
+  currencyCode: "KZT";
+  contactName: string;
+  contactPhone: string;
+  allowMessages: boolean;
+  attributes: import("@/lib/publish/contract").PublishAttributeValues;
+  images: OwnerDraftImage[];
+  rejectionReasonCode: string | null;
+  rejectedAt: string | null;
+  updatedAt: string;
 };
 
 export type Profile = {
@@ -36,7 +87,11 @@ export type Profile = {
   bio: string | null;
   verified: boolean;
   language: "ru" | "kk";
+  accountStatus: AccountStatus;
+  contactPhone?: string | null;
 };
+
+export type AccountStatus = "active" | "suspended" | "banned" | "deleted";
 
 export type ChatSummary = {
   id: string;
@@ -62,9 +117,42 @@ export type Notification = {
   read: boolean;
 };
 
-export type ModerationCase = {
+export type ModerationQueueItem = {
   id: string;
-  listingId: string;
-  status: "pending" | "approved" | "rejected";
+  title: string;
+  priceLabel: string;
+  currencyCode: string;
+  cityLabel: string;
+  categoryLabel: string;
   createdAt: string;
+  createdLabel: string;
+  sellerId: string | null;
+  sellerName: string;
+  imageUrl: string | null;
+  status: "pending";
 };
+
+export type ModerationAttribute = {
+  key: string;
+  label: string;
+  value: string;
+};
+
+export type ModerationListingDetail = {
+  id: string;
+  title: string;
+  description: string;
+  priceLabel: string;
+  currencyCode: string;
+  categoryPath: string[];
+  cityLabel: string;
+  createdAt: string;
+  createdLabel: string;
+  sellerId: string | null;
+  sellerName: string;
+  status: "pending";
+  attributes: ModerationAttribute[];
+  images: Array<{ id: string; url: string; sortOrder: number }>;
+};
+
+export type ModerationDecision = "approve" | "reject";

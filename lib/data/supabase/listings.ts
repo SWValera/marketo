@@ -1,5 +1,5 @@
 import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
-import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
+import type { Json, TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
 
 export type ListingCursor = { publishedAt: string; id: string };
 export type ListingQuery = {
@@ -8,6 +8,8 @@ export type ListingQuery = {
   query?: string;
   minPriceMinor?: number;
   maxPriceMinor?: number;
+  attributeFilters?: Record<string, string | boolean>;
+  sort?: "new" | "cheap" | "expensive";
   cursor?: ListingCursor;
   limit?: number;
 };
@@ -24,18 +26,27 @@ export type ListingDraftPatch = Pick<
 
 export async function listPublishedListingCards(client: MarketoSupabaseClient, filters: ListingQuery = {}) {
   const limit = Math.min(Math.max(filters.limit ?? 24, 1), 60);
-  let request = client.from("catalog_listing_cards").select("*");
-  if (filters.categoryIds?.length) request = request.in("category_id", filters.categoryIds);
-  if (filters.settlementId) request = request.eq("settlement_id", filters.settlementId);
-  if (filters.query?.trim()) request = request.ilike("title", `%${filters.query.trim()}%`);
-  if (filters.minPriceMinor !== undefined) request = request.gte("price_minor", filters.minPriceMinor);
-  if (filters.maxPriceMinor !== undefined) request = request.lte("price_minor", filters.maxPriceMinor);
-  if (filters.cursor) {
+  let request = client.rpc("search_catalog_listing_cards", {
+    p_category_ids: filters.categoryIds?.length ? filters.categoryIds : null,
+    p_settlement_id: filters.settlementId ?? null,
+    p_query: filters.query?.trim() || null,
+    p_min_price_minor: filters.minPriceMinor ?? null,
+    p_max_price_minor: filters.maxPriceMinor ?? null,
+    p_attribute_filters: (filters.attributeFilters ?? {}) as Json,
+  });
+  if (filters.cursor && (filters.sort ?? "new") === "new") {
     request = request.or(
       `published_at.lt.${filters.cursor.publishedAt},and(published_at.eq.${filters.cursor.publishedAt},id.lt.${filters.cursor.id})`,
     );
   }
-  const { data, error } = await request.order("published_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1);
+  if (filters.sort === "cheap") {
+    request = request.order("price_minor", { ascending: true, nullsFirst: false });
+  } else if (filters.sort === "expensive") {
+    request = request.order("price_minor", { ascending: false, nullsFirst: false });
+  } else {
+    request = request.order("published_at", { ascending: false });
+  }
+  const { data, error } = await request.order("id", { ascending: false }).limit(limit + 1);
   if (error) throw error;
   return { items: data.slice(0, limit), hasMore: data.length > limit };
 }
@@ -59,6 +70,34 @@ export async function getListingDetailByRouteKey(client: MarketoSupabaseClient, 
   const { data, error } = await request.maybeSingle();
   if (error) throw error;
   return data;
+}
+
+export async function getListingAttributeRecords(client: MarketoSupabaseClient, listingIds: string[]) {
+  if (listingIds.length === 0) return { scalarValues: [], optionValues: [], attributes: [], options: [] };
+  const [scalarResult, optionResult] = await Promise.all([
+    client.from("listing_attribute_values").select("listing_id, attribute_id, text_value, number_value, boolean_value, date_value, number_min_value, number_max_value").in("listing_id", listingIds),
+    client.from("listing_attribute_option_values").select("listing_id, attribute_id, option_id").in("listing_id", listingIds),
+  ]);
+  if (scalarResult.error) throw scalarResult.error;
+  if (optionResult.error) throw optionResult.error;
+  const attributeIds = [...new Set([...scalarResult.data, ...optionResult.data].map((row) => row.attribute_id))];
+  const optionIds = [...new Set(optionResult.data.map((row) => row.option_id))];
+  const [attributeResult, optionsResult] = await Promise.all([
+    attributeIds.length
+      ? client.from("category_attributes").select("id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, sort_order").in("id", attributeIds)
+      : Promise.resolve({ data: [], error: null }),
+    optionIds.length
+      ? client.from("category_attribute_options").select("id, value, label_ru, label_kk").in("id", optionIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (attributeResult.error) throw attributeResult.error;
+  if (optionsResult.error) throw optionsResult.error;
+  return {
+    scalarValues: scalarResult.data,
+    optionValues: optionResult.data,
+    attributes: attributeResult.data,
+    options: optionsResult.data,
+  };
 }
 
 export async function createListingDraft(client: MarketoSupabaseClient, input: ListingDraftInput) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/components/i18n-provider";
 import { localize } from "@/lib/i18n/config";
@@ -29,6 +29,8 @@ export function CategoryPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [parentSlug, setParentSlug] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const selected = getCategoryBySlug(view, value);
   const selectedPath = getCategoryPath(view, value);
   const currentParent = getCategoryBySlug(view, parentSlug);
@@ -66,27 +68,64 @@ export function CategoryPicker({
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const body = document.body;
+    const trigger = triggerRef.current;
+    const scrollY = window.scrollY;
+    const previous = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+    };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+
+    const syncVisualViewport = () => {
+      const viewport = window.visualViewport;
+      const height = Math.round(viewport?.height ?? window.innerHeight);
+      const offsetTop = Math.round(viewport?.offsetTop ?? 0);
+      backdropRef.current?.style.setProperty("--category-picker-viewport-height", `${height}px`);
+      backdropRef.current?.style.setProperty("--category-picker-viewport-top", `${offsetTop}px`);
+    };
     const close = (event: KeyboardEvent) => event.key === "Escape" && closePicker();
+    syncVisualViewport();
+    window.visualViewport?.addEventListener("resize", syncVisualViewport);
+    window.visualViewport?.addEventListener("scroll", syncVisualViewport);
+    window.addEventListener("resize", syncVisualViewport);
     window.addEventListener("keydown", close);
     return () => {
-      document.body.style.overflow = previous;
+      body.style.overflow = previous.overflow;
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      window.scrollTo(0, scrollY);
+      window.visualViewport?.removeEventListener("resize", syncVisualViewport);
+      window.visualViewport?.removeEventListener("scroll", syncVisualViewport);
+      window.removeEventListener("resize", syncVisualViewport);
       window.removeEventListener("keydown", close);
+      window.requestAnimationFrame(() => trigger?.focus({ preventScroll: true }));
     };
   }, [open]);
 
   const visibleItems = query.trim() ? searchResults : currentItems;
 
   return <>
-    <button type="button" className="category-picker-trigger" onClick={openPicker} aria-haspopup="dialog">
+    <button ref={triggerRef} type="button" className="category-picker-trigger" onClick={openPicker} aria-haspopup="dialog">
       <span>
         {selected ? <><strong>{localize(selected.name, locale)}</strong><small>{selectedPath.map((item) => localize(item.name, locale)).join(" → ")}</small></> : t("categories.chooseExact")}
       </span>
       <ChevronDown size={18} />
     </button>
     {open ? createPortal(
-      <div className="category-picker-backdrop" onMouseDown={closePicker}>
+      <div ref={backdropRef} className="category-picker-backdrop" onMouseDown={closePicker}>
         <section className="category-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="category-picker-title" onMouseDown={(event) => event.stopPropagation()}>
           <header>
             {parentSlug ? <button type="button" className="category-level-back" onClick={goBack} aria-label={t("common.back")}><ArrowLeft size={21} /></button> : null}
@@ -99,22 +138,24 @@ export function CategoryPicker({
           </header>
           <label className="location-search category-search">
             <Search size={19} />
-            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("categories.search")} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("categories.search")} />
           </label>
           {!query && parentSlug ? <div className="category-level-path">{getCategoryPath(view, parentSlug).map((item) => <span key={item.id}>{localize(item.name, locale)}</span>)}</div> : null}
-          <div className="category-picker-results" role="listbox" aria-label={t("categories.choose")}>{visibleItems.map((item) => {
-            const path = getCategoryPath(view, item);
-            const children = getCategoryChildren(view, item);
-            const hasChildren = children.length > 0;
-            return <button type="button" role="option" aria-selected={item.slug === value} className={item.slug === value ? "selected" : ""} key={item.id} onClick={() => choose(item.slug)}>
-              <span>
-                <strong>{localize(item.name, locale)}</strong>
-                {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.sections", { count: children.length })}</small> : <small>{t("categories.exact")}</small>}
-              </span>
-              {item.slug === value ? <Check size={18} /> : hasChildren ? <ChevronRight size={19} /> : null}
-            </button>;
-          })}</div>
-          {visibleItems.length === 0 ? <div className="category-picker-empty">{catalog.status === "ready" ? t("categories.notFound") : t("reference.categoriesUnavailable")}</div> : null}
+          <div className="category-picker-results" role="listbox" aria-label={t("categories.choose")}>
+            {visibleItems.map((item) => {
+              const path = getCategoryPath(view, item);
+              const children = getCategoryChildren(view, item);
+              const hasChildren = children.length > 0;
+              return <button type="button" role="option" aria-selected={item.slug === value} className={item.slug === value ? "selected" : ""} key={item.id} onClick={() => choose(item.slug)}>
+                <span>
+                  <strong>{localize(item.name, locale)}</strong>
+                  {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.sections", { count: children.length })}</small> : <small>{t("categories.exact")}</small>}
+                </span>
+                {item.slug === value ? <Check size={18} /> : hasChildren ? <ChevronRight size={19} /> : null}
+              </button>;
+            })}
+            {visibleItems.length === 0 ? <div className="category-picker-empty">{catalog.status === "ready" ? t("categories.notFound") : t("reference.categoriesUnavailable")}</div> : null}
+          </div>
         </section>
       </div>,
       document.body,

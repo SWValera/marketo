@@ -1,11 +1,42 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
-import type { TablesUpdate } from "@/lib/supabase/database.types";
+import type { MarketoSupabaseClient } from "./client.ts";
+import type { TablesUpdate } from "../../supabase/database.types.ts";
 
 export async function getCurrentProfile(client: MarketoSupabaseClient) {
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) return null;
   const { data, error } = await client.rpc("get_my_profile").maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function getCurrentAccountProfile(client: MarketoSupabaseClient) {
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw authError;
+  if (!authData.user) return null;
+  return getAuthenticatedAccountProfile(client);
+}
+
+export async function getAuthenticatedAccountProfile(client: MarketoSupabaseClient) {
+  const { data, error } = await client.rpc("get_my_account_profile").maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCurrentAccountProfile(client: MarketoSupabaseClient, input: {
+  displayName: string;
+  bio: string | null;
+  language: "ru" | "kk";
+  settlementId: string | null;
+  contactPhoneE164: string | null;
+}) {
+  const { data, error } = await client.rpc("update_my_account_profile", {
+    p_display_name: input.displayName,
+    p_bio: input.bio,
+    p_language_code: input.language,
+    p_settlement_id: input.settlementId,
+    p_contact_phone_e164: input.contactPhoneE164,
+  }).single();
   if (error) throw error;
   return data;
 }

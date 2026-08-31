@@ -16,6 +16,7 @@ import {
   type CategoryReferenceData,
   type GeographyReferenceData,
   type ReferenceCategoryAttribute,
+  type ReferenceAttributeOption,
   type ReferenceDataEnvelope,
 } from "@/lib/reference-data/types";
 import { createSupabasePublicServerClient } from "@/lib/supabase/server";
@@ -31,6 +32,7 @@ type CacheEntry<T> = {
 let geographyCache: CacheEntry<GeographyReferenceData> | undefined;
 let categoryCache: CacheEntry<CategoryReferenceData> | undefined;
 const attributeCache = new Map<string, CacheEntry<CategoryAttributeReferenceData>>();
+const optionCache = new Map<string, CacheEntry<ReferenceAttributeOption[]>>();
 
 function unavailable<T>(data: T): ReferenceDataEnvelope<T> {
   return { status: "unconfigured", data, reason: "missing_configuration" };
@@ -142,13 +144,17 @@ export async function getCategoryAttributeReferences(
   try {
     const client = createSupabasePublicServerClient();
     const attributes = await getCategoryAttributes(client, categoryId);
-    const options = await listAttributeOptions(client, attributes.map((attribute) => attribute.id));
+    const options = await listAttributeOptions(
+      client,
+      attributes.filter((attribute) => attribute.options_load_mode === "eager").map((attribute) => attribute.id),
+    );
     const optionsByAttribute = new Map<string, ReferenceCategoryAttribute["options"]>();
     for (const option of options) {
       const current = optionsByAttribute.get(option.attribute_id) ?? [];
       current.push({
         id: option.id,
         attributeId: option.attribute_id,
+        parentOptionId: option.parent_option_id,
         value: option.value,
         label: { ru: option.label_ru, kk: option.label_kk },
         sortOrder: option.sort_order,
@@ -170,6 +176,10 @@ export async function getCategoryAttributeReferences(
         searchable: attribute.is_searchable,
         inheritsToChildren: attribute.inherits_to_children,
         validation: attribute.validation,
+        filterMode: attribute.filter_mode as ReferenceCategoryAttribute["filterMode"],
+        optionsLoadMode: attribute.options_load_mode as ReferenceCategoryAttribute["optionsLoadMode"],
+        dependsOnKey: attribute.depends_on_key,
+        visible: attribute.is_visible,
         sortOrder: attribute.sort_order,
         options: (optionsByAttribute.get(attribute.id) ?? []).sort((left, right) => left.sortOrder - right.sortOrder),
       })),
@@ -178,5 +188,37 @@ export async function getCategoryAttributeReferences(
     return value;
   } catch {
     return failed(emptyCategoryAttributes(categoryId));
+  }
+}
+
+export async function getCategoryAttributeOptionReferences(
+  attributeId: string,
+  parentOptionId?: string,
+  query = "",
+): Promise<ReferenceDataEnvelope<ReferenceAttributeOption[]>> {
+  const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase("ru");
+  const cacheKey = `${attributeId}:${parentOptionId ?? "root"}:${normalizedQuery}`;
+  const cached = optionCache.get(cacheKey);
+  if (cacheIsFresh(cached)) return cached.value;
+  if (!tryGetServerSupabasePublicConfig()) return unavailable([]);
+
+  try {
+    const rows = await listAttributeOptions(createSupabasePublicServerClient(), [attributeId], {
+      parentOptionId,
+      query: normalizedQuery,
+      limit: 300,
+    });
+    const value = ready<ReferenceAttributeOption[]>(rows.map((option) => ({
+      id: option.id,
+      attributeId: option.attribute_id,
+      parentOptionId: option.parent_option_id,
+      value: option.value,
+      label: { ru: option.label_ru, kk: option.label_kk },
+      sortOrder: option.sort_order,
+    })));
+    optionCache.set(cacheKey, { expiresAt: Date.now() + REFERENCE_CACHE_TTL_MS, value });
+    return value;
+  } catch {
+    return failed([]);
   }
 }

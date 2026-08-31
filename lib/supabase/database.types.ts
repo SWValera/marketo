@@ -7,6 +7,12 @@ import type {
   categories,
   categoryAttributeOptions,
   categoryAttributes,
+  cityPremiumAccounts,
+  cityPremiumDailyMetrics,
+  cityPremiumEvents,
+  cityPremiumOrders,
+  cityPremiumPlacements,
+  cityPremiumSettings,
   conversationParticipants,
   conversations,
   countries,
@@ -29,6 +35,22 @@ import type {
 } from "@/db/schema";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+type CatalogListingCardRow = {
+  id: string | null;
+  slug: string | null;
+  title: string | null;
+  price_minor: number | null;
+  currency_code: string | null;
+  category_id: string | null;
+  category_slug: string | null;
+  settlement_id: string | null;
+  location_name_ru: string | null;
+  location_name_kk: string | null;
+  published_at: string | null;
+  promoted: boolean | null;
+  primary_image_storage_key: string | null;
+};
 
 // The explicit alias avoids repeating Drizzle's internal table constraint in
 // every entry while keeping all Row/Insert/Update fields inferred from schema.ts.
@@ -57,6 +79,12 @@ export type Database = {
       listing_attribute_values: Contract<typeof listingAttributeValues>;
       listing_attribute_option_values: Contract<typeof listingAttributeOptionValues>;
       listing_images: Contract<typeof listingImages>;
+      city_premium_settings: Contract<typeof cityPremiumSettings>;
+      city_premium_accounts: Contract<typeof cityPremiumAccounts>;
+      city_premium_orders: Contract<typeof cityPremiumOrders>;
+      city_premium_placements: Contract<typeof cityPremiumPlacements>;
+      city_premium_events: Contract<typeof cityPremiumEvents>;
+      city_premium_daily_metrics: Contract<typeof cityPremiumDailyMetrics>;
       favorites: Contract<typeof favorites>;
       conversations: Contract<typeof conversations>;
       conversation_participants: Contract<typeof conversationParticipants>;
@@ -80,21 +108,7 @@ export type Database = {
         Relationships: [];
       };
       catalog_listing_cards: {
-        Row: {
-          id: string | null;
-          slug: string | null;
-          title: string | null;
-          price_minor: number | null;
-          currency_code: string | null;
-          category_id: string | null;
-          category_slug: string | null;
-          settlement_id: string | null;
-          location_name_ru: string | null;
-          location_name_kk: string | null;
-          published_at: string | null;
-          promoted: boolean | null;
-          primary_image_storage_key: string | null;
-        };
+        Row: CatalogListingCardRow;
         Relationships: [];
       };
     };
@@ -113,6 +127,62 @@ export type Database = {
           last_seen_at: string | null;
           created_at: string;
           updated_at: string;
+        }>;
+      };
+      get_my_account_profile: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          id: string;
+          display_name: string;
+          avatar_path: string | null;
+          bio: string | null;
+          language_code: string;
+          settlement_id: string | null;
+          status: string;
+          verified_at: string | null;
+          contact_phone_e164: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      update_my_account_profile: {
+        Args: {
+          p_display_name: string;
+          p_bio: string | null;
+          p_language_code: string;
+          p_settlement_id: string | null;
+          p_contact_phone_e164: string | null;
+        };
+        Returns: Array<{
+          id: string;
+          display_name: string;
+          avatar_path: string | null;
+          bio: string | null;
+          language_code: string;
+          settlement_id: string | null;
+          status: string;
+          verified_at: string | null;
+          contact_phone_e164: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      get_city_premium_placements: {
+        Args: { p_settlement_id: string; p_limit?: number };
+        Returns: Array<{
+          placement_id: string;
+          listing_id: string;
+          slug: string;
+          title: string;
+          price_minor: number | null;
+          currency_code: string;
+          settlement_id: string;
+          location_name_ru: string;
+          location_name_kk: string;
+          primary_image_storage_key: string | null;
+          published_at: string;
+          starts_at: string;
+          ends_at: string;
         }>;
       };
       get_profile_for_staff: {
@@ -142,6 +212,52 @@ export type Database = {
       mark_own_listing_sold: {
         Args: { target_listing_id: string };
         Returns: undefined;
+      };
+      search_catalog_listing_cards: {
+        Args: {
+          p_category_ids?: string[] | null;
+          p_settlement_id?: string | null;
+          p_query?: string | null;
+          p_min_price_minor?: number | null;
+          p_max_price_minor?: number | null;
+          p_attribute_filters?: Json;
+        };
+        Returns: CatalogListingCardRow[];
+      };
+      create_listing_draft: {
+        Args: {
+          p_category_id: string;
+          p_settlement_id: string;
+          p_title: string;
+          p_description: string;
+          p_price_minor: number | null;
+          p_currency_code: string;
+          p_contact_name: string;
+          p_contact_phone_e164: string | null;
+          p_allow_messages?: boolean;
+          p_attributes?: Json;
+        };
+        Returns: Array<{ listing_id: string; listing_slug: string }>;
+      };
+      update_listing_draft: {
+        Args: {
+          target_listing_id: string;
+          p_category_id: string;
+          p_settlement_id: string;
+          p_title: string;
+          p_description: string;
+          p_price_minor: number | null;
+          p_currency_code: string;
+          p_contact_name: string;
+          p_contact_phone_e164: string;
+          p_allow_messages?: boolean;
+          p_attributes?: Json;
+        };
+        Returns: Array<{ listing_id: string; listing_slug: string; listing_status: string }>;
+      };
+      get_my_listing_moderation_feedback: {
+        Args: { p_listing_id?: string | null };
+        Returns: Array<{ listing_id: string; reason_code: string; rejected_at: string }>;
       };
       get_or_create_listing_conversation: {
         Args: { target_listing_id: string };

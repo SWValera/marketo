@@ -2,6 +2,7 @@
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CategoryCascade } from "@/components/category-cascade";
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
@@ -9,6 +10,7 @@ import { LocationPicker, useStoredLocation } from "@/components/location-picker"
 import { PageHeader } from "@/components/page-header";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
 import { useCategoryAttributes } from "@/components/use-category-attributes";
+import { ReferenceSelect } from "@/components/reference-select";
 import {
   createCategoryCatalogView,
   getCategoryBySlug,
@@ -27,6 +29,11 @@ import type {
 } from "@/lib/reference-data/types";
 import { useI18n } from "@/components/i18n-provider";
 import { localeTag, localize } from "@/lib/i18n/config";
+import {
+  clearDependentValues,
+  getDependentParentOptionId,
+  isAttributeVisible,
+} from "@/lib/reference-data/attributes";
 
 type FilterValue = string | boolean;
 
@@ -59,6 +66,7 @@ export function CatalogClient({
   initialListings?: ListingSummary[];
   fallback?: string;
 }) {
+  const router = useRouter();
   const { locale, t } = useI18n();
   const geography = useReferenceGeography();
   const catalogView = useMemo(() => createCategoryCatalogView(catalog.data), [catalog.data]);
@@ -77,8 +85,8 @@ export function CatalogClient({
   const activeRoot = getCategoryRoot(catalogView, categorySlug);
   const attributeState = useCategoryAttributes(activeCategory?.id, initialCategoryAttributes);
   const activeAttributes = useMemo(
-    () => attributeState.data.attributes.filter((attribute) => attribute.filterable),
-    [attributeState.data.attributes],
+    () => attributeState.data.attributes.filter((attribute) => attribute.filterable && isAttributeVisible(attribute, dynamicFilters)),
+    [attributeState.data.attributes, dynamicFilters],
   );
   const activePresentation = getCategoryPresentation(catalogView, categorySlug);
   const activePlaceholder = localize(activePresentation.searchPlaceholder ?? activeRoot?.searchPlaceholder, locale) || t("header.searchPlaceholder");
@@ -94,10 +102,17 @@ export function CatalogClient({
       .filter((item) => !maxPrice || (item.priceAmount ?? 0) <= Number(maxPrice))
       .filter((item) => Object.entries(dynamicFilters).every(([key, value]) => {
         if (value === "" || value === false) return true;
-        const listingValue = item.attributes?.[key];
+        const rangeMatch = key.match(/^(.*)_(min|max)$/);
+        const attributeKey = rangeMatch?.[1] ?? key;
+        const listingValue = item.attributes?.[attributeKey];
+        if (rangeMatch) {
+          const candidate = Number(listingValue);
+          const boundary = Number(value);
+          return Number.isFinite(candidate) && (rangeMatch[2] === "min" ? candidate >= boundary : candidate <= boundary);
+        }
         if (typeof value === "boolean") return listingValue === value;
-        const definition = filterDefinitions.get(key);
-        if (definition?.dataType === "text") return String(listingValue ?? "").toLocaleLowerCase("ru").includes(String(value).toLocaleLowerCase("ru"));
+        const definition = filterDefinitions.get(attributeKey);
+        if (definition?.filterMode === "search" || definition?.dataType === "text") return String(listingValue ?? "").toLocaleLowerCase("ru").includes(String(value).toLocaleLowerCase("ru"));
         if (definition?.dataType === "number") return Number(listingValue) === Number(value);
         return String(listingValue ?? "") === String(value);
       }))
@@ -117,8 +132,11 @@ export function CatalogClient({
     if (maxPrice) params.set("price_max", maxPrice);
     if (sort !== "new") params.set("sort", sort);
     for (const [key, value] of Object.entries(dynamicFilters)) if (value !== "" && value !== false) params.set(`f_${key}`, String(value));
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`);
-  }, [categorySlug, cityId, dynamicFilters, maxPrice, minPrice, query, sort]);
+    const nextUrl = `${window.location.pathname}${params.size ? `?${params}` : ""}`;
+    if (`${window.location.pathname}${window.location.search}` === nextUrl) return;
+    const timer = window.setTimeout(() => router.replace(nextUrl, { scroll: false }), 300);
+    return () => window.clearTimeout(timer);
+  }, [categorySlug, cityId, dynamicFilters, maxPrice, minPrice, query, router, sort]);
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -153,9 +171,11 @@ export function CatalogClient({
     minPrice ? `${t("catalog.from")} ${Number(minPrice).toLocaleString(localeTag(locale))} ₸` : null,
     maxPrice ? `${t("catalog.to")} ${Number(maxPrice).toLocaleString(localeTag(locale))} ₸` : null,
     ...Object.entries(dynamicFilters).filter(([, value]) => Boolean(value)).map(([key, value]) => {
-      const filter = activeAttributes.find((item) => item.key === key);
+      const rangeMatch = key.match(/^(.*)_(min|max)$/);
+      const filter = activeAttributes.find((item) => item.key === (rangeMatch?.[1] ?? key));
       const option = filter?.options?.find((item) => item.value === value);
-      return option ? localize(option.label, locale) : filter ? `${localize(filter.label, locale)}: ${value === true ? t("common.yes") : String(value)}` : null;
+      const rangeLabel = rangeMatch?.[2] === "min" ? t("catalog.from") : rangeMatch?.[2] === "max" ? t("catalog.to") : "";
+      return option ? localize(option.label, locale) : filter ? `${localize(filter.label, locale)}${rangeLabel ? ` ${rangeLabel}` : ""}: ${value === true ? t("common.yes") : String(value)}` : null;
     }),
   ].filter(Boolean) as string[];
 
@@ -176,7 +196,18 @@ export function CatalogClient({
         <div className="price-fields"><label>{t("catalog.priceFrom")}<input inputMode="numeric" value={minPrice} onChange={(event) => setMinPrice(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label><label>{t("catalog.to")}<input inputMode="numeric" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value.replace(/\D/g, ""))} placeholder="15 000 000" /></label></div>
         {attributeState.status === "loading" ? <p className="filter-reference-state">{t("reference.attributesLoading")}</p> : null}
         {attributeState.status === "error" ? <p className="filter-reference-state is-error">{t("reference.attributesUnavailable")}</p> : null}
-        {activeAttributes.map((attribute) => attribute.dataType === "select" || attribute.dataType === "multiselect" ? <label key={attribute.id}>{localize(attribute.label, locale)}<select value={String(dynamicFilters[attribute.key] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.key]: event.target.value }))}><option value="">{t("common.notImportant")}</option>{attribute.options.map((item) => <option value={item.value} key={item.id}>{localize(item.label, locale)}</option>)}</select></label> : attribute.dataType === "boolean" ? <label className="check-row" key={attribute.id}><input type="checkbox" checked={Boolean(dynamicFilters[attribute.key])} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.key]: event.target.checked }))} /> {localize(attribute.label, locale)}</label> : <label key={attribute.id}>{localize(attribute.label, locale)}<input type={attribute.dataType === "number" || attribute.dataType === "range" ? "number" : attribute.dataType === "date" ? "date" : "text"} inputMode={attribute.dataType === "number" || attribute.dataType === "range" ? "numeric" : undefined} value={String(dynamicFilters[attribute.key] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.key]: event.target.value }))} /></label>)}
+        {activeAttributes.map((attribute) => {
+          if (attribute.dataType === "select" || attribute.dataType === "multiselect") {
+            return <label key={attribute.id}>{localize(attribute.label, locale)}<ReferenceSelect attribute={attribute} emptyMode="filter" value={String(dynamicFilters[attribute.key] ?? "")} parentOptionId={getDependentParentOptionId(attribute, attributeState.data.attributes, dynamicFilters)} onChange={(value) => setDynamicFilters((current) => clearDependentValues(attribute.key, value, attributeState.data.attributes, current))} /></label>;
+          }
+          if (attribute.dataType === "boolean") {
+            return <label className="check-row" key={attribute.id}><input type="checkbox" checked={Boolean(dynamicFilters[attribute.key])} onChange={(event) => setDynamicFilters((current) => clearDependentValues(attribute.key, event.target.checked, attributeState.data.attributes, current))} /> {localize(attribute.label, locale)}</label>;
+          }
+          if (attribute.filterMode === "range") {
+            return <fieldset className="attribute-range-filter" key={attribute.id}><legend>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}</legend><div><label>{t("catalog.from")}<input type={attribute.dataType === "date" ? "date" : "number"} inputMode={attribute.dataType === "date" ? undefined : "decimal"} value={String(dynamicFilters[`${attribute.key}_min`] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [`${attribute.key}_min`]: event.target.value }))} /></label><label>{t("catalog.to")}<input type={attribute.dataType === "date" ? "date" : "number"} inputMode={attribute.dataType === "date" ? undefined : "decimal"} value={String(dynamicFilters[`${attribute.key}_max`] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [`${attribute.key}_max`]: event.target.value }))} /></label></div></fieldset>;
+          }
+          return <label key={attribute.id}>{localize(attribute.label, locale)}<input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" || attribute.dataType === "range" ? "number" : "text"} inputMode={attribute.dataType === "number" || attribute.dataType === "range" ? "decimal" : undefined} value={String(dynamicFilters[attribute.key] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.key]: event.target.value }))} /></label>;
+        })}
         <button className="filter-apply" type="button" onClick={() => setFiltersOpen(false)}>{t("catalog.show", { count: result.length })}</button>
         <button className="reset-button" type="button" onClick={resetFilters}>{t("catalog.reset")}</button>
       </aside>

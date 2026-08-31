@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { prepareNodeRuntimeEnvironment } from "./node-runtime.mjs";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +19,7 @@ export class ProcessExecutionError extends Error {
 }
 
 export function createSitesEnvironment(baseEnvironment = process.env) {
-  const environment = { ...baseEnvironment };
+  const environment = prepareNodeRuntimeEnvironment(baseEnvironment);
   const configuredRuntimeRoot = environment.SITES_RUNTIME_ROOT;
   const runtimeRoot = configuredRuntimeRoot
     ? (isAbsolute(configuredRuntimeRoot) ? configuredRuntimeRoot : resolve(projectRoot, configuredRuntimeRoot))

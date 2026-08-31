@@ -12,6 +12,9 @@ const users = {
   moderator: "30000000-0000-4000-8000-000000000003",
   admin: "40000000-0000-4000-8000-000000000004",
   suspended: "50000000-0000-4000-8000-000000000005",
+  support: "60000000-0000-4000-8000-000000000006",
+  suspendedModerator: "70000000-0000-4000-8000-000000000007",
+  bannedAdmin: "80000000-0000-4000-8000-000000000008",
 };
 
 async function applyMigrations(db) {
@@ -72,7 +75,16 @@ async function createFixtureDatabase() {
     );
   }
   await db.query("update public.profiles set status = 'suspended' where id = $1", [users.suspended]);
-  await db.query("insert into public.user_roles (user_id, role) values ($1, 'moderator'), ($2, 'admin')", [users.moderator, users.admin]);
+  await db.query("update public.profiles set status = 'suspended' where id = $1", [users.suspendedModerator]);
+  await db.query("update public.profiles set status = 'banned' where id = $1", [users.bannedAdmin]);
+  await db.query(`
+    insert into public.user_roles (user_id, role) values
+      ($1, 'moderator'),
+      ($2, 'admin'),
+      ($3, 'support'),
+      ($4, 'moderator'),
+      ($5, 'admin')
+  `, [users.moderator, users.admin, users.support, users.suspendedModerator, users.bannedAdmin]);
 
   const references = await db.query(`
     select
@@ -105,6 +117,32 @@ async function createFixtureDatabase() {
         join public.categories as category on category.id = attribute.category_id
         where category.slug = 'cars-suv' and attribute.key = 'brand' and attribute_option.value = 'toyota'
       ) as car_brand_option_id,
+      (
+        select attribute.id
+        from public.category_attributes as attribute
+        join public.categories as category on category.id = attribute.category_id
+        where category.slug = 'cars-suv' and attribute.key = 'model'
+      ) as car_model_attribute_id,
+      (
+        select attribute_option.id
+        from public.category_attribute_options as attribute_option
+        join public.category_attributes as attribute on attribute.id = attribute_option.attribute_id
+        join public.categories as category on category.id = attribute.category_id
+        where category.slug = 'cars-suv' and attribute.key = 'model' and attribute_option.value = 'toyota:rav4'
+      ) as car_model_option_id,
+      (
+        select attribute.id
+        from public.category_attributes as attribute
+        join public.categories as category on category.id = attribute.category_id
+        where category.slug = 'cars-suv' and attribute.key = 'condition'
+      ) as car_condition_attribute_id,
+      (
+        select attribute_option.id
+        from public.category_attribute_options as attribute_option
+        join public.category_attributes as attribute on attribute.id = attribute_option.attribute_id
+        join public.categories as category on category.id = attribute.category_id
+        where category.slug = 'cars-suv' and attribute.key = 'condition' and attribute_option.value = 'used'
+      ) as car_condition_option_id,
       (
         select attribute.id
         from public.category_attributes as attribute
@@ -162,8 +200,8 @@ async function createFixtureDatabase() {
     [listings.activeOwner, refs.free_condition_attribute_id, refs.free_condition_option_id],
   );
   await db.query(
-    "insert into public.listing_images (listing_id, storage_key) values ($1, 'security/draft-owner.webp'), ($2, 'security/active-owner.webp')",
-    [listings.draftCar, listings.activeOwner],
+    "insert into public.listing_images (listing_id, storage_key) values ($1, 'security/draft-owner.webp'), ($2, 'security/active-owner.webp'), ($3, 'security/pending-owner.webp')",
+    [listings.draftCar, listings.activeOwner, listings.pendingApprove],
   );
   await db.query(
     "insert into public.notifications (user_id, type, payload) values ($1, 'listing.test', '{}'::jsonb)",
@@ -227,10 +265,10 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as active_under_inactive
       `);
       assert.deepEqual(result.rows[0], {
-        total: 228,
-        reachable: 228,
+        total: 1356,
+        reachable: 1356,
         cycles: 0,
-        max_depth: 2,
+        max_depth: 4,
         duplicate_sibling_ru: 0,
         duplicate_sibling_kk: 0,
         duplicate_sort: 0,
@@ -281,8 +319,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as invalid_options
       `);
       assert.deepEqual(result.rows[0], {
-        attributes: 712,
-        options: 1519,
+        attributes: 9373,
+        options: 87150,
         orphan_attributes: 0,
         orphan_options: 0,
         invalid_attributes: 0,
@@ -309,12 +347,86 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       });
     });
 
+    await t.test("pending queue and staff helpers require an active moderator or admin", async () => {
+      for (const [userId, expectedCount, expectedRole] of [
+        [users.moderator, 2, true],
+        [users.admin, 2, true],
+        [users.buyer, 0, false],
+        [users.support, 0, false],
+        [users.suspendedModerator, 0, false],
+        [users.bannedAdmin, 0, false],
+      ]) {
+        await asAuthenticated(db, userId, async () => {
+          const queue = await db.query("select id from public.listings where status = 'pending' order by created_at, id");
+          assert.equal(queue.rows.length, expectedCount, userId);
+          const role = await db.query("select private.has_any_role(array['moderator', 'admin']) as allowed");
+          assert.equal(role.rows[0].allowed, expectedRole, userId);
+        });
+      }
+      await asAuthenticated(db, users.support, async () => {
+        await assert.rejects(
+          db.query("select * from public.get_profile_for_staff($1)", [users.owner]),
+          /moderator role required/i,
+        );
+      });
+      await asAuthenticated(db, users.suspendedModerator, async () => {
+        await assert.rejects(
+          db.query("select public.moderate_listing($1, 'approve')", [listings.pendingApprove]),
+          /moderator role required/i,
+        );
+      });
+      await asAuthenticated(db, users.bannedAdmin, async () => {
+        await assert.rejects(
+          db.query("select public.assign_user_role($1, 'support', true)", [users.buyer]),
+          /admin role required/i,
+        );
+      });
+    });
+
+    await t.test("pending media follows listing RLS for anon, owner, staff and inactive roles", async () => {
+      const pendingImage = async () => db.query(
+        "select storage_key from public.listing_images where listing_id = $1",
+        [listings.pendingApprove],
+      );
+      await asAnon(db, async () => {
+        assert.equal((await pendingImage()).rows.length, 0);
+        const active = await db.query("select storage_key from public.listing_images where listing_id = $1", [listings.activeOwner]);
+        assert.equal(active.rows.length, 1);
+      });
+      await asAuthenticated(db, users.owner, async () => assert.equal((await pendingImage()).rows.length, 1));
+      await asAuthenticated(db, users.buyer, async () => assert.equal((await pendingImage()).rows.length, 0));
+      await asAuthenticated(db, users.moderator, async () => assert.equal((await pendingImage()).rows.length, 1));
+      await asAuthenticated(db, users.admin, async () => assert.equal((await pendingImage()).rows.length, 1));
+      await asAuthenticated(db, users.support, async () => assert.equal((await pendingImage()).rows.length, 0));
+      await asAuthenticated(db, users.suspendedModerator, async () => assert.equal((await pendingImage()).rows.length, 0));
+      await asAuthenticated(db, users.bannedAdmin, async () => assert.equal((await pendingImage()).rows.length, 0));
+    });
+
+    await t.test("moderation input rejects missing or invalid reasons and oversized notes", async () => {
+      await asAuthenticated(db, users.moderator, async () => {
+        await assert.rejects(
+          db.query("select public.moderate_listing($1, 'reject')", [listings.pendingReject]),
+          /reason_code is required/i,
+        );
+        await assert.rejects(
+          db.query("select public.moderate_listing($1, 'reject', 'free.form')", [listings.pendingReject]),
+          /invalid moderation reason_code/i,
+        );
+        await assert.rejects(
+          db.query("select public.moderate_listing($1, 'reject', 'other', $2)", [listings.pendingReject, "x".repeat(2001)]),
+          /moderation note is too long/i,
+        );
+      });
+      const unchanged = await db.query("select status from public.listings where id = $1", [listings.pendingReject]);
+      assert.equal(unchanged.rows[0].status, "pending");
+    });
+
     await t.test("moderation state machine permits only the reviewed transitions", async () => {
       await asAuthenticated(db, users.moderator, async () => {
-        await db.query("select public.moderate_listing($1, 'approve')", [listings.pendingApprove]);
-        await db.query("select public.moderate_listing($1, 'hide', 'policy.hidden')", [listings.pendingApprove]);
-        await db.query("select public.moderate_listing($1, 'restore')", [listings.pendingApprove]);
-        await db.query("select public.moderate_listing($1, 'reject', 'policy.rejected')", [listings.pendingReject]);
+        await db.query("select public.moderate_listing($1, 'approve', null, 'approved after review')", [listings.pendingApprove]);
+        await db.query("select public.moderate_listing($1, 'hide', 'policy_violation', 'hidden after review')", [listings.pendingApprove]);
+        await db.query("select public.moderate_listing($1, 'restore', null, 'restored after review')", [listings.pendingApprove]);
+        await db.query("select public.moderate_listing($1, 'reject', 'wrong_category', 'move to another category')", [listings.pendingReject]);
       });
       const state = await db.query(
         "select id, status from public.listings where id = any($1::uuid[]) order by id",
@@ -332,6 +444,32 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       ]);
       const auditCount = await db.query("select count(*)::int as count from public.admin_audit_log where actor_id = $1", [users.moderator]);
       assert.equal(auditCount.rows[0].count, 4);
+      const rejection = await db.query(
+        "select moderator_id, previous_status, new_status, action, reason_code, note from public.moderation_actions where listing_id = $1",
+        [listings.pendingReject],
+      );
+      assert.deepEqual(rejection.rows[0], {
+        moderator_id: users.moderator,
+        previous_status: "pending",
+        new_status: "rejected",
+        action: "reject",
+        reason_code: "wrong_category",
+        note: "move to another category",
+      });
+      const rejectionAudit = await db.query(
+        "select actor_id, action, entity_type, entity_id, metadata from public.admin_audit_log where action = 'listing.reject' and entity_id = $1",
+        [listings.pendingReject],
+      );
+      assert.equal(rejectionAudit.rows[0].actor_id, users.moderator);
+      assert.equal(rejectionAudit.rows[0].entity_type, "listing");
+      assert.equal(rejectionAudit.rows[0].metadata.reason_code, "wrong_category");
+      assert.equal(rejectionAudit.rows[0].metadata.note, "move to another category");
+      await asAuthenticated(db, users.admin, async () => {
+        await assert.rejects(
+          db.query("select public.moderate_listing($1, 'approve')", [listings.pendingApprove]),
+          /transition .* not allowed/i,
+        );
+      });
     });
 
     await t.test("moderation rejects draft, rejected, sold, expired and deleted revival", async () => {
@@ -339,7 +477,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
         for (const [listingId, decision, reason] of [
           [listings.draftFree, "approve", null],
           [listings.rejectedOwner, "restore", null],
-          [listings.soldOwner, "hide", "policy.invalid"],
+          [listings.soldOwner, "hide", "policy_violation"],
           [listings.expiredOwner, "restore", null],
           [listings.deletedOwner, "approve", null],
         ]) {
@@ -386,6 +524,41 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       });
     });
 
+    await t.test("account profile RPC updates only the authenticated active owner", async () => {
+      await asAnon(db, async () => {
+        await assert.rejects(
+          db.query("select * from public.get_my_account_profile()"),
+          /permission denied/i,
+        );
+        await assert.rejects(
+          db.query("select * from public.update_my_account_profile($1,$2,$3,$4,$5)", ["Anonymous", null, "ru", refs.settlement_id, null]),
+          /permission denied/i,
+        );
+      });
+      await asAuthenticated(db, users.buyer, async () => {
+        const updated = await db.query(
+          "select display_name, language_code, settlement_id, contact_phone_e164 from public.update_my_account_profile($1,$2,$3,$4,$5)",
+          ["Buyer Updated", "Buyer bio", "kk", refs.settlement_id, "+77005550102"],
+        );
+        assert.deepEqual(updated.rows[0], {
+          display_name: "Buyer Updated",
+          language_code: "kk",
+          settlement_id: refs.settlement_id,
+          contact_phone_e164: "+77005550102",
+        });
+        const own = await db.query("select display_name, contact_phone_e164 from public.get_my_account_profile()");
+        assert.deepEqual(own.rows[0], { display_name: "Buyer Updated", contact_phone_e164: "+77005550102" });
+      });
+      const owner = await db.query("select display_name from public.profiles where id = $1", [users.owner]);
+      assert.notEqual(owner.rows[0].display_name, "Buyer Updated");
+      await asAuthenticated(db, users.suspended, async () => {
+        await assert.rejects(
+          db.query("select * from public.update_my_account_profile($1,$2,$3,$4,$5)", ["Suspended", null, "ru", refs.settlement_id, null]),
+          /active profile required/i,
+        );
+      });
+    });
+
     await t.test("listing child-table reads are state-aware and mutations cannot target another owner", async () => {
       await asAuthenticated(db, users.owner, async () => {
         const ownImages = await db.query("select * from public.listing_images where listing_id = $1", [listings.draftCar]);
@@ -423,6 +596,364 @@ test("Supabase v2 security and reference-data audit", async (t) => {
         assert.equal(draftImages.rows.length, 0);
         assert.equal(activeImages.rows.length, 1);
         assert.equal(activeOptions.rows.length, 1);
+      });
+    });
+
+    await t.test("owner draft update atomically replaces the aggregate and enforces owner/state boundaries", async () => {
+      const original = await db.query("select slug from public.listings where id = $1", [listings.draftCar]);
+      const freeAttributes = JSON.stringify([
+        {
+          attribute_id: refs.free_condition_attribute_id,
+          data_type: "select",
+          option_ids: [refs.free_condition_option_id],
+        },
+      ]);
+
+      await asAuthenticated(db, users.owner, async () => {
+        const updated = await db.query(
+          "select * from public.update_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",
+          [
+            listings.draftCar,
+            refs.free_category_id,
+            refs.settlement_id,
+            "Обновлённый черновик",
+            "Полное описание после атомарного обновления",
+            250000,
+            "KZT",
+            "Owner Updated",
+            "+77005550101",
+            false,
+            freeAttributes,
+          ],
+        );
+        assert.deepEqual(updated.rows, [{
+          listing_id: listings.draftCar,
+          listing_slug: original.rows[0].slug,
+          listing_status: "draft",
+        }]);
+      });
+
+      const aggregate = await db.query(`
+        select
+          listing.slug,
+          listing.status,
+          listing.category_id,
+          listing.title,
+          listing.price_minor,
+          contact.contact_name,
+          contact.contact_phone_e164,
+          contact.allow_messages,
+          (select count(*)::int from public.listing_attribute_values where listing_id = listing.id) as scalar_count,
+          (select count(*)::int from public.listing_attribute_option_values where listing_id = listing.id) as option_count
+        from public.listings as listing
+        join public.listing_contacts as contact on contact.listing_id = listing.id
+        where listing.id = $1
+      `, [listings.draftCar]);
+      assert.deepEqual(aggregate.rows[0], {
+        slug: original.rows[0].slug,
+        status: "draft",
+        category_id: refs.free_category_id,
+        title: "Обновлённый черновик",
+        price_minor: 250000,
+        contact_name: "Owner Updated",
+        contact_phone_e164: "+77005550101",
+        allow_messages: false,
+        scalar_count: 0,
+        option_count: 1,
+      });
+
+      await asAuthenticated(db, users.owner, async () => {
+        const invalidAttributes = JSON.stringify([
+          {
+            attribute_id: refs.free_condition_attribute_id,
+            data_type: "select",
+            option_ids: [refs.car_brand_option_id],
+          },
+        ]);
+        await assert.rejects(
+          db.query(
+            "select * from public.update_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",
+            [
+              listings.draftCar,
+              refs.free_category_id,
+              refs.settlement_id,
+              "Не должно сохраниться",
+              "Эта попытка обязана полностью откатиться",
+              10,
+              "KZT",
+              "Owner",
+              "+77005550101",
+              true,
+              invalidAttributes,
+            ],
+          ),
+          /inactive or unavailable|foreign key|violates/i,
+        );
+      });
+      const afterRollback = await db.query(`
+        select listing.title, option_value.option_id
+        from public.listings as listing
+        join public.listing_attribute_option_values as option_value on option_value.listing_id = listing.id
+        where listing.id = $1
+      `, [listings.draftCar]);
+      assert.deepEqual(afterRollback.rows, [{
+        title: "Обновлённый черновик",
+        option_id: refs.free_condition_option_id,
+      }]);
+
+      await asAuthenticated(db, users.buyer, async () => {
+        await assert.rejects(
+          db.query(
+            "select * from public.update_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",
+            [
+              listings.draftCar,
+              refs.free_category_id,
+              refs.settlement_id,
+              "Попытка захвата",
+              "Покупатель не может изменить чужой черновик",
+              100,
+              "KZT",
+              "Buyer",
+              "+77005550102",
+              true,
+              freeAttributes,
+            ],
+          ),
+          /listing is not editable|permission denied/i,
+        );
+      });
+
+      for (const target of [listings.pendingApprove, listings.activeOwner]) {
+        await asAuthenticated(db, users.owner, async () => {
+          await assert.rejects(
+            db.query(
+              "select * from public.update_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",
+              [
+                target,
+                refs.free_category_id,
+                refs.settlement_id,
+                "Недопустимый статус",
+                "Pending и active нельзя менять как черновик",
+                100,
+                "KZT",
+                "Owner",
+                "+77005550101",
+                true,
+                freeAttributes,
+              ],
+            ),
+            /listing is not editable|permission denied/i,
+          );
+        });
+      }
+
+      await asAuthenticated(db, users.owner, async () => {
+        const updated = await db.query(
+          "select * from public.update_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)",
+          [
+            listings.rejectedOwner,
+            refs.free_category_id,
+            refs.settlement_id,
+            "Исправленное объявление",
+            "Владелец исправил отклонённое объявление",
+            5000,
+            "KZT",
+            "Owner",
+            "+77005550101",
+            true,
+            freeAttributes,
+          ],
+        );
+        assert.equal(updated.rows[0].listing_status, "rejected");
+      });
+      await db.query(
+        "insert into public.listing_images (listing_id, storage_key) values ($1, 'security/rejected-resubmit.webp')",
+        [listings.rejectedOwner],
+      );
+      await asAuthenticated(db, users.owner, async () => {
+        await db.query("select public.submit_listing($1)", [listings.rejectedOwner]);
+      });
+      const resubmitted = await db.query("select status from public.listings where id = $1", [listings.rejectedOwner]);
+      assert.deepEqual(resubmitted.rows, [{ status: "pending" }]);
+    });
+
+    await t.test("owner archive and sold RPCs enforce the complete state matrix", async () => {
+      const created = {};
+      for (const status of ["draft", "pending", "active", "rejected"]) {
+        const publishedAt = status === "active" ? new Date().toISOString() : null;
+        const row = await db.query(`
+          insert into public.listings (
+            owner_id, category_id, settlement_id, slug, title, description,
+            price_minor, currency_code, status, published_at
+          ) values ($1,$2,$3,$4,$5,$6,1000,'KZT',$7,$8)
+          returning id
+        `, [
+          users.owner,
+          refs.free_category_id,
+          refs.settlement_id,
+          `security-archive-${status}`,
+          `Archive ${status}`,
+          `Lifecycle archive fixture for ${status}`,
+          status,
+          publishedAt,
+        ]);
+        created[status] = row.rows[0].id;
+      }
+      const soldCandidate = await db.query(`
+        insert into public.listings (
+          owner_id, category_id, settlement_id, slug, title, description,
+          price_minor, currency_code, status, published_at
+        ) values ($1,$2,$3,'security-sold-active','Sold active','Lifecycle sold fixture',1000,'KZT','active',now())
+        returning id
+      `, [users.owner, refs.free_category_id, refs.settlement_id]);
+      created.sold = soldCandidate.rows[0].id;
+
+      await asAuthenticated(db, users.buyer, async () => {
+        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.pending]), /cannot be archived|permission denied/i);
+        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /cannot be marked sold|permission denied/i);
+      });
+      await asAuthenticated(db, users.owner, async () => {
+        for (const status of ["draft", "pending", "active", "rejected"]) {
+          await db.query("select public.archive_own_listing($1)", [created[status]]);
+        }
+        await db.query("select public.mark_own_listing_sold($1)", [created.sold]);
+        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.draft]), /cannot be archived/i);
+        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /cannot be marked sold/i);
+      });
+      const states = await db.query(
+        "select id, status from public.listings where id = any($1::uuid[]) order by id",
+        [Object.values(created)],
+      );
+      const byId = new Map(states.rows.map((row) => [row.id, row.status]));
+      for (const status of ["draft", "pending", "active", "rejected"]) assert.equal(byId.get(created[status]), "archived");
+      assert.equal(byId.get(created.sold), "sold");
+    });
+
+    await t.test("owner listing query is scoped, bounded, stable and excludes deleted rows", async () => {
+      await asAuthenticated(db, users.owner, async () => {
+        const own = await db.query(`
+          select id, status, updated_at
+          from public.listings
+          where owner_id = (select auth.uid())
+            and status <> 'deleted'
+            and deleted_at is null
+          order by updated_at desc, id desc
+          limit 50 offset 0
+        `);
+        assert.ok(own.rows.some((row) => row.id === listings.draftFree && row.status === "draft"));
+        assert.ok(own.rows.some((row) => row.id === listings.activeOwner && row.status === "active"));
+        assert.ok(own.rows.some((row) => row.id === listings.pendingReject && row.status === "rejected"));
+        assert.ok(own.rows.some((row) => row.id === listings.rejectedOwner && row.status === "pending"));
+        assert.equal(own.rows.some((row) => row.id === listings.deletedOwner), false);
+        for (let index = 1; index < own.rows.length; index += 1) {
+          const previous = own.rows[index - 1];
+          const current = own.rows[index];
+          const timeOrder = new Date(previous.updated_at).getTime() - new Date(current.updated_at).getTime();
+          assert.ok(timeOrder > 0 || (timeOrder === 0 && previous.id.localeCompare(current.id) >= 0));
+        }
+      });
+      await asAuthenticated(db, users.buyer, async () => {
+        const own = await db.query(`
+          select id, status
+          from public.listings
+          where owner_id = (select auth.uid())
+            and status <> 'deleted'
+            and deleted_at is null
+          order by updated_at desc, id desc
+          limit 50
+        `);
+        assert.deepEqual(own.rows, [{ id: listings.activeBuyer, status: "active" }]);
+        const ownerPrivate = await db.query(`
+          select id
+          from public.listings
+          where owner_id = $1
+            and status <> 'active'
+            and status <> 'deleted'
+            and deleted_at is null
+        `, [users.owner]);
+        assert.deepEqual(ownerPrivate.rows, []);
+      });
+    });
+
+    await t.test("owner rejection feedback exposes only the latest safe fields", async () => {
+      await asAuthenticated(db, users.owner, async () => {
+        const feedback = await db.query(
+          "select * from public.get_my_listing_moderation_feedback($1)",
+          [listings.pendingReject],
+        );
+        assert.deepEqual(Object.keys(feedback.rows[0]).sort(), ["listing_id", "reason_code", "rejected_at"]);
+        assert.equal(feedback.rows[0].listing_id, listings.pendingReject);
+        assert.equal(feedback.rows[0].reason_code, "wrong_category");
+        assert.ok(feedback.rows[0].rejected_at instanceof Date || typeof feedback.rows[0].rejected_at === "string");
+      });
+      for (const userId of [users.buyer, users.moderator]) {
+        await asAuthenticated(db, userId, async () => {
+          const feedback = await db.query(
+            "select * from public.get_my_listing_moderation_feedback($1)",
+            [listings.pendingReject],
+          );
+          assert.deepEqual(feedback.rows, []);
+        });
+      }
+      await asAnon(db, async () => {
+        await assert.rejects(
+          db.query("select * from public.get_my_listing_moderation_feedback($1)", [listings.pendingReject]),
+          /permission denied/i,
+        );
+      });
+    });
+
+    await t.test("User A listing roundtrip is discoverable by User B after moderation", async () => {
+      const attributes = JSON.stringify([
+        { attribute_id: refs.car_brand_attribute_id, data_type: "select", option_ids: [refs.car_brand_option_id] },
+        { attribute_id: refs.car_model_attribute_id, data_type: "select", option_ids: [refs.car_model_option_id] },
+        { attribute_id: refs.car_condition_attribute_id, data_type: "select", option_ids: [refs.car_condition_option_id] },
+        { attribute_id: refs.car_year_attribute_id, data_type: "number", value: 2025 },
+      ]);
+      let listingId;
+      let listingSlug;
+      await asAuthenticated(db, users.owner, async () => {
+        const created = await db.query(
+          "select * from public.create_listing_draft($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)",
+          [refs.car_category_id, refs.settlement_id, "Toyota RAV4 roundtrip", "Полное объявление пользователя A для проверки поиска", 18500000, "KZT", "Owner", "+77005550101", true, attributes],
+        );
+        listingId = created.rows[0].listing_id;
+        listingSlug = created.rows[0].listing_slug;
+      });
+      await db.query(
+        "insert into public.listing_images (listing_id, storage_key, sort_order, width, height, byte_size, mime_type) values ($1,$2,0,1200,900,320000,'image/webp')",
+        [listingId, `listings/${users.owner}/${listingId}/00-roundtrip.webp`],
+      );
+      await asAuthenticated(db, users.owner, async () => {
+        await db.query("select public.submit_listing($1)", [listingId]);
+      });
+      await asAuthenticated(db, users.moderator, async () => {
+        await db.query("select public.moderate_listing($1, 'approve')", [listingId]);
+      });
+      await asAuthenticated(db, users.buyer, async () => {
+        const found = await db.query(
+          "select id, slug, title, price_minor, settlement_id, primary_image_storage_key from public.search_catalog_listing_cards(array[$1]::uuid[],$2,$3,$4,$5,$6::jsonb)",
+          [refs.car_category_id, refs.settlement_id, "RAV4", 18000000, 19000000, JSON.stringify({ brand: "toyota", year_min: "2024", year_max: "2026" })],
+        );
+        assert.deepEqual(found.rows, [{
+          id: listingId,
+          slug: listingSlug,
+          title: "Toyota RAV4 roundtrip",
+          price_minor: 18500000,
+          settlement_id: refs.settlement_id,
+          primary_image_storage_key: `listings/${users.owner}/${listingId}/00-roundtrip.webp`,
+        }]);
+        const seller = await db.query("select id, display_name from public.seller_profiles where id = $1", [users.owner]);
+        assert.deepEqual(seller.rows, [{ id: users.owner, display_name: "Updated Owner" }]);
+        const takeover = await db.query(
+          "update public.listings set title = 'Buyer takeover' where id = $1 returning id",
+          [listingId],
+        );
+        // PostgreSQL RLS can safely hide a disallowed UPDATE target instead of
+        // raising an exception. Verify the security outcome, not one error mode.
+        assert.equal(takeover.rowCount, 0);
+        const unchanged = await db.query("select title from public.listings where id = $1", [listingId]);
+        assert.deepEqual(unchanged.rows, [{ title: "Toyota RAV4 roundtrip" }]);
       });
     });
 
@@ -505,6 +1036,38 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       });
     });
 
+    await t.test("City Premium exposes only active placements and keeps capacity server-owned", async () => {
+      const activeStartsAt = new Date(Date.now() - 60_000).toISOString();
+      const activeEndsAt = new Date(Date.now() + 86_400_000).toISOString();
+      const futureStartsAt = new Date(Date.now() + 172_800_000).toISOString();
+      const futureEndsAt = new Date(Date.now() + 259_200_000).toISOString();
+      await db.query(
+        "insert into public.city_premium_placements (settlement_id, listing_id, starts_at, ends_at) values ($1,$2,$3,$4),($1,$5,$6,$7)",
+        [refs.settlement_id, listings.activeOwner, activeStartsAt, activeEndsAt, listings.activeBuyer, futureStartsAt, futureEndsAt],
+      );
+      await asAnon(db, async () => {
+        const settings = await db.query("select capacity from public.city_premium_settings where settlement_id = $1", [refs.settlement_id]);
+        assert.deepEqual(settings.rows, [{ capacity: 15 }]);
+        const rows = await db.query("select listing_id from public.get_city_premium_placements($1, 15)", [refs.settlement_id]);
+        assert.deepEqual(rows.rows, [{ listing_id: listings.activeOwner }]);
+        const visiblePlacements = await db.query("select listing_id from public.city_premium_placements where settlement_id = $1", [refs.settlement_id]);
+        assert.deepEqual(visiblePlacements.rows, [{ listing_id: listings.activeOwner }]);
+      });
+      await asAuthenticated(db, users.buyer, async () => {
+        await assert.rejects(
+          db.query(
+            "insert into public.city_premium_placements (settlement_id, listing_id, starts_at, ends_at) values ($1,$2,$3,$4)",
+            [refs.settlement_id, listings.pendingApprove, activeStartsAt, activeEndsAt],
+          ),
+          /permission denied/i,
+        );
+        await assert.rejects(
+          db.query("update public.city_premium_settings set capacity = 50 where settlement_id = $1", [refs.settlement_id]),
+          /permission denied/i,
+        );
+      });
+    });
+
     await t.test("SECURITY DEFINER functions have fixed search paths and no anonymous EXECUTE", async () => {
       const functions = await db.query(`
         select
@@ -519,7 +1082,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 14);
+      assert.equal(functions.rows.length, 17);
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
       assert.ok(functions.rows.every((row) => row.anon_execute === false));
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);

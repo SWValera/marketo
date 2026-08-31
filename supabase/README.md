@@ -1,107 +1,66 @@
 # Marketo Supabase foundation
 
-This directory is a reviewed, forward-only database foundation. Nothing here
-connects to or mutates the remote Supabase project automatically.
+This directory is a forward-only, locally verified database contract. Nothing
+in the build or test chain connects to or mutates production Supabase.
 
-## Status — read before SQL review
+## Review boundary
 
-- **DATABASE STATUS:** Foundation prepared; production Supabase migrations have not been applied.
-- **GEOGRAPHY STATUS:** Region + major-city bootstrap seed; full official Kazakhstan KATO import is pending.
-- **CATEGORY STATUS:** Initial Marketo reference taxonomy; final business taxonomy remains reviewable.
-- **PRODUCTION SQL STATUS:** Do not run migrations until an independent review is complete.
+- 0001–0022 are immutable and must never be edited.
+- 0017 expands the Master Catalog and adds database-backed buyer filtering.
+- 0018 adds authenticated self-profile read/update RPCs.
+- 0019 adds per-city Premium Showcase settings, placements, capacity guard,
+  active-only RLS and a deterministic public read RPC.
+- 0020 adds targeted catalog metadata and payment-neutral Premium foundations.
+- 0021 revokes implicit RPC execution and restores an explicit public/account/
+  staff allowlist; anonymous access is limited to reviewed read RPCs.
+- 0022 requires an active profile for every staff capability, removes support
+  from pending-listing RLS, and bounds moderation reasons and notes.
+- 0023 adds an owner-only atomic draft/rejected update and a deliberately
+  narrow rejection-feedback RPC without moderator identity or internal notes.
+- seeds/001_marketo_reference.sql contains only RU/KK reference data.
+- Remote application status is not inferred from local files. No migration was
+  applied remotely during recovery.
 
-## Reviewed order
+The exact ordered list, dependencies and purpose are in
+MIGRATION_MANIFEST.md. CHECKSUMS.sha256 covers all 23 migrations and the
+reference seed.
 
-1. `migrations/0001_extensions_and_helpers.sql`
-2. `migrations/0002_geography.sql`
-3. `migrations/0003_profiles_and_roles.sql`
-4. `migrations/0004_categories_and_attributes.sql`
-5. `migrations/0005_listings.sql`
-6. `migrations/0006_favorites.sql`
-7. `migrations/0007_chat.sql`
-8. `migrations/0008_notifications.sql`
-9. `migrations/0009_reports_moderation_and_audit.sql`
-10. `migrations/0010_rls_and_grants.sql`
-11. `migrations/0011_indexes_and_search.sql`
-12. `migrations/0012_realtime.sql`
-13. `seeds/001_marketo_reference.sql`
+## Clean local verification
 
-Apply them in that exact order to a clean local Supabase database or a database
-branch first. Do not concatenate them into an opaque one-off script. Every file
-is transactional and reviewable.
+    npm run validate:db
+    npm run validate:catalog
+    node --test tests/supabase-migrations.test.mjs
+    node --test tests/supabase-security.test.mjs
+    npm run typecheck
 
-## Local verification
+The migration test creates an isolated PostgreSQL-compatible PGlite database,
+stubs only Supabase-managed Auth roles/table, applies all migrations and the
+seed, and exercises profile creation, listing roundtrip, filters, RLS and the
+15-placement premium capacity. This does not replace a disposable Supabase
+branch, Database Linter or Security Advisor.
 
-```bash
-npm run seed:reference
-npm run validate:db
-node --test tests/supabase-migrations.test.mjs
-node --test tests/supabase-security.test.mjs
-npm run typecheck
-```
+## Deterministic reference state
 
-The migration test creates an in-memory PostgreSQL-compatible PGlite database,
-loads `pgcrypto` and `pg_trgm`, stubs only the Supabase-managed Auth roles/table,
-applies all migrations and the reference seed, and exercises profile creation,
-RLS grants and the draft-to-pending RPC. This is a deterministic preflight, not
-a replacement for a Supabase branch, Database Linter or Security Advisor.
+- locales: RU/KK;
+- Kazakhstan administrative bootstrap: 20 top-level units and 90 selectable
+  settlements;
+- Master Catalog: 1,356 categories, 1,137 leaves, 16 roots;
+- 9,373 category-attribute assignments;
+- 87,150 localized option assignments;
+- no users, listings, favorites, chats, messages, notifications or credentials.
 
-## Reference data
+Regenerate reference SQL only when the reviewed typed source changes:
 
-`001_marketo_reference.sql` is generated from the current typed frontend
-contracts and contains only:
+    npm run seed:reference
+    npm run db:checksums
 
-- `ru` and `kk` locales;
-- Kazakhstan and all 20 top-level administrative units used by Marketo;
-- a reviewed 90-city baseline;
-- 228 categories with RU/KK presentation data;
-- effective category attributes and their localized options.
+The geography seed is not the complete KATO hierarchy. A future official KATO
+import must be normalized and independently reviewed before a new forward-only
+migration/seed release.
 
-The 228-node category seed is the **initial Marketo reference taxonomy**, not a
-claim that the final production business taxonomy has been approved.
+## Safe rollout rule
 
-It intentionally contains no users, listings, reviews, favorites, chats,
-messages, notifications or admin records.
-
-Regenerate it with:
-
-```bash
-npm run seed:reference
-```
-
-The baseline is not presented as the complete KATO settlement hierarchy. The
-authoritative source is the Kazakhstan Bureau of National Statistics,
-[KATO NK RK 11-2025](https://stat.gov.kz/ru/classifiers/statistical/21/),
-actualized 2026-07-17. Normalize and manually review the official export using
-the contract in `seeds/kato-normalized.example.json`, then generate a separate
-seed:
-
-```bash
-node scripts/generate-kato-seed.mjs reviewed-kato.json
-```
-
-Do not apply that output until node counts, parent links, region mapping, stable
-slugs, and RU/KK names have been checked independently.
-
-`MIGRATION_MANIFEST.md` documents the ordered review boundary. Run
-`npm run db:checksums` after any reviewed SQL/seed change; `CHECKSUMS.sha256`
-must match before an archive is accepted.
-
-## Recovery strategy
-
-- Use a Supabase database branch or disposable development project for the
-  first application.
-- Capture a schema dump and backup before applying to any non-empty project.
-- A failure inside one migration rolls that migration back; do not manually
-  delete partially understood objects afterward.
-- This project uses forward-only fixes. Add a new migration after deployment;
-  do not edit an already-applied migration.
-- For an unrecoverable branch test, discard the branch. For production, restore
-  the pre-migration backup/PITR under an explicit recovery plan.
-
-## First manual step after review
-
-In the empty Supabase project's SQL Editor, run **only**
-`migrations/0001_extensions_and_helpers.sql`, verify that it commits without a
-warning, and stop. Do not run the remaining files until that result and the
-Security Advisor baseline have been reviewed.
+First rehearse 0017–0023 in order on a disposable Supabase branch cloned from
+the actual target schema. Compare it with a clean migrations-plus-seed
+database, run Database Linter/Security Advisor and exercise real Auth/R2 with
+non-production credentials. Production requires a separate explicit approval.

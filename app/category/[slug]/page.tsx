@@ -47,7 +47,17 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   const filteredCategory = getCategoryBySlug(view, parsed.categorySlug) ?? category;
   const rootCategory = getCategoryRoot(view, filteredCategory);
   const [listings, initialAttributes] = await Promise.all([
-    listingRepository.list(),
+    listingRepository.list({
+      locale,
+      categoryIds: view.items.filter((item) => getCategoryPath(view, item).some((pathItem) => pathItem.id === filteredCategory.id)).map((item) => item.id),
+      settlementId: parsed.cityId && parsed.cityId !== "all" ? parsed.cityId : undefined,
+      query: parsed.query,
+      minPriceMinor: parsed.minPrice ? Number(parsed.minPrice) : undefined,
+      maxPriceMinor: parsed.maxPrice ? Number(parsed.maxPrice) : undefined,
+      attributeFilters: parsed.dynamicFilters,
+      sort: parsed.sort,
+      limit: 60,
+    }),
     getCategoryAttributeReferences(filteredCategory.id),
   ]);
   const parent = getCategoryParent(view, category);

@@ -16,25 +16,26 @@ import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/ref
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const listing = await listingRepository.findBySlug(slug);
+  const { locale } = await getServerI18n();
+  const listing = await listingRepository.findBySlug(slug, locale);
   return listing ? { title: `${listing.title} — ${listing.priceLabel}`, description: listing.description, alternates: { canonical: `/listing/${slug}` } } : {};
 }
 
 export default async function ListingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const listing = await listingRepository.findBySlug(slug);
+  const { locale, t } = await getServerI18n();
+  const listing = await listingRepository.findBySlug(slug, locale);
   if (!listing) notFound();
   const catalog = await getCategoryReferences();
   const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), listing.categorySlug);
   const categoryAttributes = category ? await getCategoryAttributeReferences(category.id) : undefined;
-  const { locale, t } = await getServerI18n();
   const characteristics = (categoryAttributes?.data.attributes ?? []).flatMap((attribute) => {
     const raw = listing.attributes[attribute.key];
     if (raw === undefined || raw === false || raw === "") return [];
     const option = attribute.options.find((item) => item.value === raw);
-    const value = attribute.dataType === "boolean" ? t("common.yes") : option ? localize(option.label, locale) : String(raw);
+    const value = attribute.dataType === "boolean" ? t("common.yes") : listing.attributeDisplayValues?.[attribute.key] ?? (option ? localize(option.label, locale) : String(raw));
     return [{ label: localize(attribute.label, locale), value: `${value}${attribute.unit ? ` ${localize(attribute.unit, locale)}` : ""}` }];
   });
   const fallback = `/category/${listing.categorySlug}`;
-  return <><Header categorySlug={listing.categorySlug} searchPlaceholder={localize(category?.searchPlaceholder, locale)} /><main className="page-shell listing-page"><PageHeader fallback={fallback} eyebrow={category ? localize(category.name, locale) : t("listing.advert")} title={listing.title} description={`${listing.locationLabel} · ${listing.publishedLabel}`} /><nav className="breadcrumbs"><Link href="/">{t("common.home")}</Link><span>/</span><Link href={fallback}>{category ? localize(category.name, locale) : t("common.catalog")}</Link><span>/</span><span>{listing.title}</span></nav><div className="listing-layout"><section>{listing.imageUrl ? <div className="gallery-main"><img src={listing.imageUrl} alt={listing.title} /></div> : <EmptyState title={t("listing.photosMissing")} description={t("listing.photosMissingNote")} />} {characteristics.length ? <article className="detail-card"><h2>{t("listing.characteristics")}</h2><dl className="characteristics-grid">{characteristics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></article> : null}<article className="detail-card"><h2>{t("listing.description")}</h2><p>{listing.description}</p></article><article className="detail-card"><h2>{t("listing.location")}</h2><p><MapPin size={17} /> {listing.locationLabel}</p></article></section><aside className="seller-column"><article className="price-card"><h2>{listing.title}</h2><div className="detail-price">{listing.priceLabel}</div><ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} /></article><Link className="seller-card" href={`/seller/${listing.sellerId}`}><div className="avatar"><UserRound size={22} /></div><div><strong>{t("listing.sellerProfile")}</strong><small>{t("listing.openSeller")}</small></div></Link></aside></div></main><MobileNav /></>;
+  return <><Header categorySlug={listing.categorySlug} searchPlaceholder={localize(category?.searchPlaceholder, locale)} /><main className="page-shell listing-page"><PageHeader fallback={fallback} eyebrow={category ? localize(category.name, locale) : t("listing.advert")} title={listing.title} description={`${listing.locationLabel} · ${listing.publishedLabel}`} /><nav className="breadcrumbs"><Link href="/">{t("common.home")}</Link><span>/</span><Link href={fallback}>{category ? localize(category.name, locale) : t("common.catalog")}</Link><span>/</span><span>{listing.title}</span></nav><div className="listing-layout"><section>{listing.imageUrl ? <div className="gallery-main"><img src={listing.imageUrl} alt={listing.title} /></div> : <EmptyState title={t("listing.photosMissing")} description={t("listing.photosMissingNote")} />} {characteristics.length ? <article className="detail-card"><h2>{t("listing.characteristics")}</h2><dl className="characteristics-grid">{characteristics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></article> : null}<article className="detail-card"><h2>{t("listing.description")}</h2><p>{listing.description}</p></article><article className="detail-card"><h2>{t("listing.location")}</h2><p><MapPin size={17} /> {listing.locationLabel}</p></article></section><aside className="seller-column"><article className="price-card"><h2>{listing.title}</h2><div className="detail-price">{listing.priceLabel}</div><ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} /></article><Link className="seller-card" href={`/seller/${listing.sellerId}`}><div className="avatar"><UserRound size={22} /></div><div><strong>{listing.sellerName}</strong><small>{t("listing.openSeller")}</small></div></Link></aside></div></main><MobileNav /></>;
 }
