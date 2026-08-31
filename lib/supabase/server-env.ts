@@ -1,3 +1,11 @@
+import { env as cloudflareEnv } from "cloudflare:workers";
+
+function readRuntimeString(name: string): string | undefined {
+  const runtimeValue = cloudflareEnv[name];
+  if (typeof runtimeValue === "string" && runtimeValue.length > 0) return runtimeValue;
+  return process.env[name];
+}
+
 function validatePublicConfig(url: string, publishableKey: string) {
   let parsed: URL;
   try {
@@ -15,10 +23,10 @@ function validatePublicConfig(url: string, publishableKey: string) {
 }
 
 export function tryGetServerSupabasePublicConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = readRuntimeString("NEXT_PUBLIC_SUPABASE_URL");
   const publishableKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    readRuntimeString("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+    ?? readRuntimeString("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
   if (!url || !publishableKey) return null;
   return validatePublicConfig(url, publishableKey);
@@ -35,8 +43,8 @@ export function getServerSupabasePublicConfig() {
 export function getServerSupabaseSecretConfig() {
   const { url } = getServerSupabasePublicConfig();
   const secretKey =
-    process.env.SUPABASE_SECRET_KEY
-    ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+    readRuntimeString("SUPABASE_SECRET_KEY")
+    ?? readRuntimeString("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!secretKey) {
     throw new Error("Supabase server secret is not configured.");
