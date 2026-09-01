@@ -46,7 +46,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
 
         <LanguageSwitcher compact />
         <PwaInstall />
-        <Link className="publish-button" href="/publish">{t("header.publish")}</Link>
+        <Link prefetch={false} className="publish-button" href="/publish">{t("header.publish")}</Link>
         <button
           type="button"
           className="menu-toggle"
@@ -67,7 +67,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           <Link href="/messages" onClick={() => setMenuOpen(false)}>{t("nav.chats")}</Link>
           <Link href="/profile" onClick={() => setMenuOpen(false)}>{t("nav.profile")}</Link>
           <PwaInstall />
-          <Link href="/publish" onClick={() => setMenuOpen(false)}>{t("header.publish")}</Link>
+          <Link prefetch={false} href="/publish" onClick={() => setMenuOpen(false)}>{t("header.publish")}</Link>
         </nav></>
       )}
     </header>
