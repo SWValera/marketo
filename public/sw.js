@@ -1,6 +1,6 @@
-const CACHE_NAME = "marketo-static-v5";
-// The manifest and HTML intentionally stay out of the precache so Android and
-// installed PWAs receive deployment updates instead of a stale app identity.
+const CACHE_NAME = "marketo-static-v6";
+// HTML and authenticated pages are deliberately never cached. Only the
+// dedicated offline page and immutable/static assets are stored by the PWA.
 const APP_SHELL = ["/offline"];
 
 self.addEventListener("install", (event) => {
@@ -27,14 +27,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-          return response;
-        })
-        .catch(async () => (await caches.match(request)) || caches.match("/offline")),
-    );
+    event.respondWith(fetch(request).catch(async () => (await caches.match("/offline")) || Response.error()));
     return;
   }
 
@@ -43,7 +36,8 @@ self.addEventListener("fetch", (event) => {
       caches.match(request).then((cached) => {
         const network = fetch(request).then((response) => {
           if (response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+            const copy = response.clone();
+            void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return response;
         });
