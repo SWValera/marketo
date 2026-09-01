@@ -31,9 +31,12 @@ test("listing image validator sniffs bytes, dimensions, MIME and digest", async 
 });
 
 test("real listing flow persists draft, verified photos and moderation submission server-side", async () => {
-  const [publish, draftRoute, imageRoute, submitRoute, mediaRoute, hosting] = await Promise.all([
+  const [publish, publishPage, loader, draftRoute, draftReadRoute, imageRoute, submitRoute, mediaRoute, hosting] = await Promise.all([
     readFile(new URL("components/publish-form.tsx", root), "utf8"),
+    readFile(new URL("app/publish/page.tsx", root), "utf8"),
+    readFile(new URL("components/publish-form-loader.tsx", root), "utf8"),
     readFile(new URL("app/api/listings/route.ts", root), "utf8"),
+    readFile(new URL("app/api/listings/[id]/route.ts", root), "utf8"),
     readFile(new URL("app/api/listings/[id]/images/route.ts", root), "utf8"),
     readFile(new URL("app/api/listings/[id]/submit/route.ts", root), "utf8"),
     readFile(new URL("app/api/media/[...key]/route.ts", root), "utf8"),
@@ -43,7 +46,17 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(publish, /method: currentListingId \? "PATCH" : "POST"/);
   assert.match(publish, /\/images`/);
   assert.match(publish, /\/submit`/);
+  assert.match(loader, /listActiveCategories/);
+  assert.match(loader, /mapCategoryReferenceRows/);
+  assert.doesNotMatch(loader, /CATEGORY_COLUMNS/);
+  assert.match(loader, /createSingleFlightTtlLoader/);
+  assert.match(loader, /CATEGORY_CATALOG_TTL_MS/);
+  assert.match(loader, /const draft = requestedListingId \? await loadDraft/);
+  assert.match(loader, /isPublishLoadRetryable\(state\.reason\)/);
+  assert.match(loader, /key=\{state\.draft\?\.id \?\? "create"\}/);
+  assert.doesNotMatch(publishPage, /getCategoryReferences|getMyListingDraftBundle/);
   assert.match(draftRoute, /create_listing_draft/);
+  for (const status of [401, 404, 409, 503]) assert.match(draftReadRoute, new RegExp(`status: ${status}`));
   assert.match(imageRoute, /validateListingImage/);
   assert.match(imageRoute, /listing\.owner_id !== authData\.user\.id/);
   assert.match(imageRoute, /bucket\.put/);

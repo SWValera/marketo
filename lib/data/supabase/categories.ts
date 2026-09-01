@@ -1,6 +1,51 @@
 import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { Database } from "@/lib/supabase/database.types";
+import type { CategoryPriceMode, CategoryReferenceData } from "@/lib/reference-data/types";
 
 const CATEGORY_COLUMNS = "id, parent_id, slug, name_ru, name_kk, icon_key, tone_key, search_placeholder_ru, search_placeholder_kk, title_placeholder_ru, title_placeholder_kk, description_hint_ru, description_hint_kk, price_mode, sort_order" as const;
+
+type CategoryReferenceRow = Pick<
+  Database["public"]["Tables"]["categories"]["Row"],
+  | "id"
+  | "parent_id"
+  | "slug"
+  | "name_ru"
+  | "name_kk"
+  | "icon_key"
+  | "tone_key"
+  | "search_placeholder_ru"
+  | "search_placeholder_kk"
+  | "title_placeholder_ru"
+  | "title_placeholder_kk"
+  | "description_hint_ru"
+  | "description_hint_kk"
+  | "price_mode"
+  | "sort_order"
+>;
+
+export function mapCategoryReferenceRows(rows: readonly CategoryReferenceRow[]): CategoryReferenceData {
+  return {
+    categories: rows.map((category) => ({
+      id: category.id,
+      parentId: category.parent_id,
+      slug: category.slug,
+      name: { ru: category.name_ru, kk: category.name_kk },
+      icon: category.icon_key,
+      tone: category.tone_key,
+      searchPlaceholder: category.search_placeholder_ru && category.search_placeholder_kk
+        ? { ru: category.search_placeholder_ru, kk: category.search_placeholder_kk }
+        : null,
+      titlePlaceholder: category.title_placeholder_ru && category.title_placeholder_kk
+        ? { ru: category.title_placeholder_ru, kk: category.title_placeholder_kk }
+        : null,
+      descriptionHint: category.description_hint_ru && category.description_hint_kk
+        ? { ru: category.description_hint_ru, kk: category.description_hint_kk }
+        : null,
+      priceMode: category.price_mode as CategoryPriceMode,
+      sortOrder: category.sort_order,
+    })),
+  };
+}
 
 export async function listCategoryLevel(client: MarketoSupabaseClient, parentId: string | null) {
   let request = client.from("categories").select(CATEGORY_COLUMNS).eq("is_active", true);

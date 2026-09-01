@@ -33,7 +33,7 @@ export default async function Home() {
 
   const listingsPanel = <section className="home-tab-panel" aria-labelledby="home-listings-title">
     <div className="section-heading"><div><span className="section-kicker">{t("home.newOffers")}</span><h2 id="home-listings-title">{t("home.recommended")}</h2></div><Link href="/search">{t("home.allListings")} <ArrowRight size={16} /></Link></div>
-    {listings.items.length ? <div className="listing-grid">{listings.items.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div> : <EmptyState title={t("home.emptyTitle")} description={t("home.emptyDescription")} actionHref="/publish" actionLabel={t("nav.publish")} />}
+    {listings.items.length ? <div className="listing-grid">{listings.items.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div> : <EmptyState title={t("home.emptyTitle")} description={t("home.emptyDescription")} actionHref="/publish" actionLabel={t("nav.publish")} actionPrefetch={false} />}
   </section>;
 
   return <>
@@ -42,10 +42,9 @@ export default async function Home() {
       <section className="home-showcase-shell page-shell"><CityPremiumShowcase /></section>
       <HomeMarketplaceTabs catalog={catalogPanel} listings={listingsPanel} />
       <section className="trust-row home-trust-row page-shell"><div><ShieldCheck size={24} /><span><strong>{t("home.safety")}</strong><small>{t("home.safetyNote")}</small></span></div><div><Search size={24} /><span><strong>{t("home.preciseSearch")}</strong><small>{t("home.preciseSearchNote")}</small></span></div><div><MessageCircle size={24} /><span><strong>{t("home.chat")}</strong><small>{t("home.chatNote")}</small></span></div><div><Heart size={24} /><span><strong>{t("nav.favorites")}</strong><small>{t("home.favoritesNote")}</small></span></div></section>
-      <section className="cta-section page-shell"><div><span className="section-kicker">{t("home.startNow")}</span><h2>{t("home.prepareFirst")}</h2><p>{t("home.prepareFirstNote")}</p></div><Link href="/publish" className="primary-action">{t("header.publish")} <ArrowRight size={18} /></Link></section>
+      <section className="cta-section page-shell"><div><span className="section-kicker">{t("home.startNow")}</span><h2>{t("home.prepareFirst")}</h2><p>{t("home.prepareFirstNote")}</p></div><Link href="/publish" prefetch={false} className="primary-action">{t("header.publish")} <ArrowRight size={18} /></Link></section>
     </main>
     <footer className="site-footer"><div className="page-shell"><span className="brand"><span className="brand-mark">M</span>Marketo</span><p>{t("home.footer")}</p><span>© 2026 Marketo</span></div></footer>
     <MobileNav />
   </>;
 }
-

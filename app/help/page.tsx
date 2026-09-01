@@ -11,7 +11,7 @@ export default async function HelpPage() {
   return (
     <DashboardShell active="/help" title={t("help.title")} description={t("help.description")}>
       <section className="dashboard-card help-grid">
-        <Link className="help-card" href="/publish"><BookOpen size={24} /><strong>{t("help.publish")}</strong><span>{t("help.publishNote")}</span></Link>
+        <Link className="help-card" href="/publish" prefetch={false}><BookOpen size={24} /><strong>{t("help.publish")}</strong><span>{t("help.publishNote")}</span></Link>
         <Link className="help-card" href="/messages"><MessageCircle size={24} /><strong>{t("help.communication")}</strong><span>{t("help.communicationNote")}</span></Link>
         <Link className="help-card" href="/help"><ShieldCheck size={24} /><strong>{t("help.safety")}</strong><span>{t("help.safetyNote")}</span></Link>
         <Link className="help-card" href="/login"><CircleHelp size={24} /><strong>{t("help.support")}</strong><span>{t("help.supportNote")}</span></Link>

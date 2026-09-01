@@ -12,13 +12,13 @@ import {
   emptyCategoryAttributes,
   type CategoryAttributeDataType,
   type CategoryAttributeReferenceData,
-  type CategoryPriceMode,
   type CategoryReferenceData,
   type GeographyReferenceData,
   type ReferenceCategoryAttribute,
   type ReferenceAttributeOption,
   type ReferenceDataEnvelope,
 } from "@/lib/reference-data/types";
+import { mapCategoryReferenceRows } from "@/lib/data/supabase/categories";
 import { createSupabasePublicServerClient } from "@/lib/supabase/server";
 import { tryGetServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
@@ -106,27 +106,7 @@ export async function getCategoryReferences(): Promise<ReferenceDataEnvelope<Cat
 
   try {
     const rows = await listActiveCategories(createSupabasePublicServerClient());
-    const value = ready<CategoryReferenceData>({
-      categories: rows.map((category) => ({
-        id: category.id,
-        parentId: category.parent_id,
-        slug: category.slug,
-        name: { ru: category.name_ru, kk: category.name_kk },
-        icon: category.icon_key,
-        tone: category.tone_key,
-        searchPlaceholder: category.search_placeholder_ru && category.search_placeholder_kk
-          ? { ru: category.search_placeholder_ru, kk: category.search_placeholder_kk }
-          : null,
-        titlePlaceholder: category.title_placeholder_ru && category.title_placeholder_kk
-          ? { ru: category.title_placeholder_ru, kk: category.title_placeholder_kk }
-          : null,
-        descriptionHint: category.description_hint_ru && category.description_hint_kk
-          ? { ru: category.description_hint_ru, kk: category.description_hint_kk }
-          : null,
-        priceMode: category.price_mode as CategoryPriceMode,
-        sortOrder: category.sort_order,
-      })),
-    });
+    const value = ready<CategoryReferenceData>(mapCategoryReferenceRows(rows));
     categoryCache = { expiresAt: Date.now() + REFERENCE_CACHE_TTL_MS, value };
     return value;
   } catch {

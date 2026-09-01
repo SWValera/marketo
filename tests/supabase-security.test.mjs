@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
-import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 
 const root = new URL("../", import.meta.url);
 const users = {
@@ -46,8 +46,9 @@ async function asAnon(db, operation) {
 }
 
 async function createFixtureDatabase() {
-  const db = new PGlite({ extensions: { pg_trgm, pgcrypto } });
-  await db.exec(`
+  const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
+  try {
+    await db.exec(`
     create schema auth;
     create role anon nologin;
     create role authenticated nologin;
@@ -208,7 +209,11 @@ async function createFixtureDatabase() {
     [users.buyer],
   );
 
-  return { db, refs, listings };
+    return { db, refs, listings };
+  } catch (error) {
+    await closePGliteTestDatabase(db);
+    throw error;
+  }
 }
 
 test("Supabase v2 security and reference-data audit", async (t) => {
@@ -1089,6 +1094,6 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       assert.deepEqual(notClientCallable, ["handle_new_auth_user", "touch_conversation_after_message"]);
     });
   } finally {
-    await db.close();
+    await closePGliteTestDatabase(db);
   }
 });

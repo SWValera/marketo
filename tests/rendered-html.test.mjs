@@ -136,6 +136,7 @@ test("invalid callback cannot create an open redirect", async () => {
 test("protected pages redirect anonymous users to login in both locales", async () => {
   for (const locale of ["ru", "kk"]) {
     for (const [pathname, expectedNext] of [
+      [`/publish?listing=${ids.country}`, `/publish?listing=${ids.country}`],
       ["/publish", "/publish"],
       ["/profile/edit", "/profile/edit"],
       ["/admin", "/admin"],

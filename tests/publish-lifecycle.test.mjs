@@ -18,11 +18,192 @@ import {
 } from "../lib/publish/recovery.ts";
 import { protectedMediaUrl, publicMediaUrl } from "../lib/media/public-url.ts";
 import { translate } from "../lib/i18n/messages.ts";
+import { mapCategoryReferenceRows } from "../lib/data/supabase/categories.ts";
+import {
+  createSingleFlightTtlLoader,
+  isPublishLoadRetryable,
+  publishEditorPath,
+  publishLoadFailureForStatus,
+  publishLoginHref,
+  readPublishDraftResponse,
+} from "../lib/publish/loader.ts";
 
 const categoryId = "10000000-0000-4000-8000-000000000001";
 const settlementId = "20000000-0000-4000-8000-000000000002";
 const userA = "30000000-0000-4000-8000-000000000003";
 const userB = "40000000-0000-4000-8000-000000000004";
+
+function ownerDraftBundle(overrides = {}) {
+  return {
+    id: categoryId,
+    slug: "draft-listing",
+    status: "draft",
+    categoryId,
+    categorySlug: "jobs-logistics",
+    settlementId,
+    title: "Рабочий заголовок",
+    description: "Достаточно подробное описание",
+    price: 1000,
+    currencyCode: "KZT",
+    contactName: "Алия",
+    contactPhone: "+77001234567",
+    allowMessages: true,
+    attributes: {},
+    images: [],
+    rejectionReasonCode: null,
+    rejectedAt: null,
+    updatedAt: "2026-09-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+test("publish loader preserves status semantics and safe edit return paths", () => {
+  assert.deepEqual(
+    [401, 404, 409, 503, 500].map((status) => [status, publishLoadFailureForStatus(status)]),
+    [
+      [401, "authentication"],
+      [404, "not_found"],
+      [409, "not_editable"],
+      [503, "temporary"],
+      [500, "unexpected"],
+    ],
+  );
+  assert.equal(isPublishLoadRetryable("temporary"), true);
+  for (const reason of ["authentication", "not_found", "not_editable", "unexpected"]) {
+    assert.equal(isPublishLoadRetryable(reason), false);
+  }
+  assert.equal(publishEditorPath(null), "/publish");
+  assert.equal(publishEditorPath(categoryId), `/publish?listing=${categoryId}`);
+  assert.equal(publishLoginHref(null), "/login?next=%2Fpublish");
+  assert.equal(
+    publishLoginHref(categoryId),
+    `/login?next=${encodeURIComponent(`/publish?listing=${categoryId}`)}`,
+  );
+});
+
+test("publish draft response parser preserves HTTP failures and rejects malformed success bodies", async () => {
+  for (const [status, reason] of [[401, "authentication"], [404, "not_found"], [409, "not_editable"], [503, "temporary"]]) {
+    await assert.rejects(
+      readPublishDraftResponse(new Response(null, { status })),
+      (error) => error?.reason === reason,
+    );
+  }
+  await assert.rejects(
+    readPublishDraftResponse(new Response("not-json", { status: 200 })),
+    (error) => error?.reason === "unexpected",
+  );
+  await assert.rejects(
+    readPublishDraftResponse(new Response(JSON.stringify({}), { status: 200 })),
+    (error) => error?.reason === "unexpected",
+  );
+  for (const listing of ["invalid", [], { id: categoryId }]) {
+    await assert.rejects(
+      readPublishDraftResponse(new Response(JSON.stringify({ listing }), { status: 200 })),
+      (error) => error?.reason === "unexpected",
+    );
+  }
+  const listing = ownerDraftBundle();
+  assert.deepEqual(
+    await readPublishDraftResponse(new Response(JSON.stringify({ listing }), { status: 200 })),
+    listing,
+  );
+});
+
+test("publish catalog cache deduplicates, expires, and never caches failures", async () => {
+  let now = 1000;
+  let calls = 0;
+  const load = createSingleFlightTtlLoader(async () => {
+    calls += 1;
+    return { generation: calls };
+  }, 500, () => now);
+
+  const first = load();
+  const concurrent = load();
+  assert.equal(first, concurrent);
+  assert.deepEqual(await first, { generation: 1 });
+  assert.deepEqual(await load(), { generation: 1 });
+  assert.equal(calls, 1);
+
+  now += 501;
+  assert.deepEqual(await load(), { generation: 2 });
+  assert.equal(calls, 2);
+
+  let failingCalls = 0;
+  const retryable = createSingleFlightTtlLoader(async () => {
+    failingCalls += 1;
+    if (failingCalls === 1) throw new Error("temporary reference failure");
+    return "ready";
+  }, 500, () => now);
+  await assert.rejects(retryable(), /temporary reference failure/);
+  assert.equal(await retryable(), "ready");
+  assert.equal(failingCalls, 2);
+});
+
+test("shared category mapper preserves catalog identity, hierarchy, RU/KK, and presentation", () => {
+  const childId = "10000000-0000-4000-8000-000000000009";
+  assert.deepEqual(mapCategoryReferenceRows([
+    {
+      id: categoryId,
+      parent_id: null,
+      slug: "jobs",
+      name_ru: "Работа",
+      name_kk: "Жұмыс",
+      icon_key: "briefcase",
+      tone_key: "green",
+      search_placeholder_ru: null,
+      search_placeholder_kk: null,
+      title_placeholder_ru: null,
+      title_placeholder_kk: null,
+      description_hint_ru: null,
+      description_hint_kk: null,
+      price_mode: "salary",
+      sort_order: 16,
+    },
+    {
+      id: childId,
+      parent_id: categoryId,
+      slug: "jobs-logistics",
+      name_ru: "Логистика",
+      name_kk: "Логистика",
+      icon_key: "truck",
+      tone_key: "blue",
+      search_placeholder_ru: "Найти вакансию",
+      search_placeholder_kk: "Жұмыс табу",
+      title_placeholder_ru: "Водитель",
+      title_placeholder_kk: "Жүргізуші",
+      description_hint_ru: "Опишите условия",
+      description_hint_kk: "Шарттарды сипаттаңыз",
+      price_mode: "salary",
+      sort_order: 17,
+    },
+  ]), {
+    categories: [{
+      id: categoryId,
+      parentId: null,
+      slug: "jobs",
+      name: { ru: "Работа", kk: "Жұмыс" },
+      icon: "briefcase",
+      tone: "green",
+      searchPlaceholder: null,
+      titlePlaceholder: null,
+      descriptionHint: null,
+      priceMode: "salary",
+      sortOrder: 16,
+    }, {
+      id: childId,
+      parentId: categoryId,
+      slug: "jobs-logistics",
+      name: { ru: "Логистика", kk: "Логистика" },
+      icon: "truck",
+      tone: "blue",
+      searchPlaceholder: { ru: "Найти вакансию", kk: "Жұмыс табу" },
+      titlePlaceholder: { ru: "Водитель", kk: "Жүргізуші" },
+      descriptionHint: { ru: "Опишите условия", kk: "Шарттарды сипаттаңыз" },
+      priceMode: "salary",
+      sortOrder: 17,
+    }],
+  });
+});
 
 function attribute(overrides = {}) {
   return {

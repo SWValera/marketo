@@ -213,7 +213,7 @@ export function CatalogClient({
       </aside>
       <section className="catalog-results">
         <div className="catalog-toolbar catalog-toolbar-compact"><div className="active-filter-chips">{activeChips.length > 0 ? activeChips.map((chip) => <span key={chip}>{chip}</span>) : <span className="muted-chip">{t("catalog.noExtraFilters")}</span>}</div><label>{t("catalog.sort")}<select value={sort} onChange={(event) => setSort(event.target.value)}><option value="new">{t("catalog.sortNew")}</option><option value="cheap">{t("catalog.sortCheap")}</option><option value="expensive">{t("catalog.sortExpensive")}</option></select></label></div>
-        {result.length ? <div className="listing-grid catalog-grid">{result.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div> : <EmptyState icon={<Search size={30} />} title={t("catalog.emptyTitle")} description={t("catalog.emptyDescription")} actionHref="/publish" actionLabel={t("nav.publish")} />}
+        {result.length ? <div className="listing-grid catalog-grid">{result.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div> : <EmptyState icon={<Search size={30} />} title={t("catalog.emptyTitle")} description={t("catalog.emptyDescription")} actionHref="/publish" actionLabel={t("nav.publish")} actionPrefetch={false} />}
       </section>
     </div>
   </>;

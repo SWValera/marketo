@@ -4,25 +4,35 @@ import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 import { PublishFormLoader } from "@/components/publish-form-loader";
 import { getCurrentAuthContext } from "@/lib/auth/context";
+import { publishLoginHref } from "@/lib/publish/loader";
 
 export const metadata: Metadata = { title: "Разместить объявление", robots: { index: false, follow: false } };
+export const dynamic = "force-dynamic";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export default async function PublishPage({
-  searchParams,
-}: {
+type PublishPageProps = {
   searchParams: Promise<{ listing?: string | string[] }>;
-}) {
+};
+
+export default function PublishPage(props: PublishPageProps) {
+  return <PublishPageContent {...props} />;
+}
+
+async function PublishPageContent({
+  searchParams,
+}: PublishPageProps) {
   const [authContext, params] = await Promise.all([
     getCurrentAuthContext(),
     searchParams,
   ]);
-  if (authContext.status === "anonymous") redirect("/login?next=/publish");
+  const requestedListing = Array.isArray(params.listing) ? params.listing[0] : params.listing;
+  const validRequestedListing = requestedListing && uuid.test(requestedListing) ? requestedListing : null;
+
+  if (authContext.status === "anonymous") redirect(publishLoginHref(validRequestedListing));
   if (authContext.status === "error") throw new Error("AUTH_CONTEXT_UNAVAILABLE");
   if (authContext.accountStatus !== "active") redirect("/profile");
 
-  const requestedListing = Array.isArray(params.listing) ? params.listing[0] : params.listing;
   if (requestedListing && !uuid.test(requestedListing)) notFound();
 
   return <>

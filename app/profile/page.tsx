@@ -142,7 +142,7 @@ export default async function ProfilePage({
           <h2 id="my-listings-title">{t("profile.myListings")}</h2>
           <p>{listings ? t("profile.myListingsCount", { count: listings.total }) : t("profile.myListingsNote")}</p>
         </div>
-        <Link className="primary-action" href="/publish"><Plus size={17} />{t("profile.createListing")}</Link>
+        <Link className="primary-action" href="/publish" prefetch={false}><Plus size={17} />{t("profile.createListing")}</Link>
       </div>
 
       {!listings ? <EmptyState
@@ -156,6 +156,7 @@ export default async function ProfilePage({
         description={t("profile.emptyListingsNote")}
         actionHref="/publish"
         actionLabel={t("profile.createListing")}
+        actionPrefetch={false}
       /> : <div className="owner-listings-shell">
         {listings.items.length ? <div className="owner-listing-grid">
           {listings.items.map((listing) => <article className="owner-listing-card" key={listing.id}>

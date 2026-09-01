@@ -2,6 +2,7 @@ import vinext from "vinext";
 import { defineConfig } from "vite";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { publicSupabaseBuildEnvGuard } from "./build/public-supabase-env-guard";
 import { sites } from "./build/sites-vite-plugin";
 
 const hostingConfigPath = fileURLToPath(new URL("./.openai/hosting.json", import.meta.url));
@@ -52,6 +53,7 @@ export default defineConfig(async () => {
         inspectorPort: false,
         config: localBindingConfig,
       }),
+      publicSupabaseBuildEnvGuard(),
     ],
   };
 });

@@ -47,7 +47,7 @@ test("frontend auth implements register, login, refreshed session, recovery, pas
   assert.match(profileEdit, /updateCurrentAccountProfile/);
   assert.match(publishPage, /getCurrentAuthContext\(\)/);
   assert.match(publishPage, /authContext\.status === "anonymous"/);
-  assert.match(publishPage, /redirect\("\/login\?next=\/publish"\)/);
+  assert.match(publishPage, /redirect\(publishLoginHref\(validRequestedListing\)\)/);
   assert.match(proxy, /createServerClient<Database>/);
   assert.match(proxy, /request\.cookies\.getAll\(\)/);
   assert.match(proxy, /response\.cookies\.set/);

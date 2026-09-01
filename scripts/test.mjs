@@ -25,6 +25,7 @@ async function main() {
     "--import",
     new URL("./lib/register-cloudflare-node-shim.mjs", import.meta.url).href,
     "--test",
+    "--test-concurrency=1",
     ...testFiles,
   ], {
     environment,

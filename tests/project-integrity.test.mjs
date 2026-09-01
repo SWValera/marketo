@@ -30,7 +30,7 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.doesNotMatch(favicon, /#0C79D8|#2E9EFF/);
   const worker = await readFile(new URL("public/sw.js", root), "utf8");
   const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
-  assert.match(worker, /marketo-static-v5/);
+  assert.match(worker, /marketo-static-v6/);
   assert.match(worker, /"\/offline"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
   assert.match(worker, /request\.mode === "navigate"[\s\S]*fetch\(request\)/);
@@ -177,7 +177,7 @@ test("home search, City Premium Showcase and primary calls to action navigate to
   const home = await readFile(new URL("app/page.tsx", root), "utf8");
   const showcase = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
-  assert.match(home, /<Link href="\/publish" className="primary-action"/);
+  assert.match(home, /<Link(?=[^>]*\bhref="\/publish")(?=[^>]*\bprefetch=\{false\})[^>]*\bclassName="primary-action"/);
   assert.match(home, /<CityPremiumShowcase \/>/);
   assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} listings=\{listingsPanel\} \/>/);
   assert.match(showcase, /href=\{`\/listing\/\$\{item\.listingId\}-\$\{item\.slug\}`\}/);

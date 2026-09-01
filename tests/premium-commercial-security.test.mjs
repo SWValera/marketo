@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
-import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 
 const root = new URL("../", import.meta.url);
 const ownerId = "61000000-0000-4000-8000-000000000001";
@@ -19,7 +19,7 @@ async function asAuthenticated(db, userId, operation) {
 }
 
 test("Premium commercial accounts, orders and analytics are owner-scoped by RLS", async () => {
-  const db = new PGlite({ extensions: { pg_trgm, pgcrypto } });
+  const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
   try {
     await db.exec(`
       create schema auth;
@@ -120,6 +120,6 @@ test("Premium commercial accounts, orders and analytics are owner-scoped by RLS"
     assert.deepEqual(publicPlacements.rows, []);
     await db.exec("reset role;");
   } finally {
-    await db.close();
+    await closePGliteTestDatabase(db);
   }
 });

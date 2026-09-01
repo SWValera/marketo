@@ -1,7 +1,7 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
 
 function readRuntimeString(name: string): string | undefined {
-  const runtimeValue = cloudflareEnv[name];
+  const runtimeValue = (cloudflareEnv as unknown as Record<string, unknown>)[name];
   if (typeof runtimeValue === "string" && runtimeValue.length > 0) return runtimeValue;
   return process.env[name];
 }

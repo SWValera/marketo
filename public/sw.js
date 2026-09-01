@@ -24,7 +24,12 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (
+    request.method !== "GET"
+    || url.origin !== self.location.origin
+    || url.pathname === "/api"
+    || url.pathname.startsWith("/api/")
+  ) return;
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(async () => (await caches.match("/offline")) || Response.error()));
@@ -32,17 +37,23 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (["image", "font", "script", "style"].includes(request.destination)) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const network = fetch(request).then((response) => {
-          if (response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
-            const copy = response.clone();
-            void caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        });
-        return cached || network;
-      }),
-    );
+    const result = (async () => {
+      const cached = await caches.match(request).catch(() => undefined);
+      if (cached) return { response: cached, cacheWrite: Promise.resolve() };
+
+      const response = await fetch(request);
+      let cacheWrite = Promise.resolve();
+      if (response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
+        try {
+          const copy = response.clone();
+          cacheWrite = caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
+        } catch {
+          // A cache copy is optional; the successful network response remains authoritative.
+        }
+      }
+      return { response, cacheWrite };
+    })();
+    event.respondWith(result.then(({ response }) => response));
+    event.waitUntil(result.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
   }
 });

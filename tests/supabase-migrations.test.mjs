@@ -1,35 +1,40 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
-import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { categoryOptions, getCategoryPresentation } from "../lib/catalog-config.ts";
+import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 
 const root = new URL("../", import.meta.url);
 
 async function createDatabase() {
-  const db = new PGlite({ extensions: { pg_trgm, pgcrypto } });
-  await db.exec(`
-    create schema auth;
-    create role anon nologin;
-    create role authenticated nologin;
-    create role service_role nologin;
-    grant usage on schema auth to anon, authenticated, service_role;
-    create table auth.users (
-      id uuid primary key,
-      raw_user_meta_data jsonb not null default '{}'::jsonb
-    );
-    create function auth.uid()
-    returns uuid
-    language sql
-    stable
-    as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-    $$;
-    create publication supabase_realtime;
-  `);
-  return db;
+  const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
+  try {
+    await db.exec(`
+      create schema auth;
+      create role anon nologin;
+      create role authenticated nologin;
+      create role service_role nologin;
+      grant usage on schema auth to anon, authenticated, service_role;
+      create table auth.users (
+        id uuid primary key,
+        raw_user_meta_data jsonb not null default '{}'::jsonb
+      );
+      create function auth.uid()
+      returns uuid
+      language sql
+      stable
+      as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+      $$;
+      create publication supabase_realtime;
+    `);
+    return db;
+  } catch (error) {
+    await closePGliteTestDatabase(db);
+    throw error;
+  }
 }
 
 async function applyMigrations(db) {
@@ -481,6 +486,6 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
     assert.ok(publicPremium.rows.every((row) => row.listing_id !== premiumListings.rows[0].id));
     await db.exec("reset role;");
   } finally {
-    await db.close();
+    await closePGliteTestDatabase(db);
   }
 });
