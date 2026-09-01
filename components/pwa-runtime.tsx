@@ -4,6 +4,8 @@ import { RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
 
+const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
+
 export function PwaRuntime() {
   const { t } = useI18n();
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -13,6 +15,7 @@ export function PwaRuntime() {
     if (!("serviceWorker" in navigator)) return;
     let reloading = false;
     let registration: ServiceWorkerRegistration | undefined;
+    let intervalId: number | undefined;
 
     const onControllerChange = () => {
       if (reloading) return;
@@ -20,14 +23,15 @@ export function PwaRuntime() {
       window.location.reload();
     };
     const checkForUpdate = () => registration?.update().catch(() => undefined);
-    const onVisibility = () => document.visibilityState === "visible" && checkForUpdate();
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-    document.addEventListener("visibilitychange", onVisibility);
 
     navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((nextRegistration) => {
       registration = nextRegistration;
       if (registration.waiting) setWaitingWorker(registration.waiting);
       checkForUpdate();
+      intervalId = window.setInterval(() => {
+        if (document.visibilityState === "visible") checkForUpdate();
+      }, UPDATE_INTERVAL_MS);
       registration.addEventListener("updatefound", () => {
         const worker = registration?.installing;
         worker?.addEventListener("statechange", () => {
@@ -38,7 +42,7 @@ export function PwaRuntime() {
 
     return () => {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      document.removeEventListener("visibilitychange", onVisibility);
+      if (intervalId !== undefined) window.clearInterval(intervalId);
     };
   }, []);
 
