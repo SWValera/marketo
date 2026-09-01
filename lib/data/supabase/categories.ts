@@ -12,7 +12,7 @@ export async function listCategoryLevel(client: MarketoSupabaseClient, parentId:
 
 export async function listActiveCategories(client: MarketoSupabaseClient) {
   const rows = [];
-  const pageSize = 500;
+  const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await client
       .from("categories")
