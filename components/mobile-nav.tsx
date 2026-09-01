@@ -20,7 +20,7 @@ export function MobileNav() {
     <nav className="mobile-bottom-nav" aria-label={t("nav.mobileAria")}>
       {links.map(({ href, label, icon: Icon, publish }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-        return <Link href={href} className={`${publish ? "mobile-publish " : ""}${active ? "is-active" : ""}`} key={href}>
+        return <Link prefetch={publish ? false : undefined} href={href} className={`${publish ? "mobile-publish " : ""}${active ? "is-active" : ""}`} key={href}>
           <span className="mobile-nav-icon"><Icon size={publish ? 25 : 21} /></span>
           <span>{label}</span>
         </Link>;
