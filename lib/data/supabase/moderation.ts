@@ -6,11 +6,12 @@ import type {
   ModerationDecision,
   ModerationListingDetail,
   ModerationQueueItem,
-  PageResult,
+  NumberedPageResult,
 } from "@/lib/data/types";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
 import type { ModerationRejectionReason } from "@/lib/moderation/policy";
+import { normalizePageSize, normalizePositivePage, pageWindow } from "../pagination.ts";
 import {
   ModerationDataError,
   moderationMediaUrl,
@@ -75,23 +76,34 @@ function safeNumber(value: unknown) {
 export async function listModerationQueue(
   client: MarketoSupabaseClient,
   options: { page?: number; pageSize?: number; locale?: Locale } = {},
-): Promise<PageResult<ModerationQueueItem>> {
-  const page = Math.max(Math.trunc(options.page ?? 1), 1);
-  const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 24), 1), MAX_QUEUE_PAGE_SIZE);
+): Promise<NumberedPageResult<ModerationQueueItem>> {
+  const page = normalizePositivePage(options.page);
+  const pageSize = normalizePageSize(options.pageSize, 24, MAX_QUEUE_PAGE_SIZE);
   const locale = options.locale ?? "ru";
-  const offset = (page - 1) * pageSize;
+  const countResponse = await client
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (countResponse.error || countResponse.count === null) {
+    throw new ModerationDataError("QUEUE_UNAVAILABLE", countResponse.error);
+  }
+  const pagination = pageWindow(countResponse.count, page, pageSize);
+  if (pagination.offset === null || pagination.rangeEnd === null) {
+    return { items: [], total: countResponse.count, nextCursor: null, page, totalPages: pagination.totalPages, state: pagination.outOfRange ? "out_of_range" : "empty" };
+  }
+  const offset = pagination.offset;
   const response = await client
     .from("listings")
     .select(
       "id, title, price_minor, currency_code, status, owner_id, category_id, settlement_id, created_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
-      { count: "exact" },
     )
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
-    .range(offset, offset + pageSize - 1);
-  const { rows, total } = normalizeModerationQueueQueryResult(response as unknown as QueueQueryResult);
-  if (rows.length === 0) return { items: [], total, nextCursor: null };
+    .range(offset, pagination.rangeEnd);
+  const { rows } = normalizeModerationQueueQueryResult({ ...response, count: countResponse.count } as unknown as QueueQueryResult);
+  const total = countResponse.count;
+  if (rows.length === 0) throw new ModerationDataError("QUEUE_UNAVAILABLE");
 
   const listingIds = rows.map((row) => row.id);
   const ownerIds = [...new Set(rows.map((row) => row.owner_id).filter((id): id is string => Boolean(id)))];
@@ -139,6 +151,9 @@ export async function listModerationQueue(
     }),
     total,
     nextCursor: offset + rows.length < total ? String(page + 1) : null,
+    page,
+    totalPages: pagination.totalPages,
+    state: "ready",
   };
 }
 

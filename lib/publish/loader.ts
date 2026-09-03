@@ -1,5 +1,7 @@
 import type { OwnerDraftBundle } from "@/lib/data/types";
 
+export { createSingleFlightTtlLoader } from "../reference-data/cache.ts";
+
 export type PublishLoadFailure =
   | "authentication"
   | "not_found"
@@ -79,32 +81,6 @@ export async function readPublishDraftResponse(response: {
     throw new PublishLoadError("unexpected");
   }
   return body.listing;
-}
-
-export function createSingleFlightTtlLoader<T>(
-  load: () => Promise<T>,
-  ttlMilliseconds: number,
-  now: () => number = Date.now,
-) {
-  let cached: { expiresAt: number; value: T } | undefined;
-  let inFlight: Promise<T> | undefined;
-
-  return function loadCached(): Promise<T> {
-    if (cached && cached.expiresAt > now()) return Promise.resolve(cached.value);
-    if (inFlight) return inFlight;
-
-    const request = Promise.resolve()
-      .then(load)
-      .then((value) => {
-        cached = { expiresAt: now() + ttlMilliseconds, value };
-        return value;
-      })
-      .finally(() => {
-        if (inFlight === request) inFlight = undefined;
-      });
-    inFlight = request;
-    return request;
-  };
 }
 
 export function isPublishLoadRetryable(reason: PublishLoadFailure) {

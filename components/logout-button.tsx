@@ -10,14 +10,21 @@ export function LogoutButton({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   async function logout() {
     setLoading(true);
-    await getSupabaseBrowserClient().auth.signOut({ scope: "local" });
-    router.replace("/");
-    router.refresh();
+    setFailed(false);
+    try {
+      const result = await getSupabaseBrowserClient().auth.signOut({ scope: "local" });
+      if (result.error) throw result.error;
+      router.replace("/");
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return <button className={compact ? "logout-button is-compact" : "logout-button"} type="button" onClick={() => void logout()} disabled={loading}><LogOut size={17} />{loading ? t("auth.loggingOut") : t("auth.logout")}</button>;
+  return <><button className={compact ? "logout-button is-compact" : "logout-button"} type="button" onClick={() => void logout()} disabled={loading}><LogOut size={17} />{loading ? t("auth.loggingOut") : t("auth.logout")}</button>{failed ? <span className="owner-listing-action-error" role="alert">{t("auth.errorGeneric")}</span> : null}</>;
 }
-

@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PREVIOUS_ROUTE_KEY } from "@/components/navigation-history";
 import { useI18n } from "@/components/i18n-provider";
+import { safeReadBrowserStorage } from "@/lib/browser/storage";
 
 export function BackButton({
   fallback,
@@ -25,7 +26,7 @@ export function BackButton({
       onBack();
       return;
     }
-    const previousRoute = window.sessionStorage.getItem(PREVIOUS_ROUTE_KEY);
+    const previousRoute = safeReadBrowserStorage("sessionStorage", PREVIOUS_ROUTE_KEY);
     const hasInternalHistory = Boolean(previousRoute && previousRoute !== window.location.pathname && window.history.length > 1);
     if (hasInternalHistory) router.back();
     else router.push(fallback);

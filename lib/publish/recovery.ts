@@ -57,19 +57,36 @@ export function publishRecoveryKey(userId: string) {
 export type PublishRecoveryStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export function readPublishRecovery(
-  storage: PublishRecoveryStorage,
+  storage: PublishRecoveryStorage | null,
   expectedUserId: string,
   now = Date.now(),
 ) {
-  return parsePublishRecovery(storage.getItem(publishRecoveryKey(expectedUserId)), expectedUserId, now);
+  if (!storage) return { status: "unavailable" as const, draft: null };
+  try {
+    return parsePublishRecovery(storage.getItem(publishRecoveryKey(expectedUserId)), expectedUserId, now);
+  } catch {
+    return { status: "unavailable" as const, draft: null };
+  }
 }
 
-export function savePublishRecovery(storage: PublishRecoveryStorage, draft: PublishRecoveryDraft) {
-  storage.setItem(publishRecoveryKey(draft.userId), JSON.stringify(draft));
+export function savePublishRecovery(storage: PublishRecoveryStorage | null, draft: PublishRecoveryDraft) {
+  if (!storage) return false;
+  try {
+    storage.setItem(publishRecoveryKey(draft.userId), JSON.stringify(draft));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function removePublishRecovery(storage: PublishRecoveryStorage, userId: string) {
-  storage.removeItem(publishRecoveryKey(userId));
+export function removePublishRecovery(storage: PublishRecoveryStorage | null, userId: string) {
+  if (!storage) return false;
+  try {
+    storage.removeItem(publishRecoveryKey(userId));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function createPublishRecovery(

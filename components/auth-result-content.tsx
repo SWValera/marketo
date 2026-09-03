@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { CheckCircle2, X } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/components/i18n-provider";
@@ -9,7 +9,7 @@ import { publishBrowserAuthEvent } from "@/lib/auth/events";
 export function AuthResultContent({ next }: { next: string }) {
   const { t } = useI18n();
   useEffect(() => publishBrowserAuthEvent("signup-confirmed"), []);
-  return <main className="auth-page"><section className="auth-card auth-result-card" role="status">
+  return <main id="main-content" tabIndex={-1} className="auth-page"><section className="auth-card auth-result-card" role="status">
     <span className="auth-result-icon"><CheckCircle2 size={34} /></span>
     <h1>{t("auth.confirmationSuccessTitle")}</h1>
     <p>{t("auth.confirmationSuccessNote")}</p>

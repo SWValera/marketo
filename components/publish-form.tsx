@@ -47,6 +47,7 @@ import {
   type PublishRecoveryDraft,
   type PublishRecoveryFields,
 } from "@/lib/publish/recovery";
+import { safeBrowserStorage } from "@/lib/browser/storage";
 import {
   clearDependentValues,
   getAttributeValidation,
@@ -160,9 +161,10 @@ export function PublishForm({
   useEffect(() => {
     let active = true;
     async function loadRecovery() {
-      const parsed = readPublishRecovery(window.localStorage, userId);
+      const storage = safeBrowserStorage("localStorage");
+      const parsed = readPublishRecovery(storage, userId);
       if (parsed.status === "invalid" || parsed.status === "stale" || parsed.status === "foreign") {
-        removePublishRecovery(window.localStorage, userId);
+        removePublishRecovery(storage, userId);
         if (parsed.status === "stale" && active) setRecoveryNotice(t("publish.recoveryExpired"));
         if (active) setRecoveryReady(true);
         return;
@@ -171,7 +173,7 @@ export function PublishForm({
         if (active) setRecoveryReady(true);
         return;
       }
-      let candidate = parsed.draft;
+      const candidate = parsed.draft;
       let serverDraft: OwnerDraftBundle | null = null;
       if (initialDraft) {
         if (candidate.serverListingId !== initialDraft.id) {
@@ -188,12 +190,19 @@ export function PublishForm({
             const body = await response.json() as { listing?: OwnerDraftBundle };
             serverDraft = body.listing ?? null;
           } else {
-            candidate = createPublishRecovery(userId, candidate.fields, null, candidate.savedAt);
-            savePublishRecovery(window.localStorage, candidate);
             if (active) setRecoveryNotice(t("publish.recoveryServerStale"));
+            if (active) setRecoveryReady(true);
+            return;
           }
         } catch {
           if (active) setRecoveryNotice(t("publish.recoveryCheckFailed"));
+          if (active) setRecoveryReady(true);
+          return;
+        }
+        if (!serverDraft) {
+          if (active) setRecoveryNotice(t("publish.recoveryCheckFailed"));
+          if (active) setRecoveryReady(true);
+          return;
         }
       }
       if (active) {
@@ -224,7 +233,7 @@ export function PublishForm({
     if (!meaningful) return;
     const timer = window.setTimeout(() => {
       savePublishRecovery(
-        window.localStorage,
+        safeBrowserStorage("localStorage"),
         createPublishRecovery(userId, recoveryFields, listingId),
       );
     }, 700);
@@ -346,7 +355,7 @@ export function PublishForm({
 
   function addPhotos(files: FileList | null) {
     if (!files) return;
-    const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
+    const allowed = new Set(["image/jpeg", "image/png"]);
     const available = Math.max(0, 12 - existingImages.length - photos.length);
     const candidates = Array.from(files).slice(0, available);
     if (candidates.length === 0 || candidates.some((file) => !allowed.has(file.type) || file.size > 12 * 1024 * 1024)) {
@@ -428,7 +437,7 @@ export function PublishForm({
   }
 
   function deleteRecovery() {
-    removePublishRecovery(window.localStorage, userId);
+    removePublishRecovery(safeBrowserStorage("localStorage"), userId);
     setRecoveryCandidate(null);
     setRecoveryServerDraft(null);
     setRecoveryNotice(t("publish.recoveryDeleted"));
@@ -436,7 +445,7 @@ export function PublishForm({
 
   function reset() {
     photos.forEach((photo) => URL.revokeObjectURL(photo.url));
-    removePublishRecovery(window.localStorage, userId);
+    removePublishRecovery(safeBrowserStorage("localStorage"), userId);
     setPhotos([]);
     setExistingImages([]);
     setSubmitted(false);
@@ -469,7 +478,7 @@ export function PublishForm({
   async function submitForModeration() {
     if (!validateCurrent(step, true)) return;
     const input = buildDraftInput();
-    savePublishRecovery(window.localStorage, createPublishRecovery(userId, recoveryFields, listingId));
+    savePublishRecovery(safeBrowserStorage("localStorage"), createPublishRecovery(userId, recoveryFields, listingId));
     setSaving(true);
     setGlobalError("");
     setFieldErrors({});
@@ -496,7 +505,7 @@ export function PublishForm({
       currentListingId = saveBody.listing.id;
       setListingId(currentListingId);
       setListingStatus(listingStatus);
-      savePublishRecovery(window.localStorage, createPublishRecovery(userId, recoveryFields, currentListingId));
+      savePublishRecovery(safeBrowserStorage("localStorage"), createPublishRecovery(userId, recoveryFields, currentListingId));
 
       if (photos.length > 0) {
         const form = new FormData();
@@ -536,7 +545,7 @@ export function PublishForm({
         }
         return;
       }
-      removePublishRecovery(window.localStorage, userId);
+      removePublishRecovery(safeBrowserStorage("localStorage"), userId);
       setSubmitted(true);
     } catch {
       setGlobalError(t("publish.saveFailedOffline"));
@@ -698,7 +707,7 @@ export function PublishForm({
           {step === 2 && <div className="publish-panel" ref={(node) => setFieldRef("photos", node)}>
             <div className="panel-heading"><span><Camera size={22} /></span><div><h2>{t("publish.addPhotos")}</h2><p>{t("publish.photosNote")}</p></div></div>
             {existingImages.length > 0 ? <div className="existing-photo-grid">{existingImages.map((image, index) => <article key={image.id}><img src={image.url} alt={t("publish.existingPhoto", { count: index + 1 })} />{index === 0 ? <b>{t("publish.mainPhoto")}</b> : null}</article>)}</div> : null}
-            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => addPhotos(event.target.files)} /></label>
+            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png" multiple onChange={(event) => addPhotos(event.target.files)} /></label>
             {photos.length > 0 && <div className="photo-preview-grid">{photos.map((photo, index) => <article key={`${photo.name}-${index}`}><img src={photo.url} alt={t("publish.preview", { count: index + 1 })} />{existingImages.length === 0 && index === 0 && <b>{t("publish.mainPhoto")}</b>}<div><button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} aria-label={t("publish.moveLeft")}><ChevronLeft size={16} /></button><GripVertical size={16} /><button type="button" disabled={index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={t("publish.moveRight")}><ChevronRight size={16} /></button><button type="button" className="remove-photo" onClick={() => removePhoto(index)} aria-label={t("publish.removePhoto")}><Trash2 size={16} /></button></div></article>)}</div>}
             {fieldError("photos")}
             <div className="photo-tips"><ShieldCheck size={19} /><div><strong>{t("publish.photoTip")}</strong><p>{t("publish.photoTipNote")}</p></div></div>

@@ -8,7 +8,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Подтверждение аккаунта", robots: { index: false, follow: false } };
 
-export default async function AuthResultPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+type AuthResultPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default function AuthResultPage(props: AuthResultPageProps) {
+  return <AuthResultPageContent {...props} />;
+}
+
+async function AuthResultPageContent({ searchParams }: AuthResultPageProps) {
   const params = await searchParams;
   if (params.event !== "signup-confirmed") redirect("/login?mode=register&auth_error=invalid");
   const { data, error } = await (await createSupabaseServerClient()).auth.getUser();

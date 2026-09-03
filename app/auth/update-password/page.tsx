@@ -8,7 +8,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Новый пароль", robots: { index: false, follow: false } };
 
-export default async function UpdatePasswordPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+type UpdatePasswordPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default function UpdatePasswordPage(props: UpdatePasswordPageProps) {
+  return <UpdatePasswordPageContent {...props} />;
+}
+
+async function UpdatePasswordPageContent({ searchParams }: UpdatePasswordPageProps) {
   const params = await searchParams;
   const { data, error } = await (await createSupabaseServerClient()).auth.getUser();
   if (error || !data.user) redirect("/login?mode=recover&auth_error=invalid");

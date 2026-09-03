@@ -14,5 +14,5 @@ export function QueryTabs({ className, items, defaultValue, initialValue, param 
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${next.size ? `?${next}` : ""}`);
   }
 
-  return <div className={className} role="tablist">{items.map((item) => <button className={item.value === active ? "is-active" : ""} type="button" role="tab" aria-selected={item.value === active} onClick={() => choose(item.value)} key={item.value}>{item.label}{typeof item.count === "number" ? <> <b>{item.count}</b></> : null}</button>)}</div>;
+  return <div className={className}>{items.map((item) => <button className={item.value === active ? "is-active" : ""} type="button" aria-pressed={item.value === active} onClick={() => choose(item.value)} key={item.value}>{item.label}{typeof item.count === "number" ? <> <b>{item.count}</b></> : null}</button>)}</div>;
 }

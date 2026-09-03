@@ -369,7 +369,7 @@ test("protected listing media never uses the configured public CDN", () => {
   const previous = process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;
   process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://cdn.example.test/media";
   try {
-    assert.equal(publicMediaUrl("listings/a/photo.webp"), "https://cdn.example.test/media/listings/a/photo.webp");
+    assert.equal(publicMediaUrl("listings/a/photo.webp"), "/api/media/listings/a/photo.webp");
     assert.equal(protectedMediaUrl("listings/a/photo.webp"), "/api/media/listings/a/photo.webp");
   } finally {
     if (previous === undefined) delete process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL;

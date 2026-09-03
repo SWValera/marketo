@@ -31,7 +31,7 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   const worker = await readFile(new URL("public/sw.js", root), "utf8");
   const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
   assert.match(worker, /marketo-static-v6/);
-  assert.match(worker, /"\/offline"/);
+  assert.match(worker, /"\/offline\.html"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
   assert.match(worker, /request\.mode === "navigate"[\s\S]*fetch\(request\)/);
   assert.match(worker, /event\.waitUntil\(self\.skipWaiting/);
@@ -188,15 +188,18 @@ test("home search, City Premium Showcase and primary calls to action navigate to
 
 test("catalog URL parser preserves search, geo, sorting and category attributes", async () => {
   const { parseCatalogSearchParams } = await import(new URL("lib/catalog-search-params.ts", root));
-  assert.deepEqual(parseCatalogSearchParams({ q: "camry", category: "cars-suv", city: "petropavl", price_min: "1 000", sort: "cheap", f_drive: "all", f_remote: "true" }), {
+  const cityId = "11111111-1111-4111-8111-111111111111";
+  assert.deepEqual(parseCatalogSearchParams({ q: "camry", category: "cars-suv", city: cityId, price_min: "1 000", sort: "cheap", f_drive: "all", f_remote: "true" }), {
     query: "camry",
     categorySlug: "cars-suv",
-    cityId: "petropavl",
+    cityId,
     minPrice: "1000",
     maxPrice: "",
     sort: "cheap",
+    page: 1,
     dynamicFilters: { drive: "all", remote: true },
   });
+  assert.equal(parseCatalogSearchParams({ city: "petropavl" }).cityId, undefined);
 });
 
 test("Russian and Kazakh dictionaries stay type-aligned and locale preference is wired", async () => {

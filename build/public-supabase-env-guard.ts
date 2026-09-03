@@ -1,4 +1,5 @@
 import type { Plugin } from "vite";
+import { isLegacyServiceRoleJwt } from "../lib/supabase/public-config-validation.ts";
 
 type BuildEnvironment = Readonly<Record<string, string | undefined>>;
 type BuildDefines = Readonly<Record<string, unknown>> | undefined;
@@ -11,17 +12,6 @@ const KEY_NAMES = [PUBLISHABLE_NAME, ANON_NAME] as const;
 function assertInline(define: BuildDefines, name: string, value: string) {
   if (define?.[`process.env.${name}`] !== JSON.stringify(value)) {
     throw new Error(`vinext did not inline ${name} into the browser build.`);
-  }
-}
-
-function isLegacyServiceRoleJwt(value: string) {
-  const parts = value.split(".");
-  if (parts.length !== 3) return false;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as unknown;
-    return Boolean(payload && typeof payload === "object" && "role" in payload && payload.role === "service_role");
-  } catch {
-    return false;
   }
 }
 

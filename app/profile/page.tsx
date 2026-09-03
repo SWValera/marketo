@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Owner media is served through the authenticated same-origin media route. */
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import {
   AlertTriangle,
   BadgeCheck,
@@ -20,6 +20,7 @@ import { listingRepository } from "@/lib/data/repositories";
 import type { MyListingSummary } from "@/lib/data/types";
 import { getServerI18n } from "@/lib/i18n/server";
 import { MODERATION_REJECTION_REASONS } from "@/lib/moderation/policy";
+import { normalizePositivePage } from "@/lib/data/pagination";
 
 export const metadata: Metadata = {
   title: "Профиль",
@@ -27,11 +28,6 @@ export const metadata: Metadata = {
 };
 
 const PAGE_SIZE = 12;
-
-function requestedPage(value: string | string[] | undefined) {
-  const parsed = Number(Array.isArray(value) ? value[0] : value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-}
 
 function safeInitial(value: string) {
   return Array.from(value.trim())[0]?.toLocaleUpperCase() ?? "M";
@@ -57,7 +53,7 @@ export default async function ProfilePage({
     searchParams,
     getCurrentAuthContext(),
   ]);
-  const page = requestedPage(params.page);
+  const page = normalizePositivePage(params.page);
 
   if (authContext.status === "anonymous") {
     return <DashboardShell
@@ -151,14 +147,19 @@ export default async function ProfilePage({
         description={t("profile.listingsLoadErrorNote")}
         actionHref={page === 1 ? "/profile" : `/profile?page=${page}`}
         actionLabel={t("common.retry")}
-      /> : listings.total === 0 ? <EmptyState
+      /> : listings.state === "empty" ? <EmptyState
         title={t("profile.emptyListings")}
         description={t("profile.emptyListingsNote")}
         actionHref="/publish"
         actionLabel={t("profile.createListing")}
         actionPrefetch={false}
+      /> : listings.state === "out_of_range" ? <EmptyState
+        title={t("profile.pageEmptyTitle")}
+        description={t("profile.pageEmptyNote")}
+        actionHref="/profile"
+        actionLabel={t("profile.firstPage")}
       /> : <div className="owner-listings-shell">
-        {listings.items.length ? <div className="owner-listing-grid">
+        <div className="owner-listing-grid">
           {listings.items.map((listing) => <article className="owner-listing-card" key={listing.id}>
             <div className="owner-listing-media">
               {listing.imageUrl
@@ -178,15 +179,10 @@ export default async function ProfilePage({
               <OwnerListingActions listing={listing} />
             </div>
           </article>)}
-        </div> : <EmptyState
-          title={t("profile.pageEmptyTitle")}
-          description={t("profile.pageEmptyNote")}
-          actionHref="/profile"
-          actionLabel={t("profile.firstPage")}
-        />}
-        {page > 1 || listings.nextCursor ? <nav className="owner-listing-pagination" aria-label={t("profile.myListings")}>
-          {page > 1
-            ? <Link href={page === 2 ? "/profile" : `/profile?page=${page - 1}`}><ChevronLeft size={17} />{t("profile.previousPage")}</Link>
+        </div>
+        {listings.page > 1 || listings.nextCursor ? <nav className="owner-listing-pagination" aria-label={t("profile.myListings")}>
+          {listings.page > 1
+            ? <Link href={listings.page === 2 ? "/profile" : `/profile?page=${listings.page - 1}`}><ChevronLeft size={17} />{t("profile.previousPage")}</Link>
             : <span />}
           {listings.nextCursor
             ? <Link href={`/profile?page=${listings.nextCursor}`}>{t("profile.nextPage")}<ChevronRight size={17} /></Link>

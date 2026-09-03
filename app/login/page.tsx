@@ -10,7 +10,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Вход и регистрация", robots: { index: false, follow: false } };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+type LoginPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export default function LoginPage(props: LoginPageProps) {
+  return <LoginPageContent {...props} />;
+}
+
+async function LoginPageContent({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const rawMode = typeof params.mode === "string" ? params.mode : "login";
   const mode: AuthMode = rawMode === "register" || rawMode === "recover" ? rawMode : "login";

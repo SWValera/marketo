@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { ArrowRight, Heart, MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { CityPremiumShowcase } from "@/components/city-premium-showcase";
@@ -38,7 +38,7 @@ export default async function Home() {
 
   return <>
     <Header />
-    <main>
+    <main id="main-content" tabIndex={-1}>
       <section className="home-showcase-shell page-shell"><CityPremiumShowcase /></section>
       <HomeMarketplaceTabs catalog={catalogPanel} listings={listingsPanel} />
       <section className="trust-row home-trust-row page-shell"><div><ShieldCheck size={24} /><span><strong>{t("home.safety")}</strong><small>{t("home.safetyNote")}</small></span></div><div><Search size={24} /><span><strong>{t("home.preciseSearch")}</strong><small>{t("home.preciseSearchNote")}</small></span></div><div><MessageCircle size={24} /><span><strong>{t("home.chat")}</strong><small>{t("home.chatNote")}</small></span></div><div><Heart size={24} /><span><strong>{t("nav.favorites")}</strong><small>{t("home.favoritesNote")}</small></span></div></section>

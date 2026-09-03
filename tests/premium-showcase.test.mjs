@@ -16,25 +16,29 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   assert.match(home, /listings=\{listingsPanel\}/);
 });
 
-test("showcase uses the persistent elapsed-time timeline without locale or manual-reset coupling", async () => {
+test("showcase uses the persistent elapsed-time timeline with locale-stable offsets and explicit pause", async () => {
   const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
   const timeline = await readFile(new URL("components/use-showcase-timeline.ts", root), "utf8");
   const rotation = await readFile(new URL("lib/showcase-rotation.ts", root), "utf8");
   assert.match(rotation, /SHOWCASE_ROTATION_MS = 3000/);
   assert.match(timeline, /rotationFrameAt\(Date\.now\(\)\)/);
   assert.match(timeline, /window\.setInterval\(listener, SHOWCASE_ROTATION_MS\)/);
-  assert.match(source, /useShowcaseTimeline\(items\.length < 2\)/);
+  assert.match(source, /useShowcaseTimeline\(items\.length < 2 \|\| autoplayPaused\)/);
   assert.match(source, /rotationIndexAt\(timelineFrame, items\.length, persistedOffset\)/);
   assert.doesNotMatch(source, /setInterval/);
-  assert.match(source, /window\.localStorage\.setItem/);
-  assert.match(source, /window\.sessionStorage\.setItem/);
+  assert.match(source, /safeWriteBrowserStorage\("localStorage", storageKey, String\(value\)\)/);
+  assert.match(source, /safeWriteBrowserStorage\("sessionStorage", storageKey, String\(value\)\)/);
+  assert.match(source, /safeReadBrowserStorage\("localStorage", storageKey\)/);
+  assert.match(source, /safeReadBrowserStorage\("sessionStorage", storageKey\)/);
   assert.match(source, /marketo-showcase-offset-v2/);
   assert.match(source, /getServerSnapshot = useCallback\(\(\) => rotationOffsets\.get\(rotationKey\) \?\? 0/);
   assert.match(source, /rotationKey = selectedLocation === "all" \? "all-kazakhstan" : selectedLocation/);
   assert.doesNotMatch(source, /rotationKey\s*=.*locale/);
   assert.match(source, /onClick=\{\(\) => advance\(-1\)\}/);
   assert.match(source, /onClick=\{\(\) => advance\(1\)\}/);
-  assert.doesNotMatch(source, /setPaused|clearInterval/);
+  assert.match(source, /const \[autoplayPaused, setAutoplayPaused\] = useState\(false\)/);
+  assert.match(source, /onClick=\{toggleAutoplay\}/);
+  assert.match(source, /aria-pressed=\{autoplayPaused\}/);
   assert.deepEqual(
     [...source.matchAll(/\{ id: "(market|goods|auto|property|jobs|services|rental|business|exchange|free)"/g)].map((match) => match[1]),
     ["market", "goods", "auto", "property", "jobs", "services", "rental", "business", "exchange", "free"],

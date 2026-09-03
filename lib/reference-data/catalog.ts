@@ -12,10 +12,16 @@ export type CategoryCatalogView = {
   childrenByParentId: Map<string | null, ReferenceCategory[]>;
 };
 
+const viewCache = new WeakMap<CategoryReferenceData, CategoryCatalogView>();
+const pathCache = new WeakMap<CategoryCatalogView, Map<string, ReferenceCategory[]>>();
+const descendantCache = new WeakMap<CategoryCatalogView, Map<string, { ids: string[]; set: Set<string> }>>();
+
 const compareCategories = (left: ReferenceCategory, right: ReferenceCategory) =>
   left.sortOrder - right.sortOrder || left.name.ru.localeCompare(right.name.ru, "ru");
 
 export function createCategoryCatalogView(reference: CategoryReferenceData): CategoryCatalogView {
+  const cached = viewCache.get(reference);
+  if (cached) return cached;
   const items = [...reference.categories].sort(compareCategories);
   const byId = new Map(items.map((category) => [category.id, category]));
   const bySlug = new Map(items.map((category) => [category.slug, category]));
@@ -27,7 +33,9 @@ export function createCategoryCatalogView(reference: CategoryReferenceData): Cat
     childrenByParentId.set(category.parentId, siblings);
   }
 
-  return { items, byId, bySlug, childrenByParentId };
+  const view = { items, byId, bySlug, childrenByParentId };
+  viewCache.set(reference, view);
+  return view;
 }
 
 export function getRootCategories(view: CategoryCatalogView) {
@@ -54,8 +62,18 @@ export function getCategoryParent(view: CategoryCatalogView, category?: Referenc
 }
 
 export function getCategoryPath(view: CategoryCatalogView, category?: ReferenceCategory | string | null) {
+  const item = typeof category === "string" ? view.bySlug.get(category) : category;
+  if (!item) return [];
+  let paths = pathCache.get(view);
+  if (!paths) {
+    paths = new Map();
+    pathCache.set(view, paths);
+  }
+  const cached = paths.get(item.id);
+  if (cached) return cached;
+
   const path: ReferenceCategory[] = [];
-  let current = typeof category === "string" ? view.bySlug.get(category) : category;
+  let current: ReferenceCategory | undefined = item;
   const visited = new Set<string>();
 
   while (current && !visited.has(current.id)) {
@@ -64,7 +82,38 @@ export function getCategoryPath(view: CategoryCatalogView, category?: ReferenceC
     current = current.parentId ? view.byId.get(current.parentId) : undefined;
   }
 
+  paths.set(item.id, path);
   return path;
+}
+
+function getCategoryDescendants(view: CategoryCatalogView, category: ReferenceCategory | string) {
+  const item = typeof category === "string" ? view.bySlug.get(category) : category;
+  if (!item) return { ids: [], set: new Set<string>() };
+  let descendants = descendantCache.get(view);
+  if (!descendants) {
+    descendants = new Map();
+    descendantCache.set(view, descendants);
+  }
+  const cached = descendants.get(item.id);
+  if (cached) return cached;
+
+  const ids: string[] = [];
+  const set = new Set<string>();
+  const pending = [item];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || set.has(current.id)) continue;
+    set.add(current.id);
+    ids.push(current.id);
+    pending.push(...(view.childrenByParentId.get(current.id) ?? []));
+  }
+  const value = { ids, set };
+  descendants.set(item.id, value);
+  return value;
+}
+
+export function getCategoryDescendantIds(view: CategoryCatalogView, category: ReferenceCategory | string) {
+  return getCategoryDescendants(view, category).ids;
 }
 
 export function getCategoryRoot(view: CategoryCatalogView, category?: ReferenceCategory | string | null) {
@@ -76,7 +125,9 @@ export function getCategoryDepth(view: CategoryCatalogView, category: ReferenceC
 }
 
 export function isCategoryWithin(view: CategoryCatalogView, candidateSlug: string, selectedSlug?: string | null) {
-  return !selectedSlug || getCategoryPath(view, candidateSlug).some((item) => item.slug === selectedSlug);
+  if (!selectedSlug) return true;
+  const candidate = view.bySlug.get(candidateSlug);
+  return Boolean(candidate && getCategoryDescendants(view, selectedSlug).set.has(candidate.id));
 }
 
 export function searchCategoryReferences(view: CategoryCatalogView, query: string, limit = 40) {
@@ -93,7 +144,7 @@ export function searchCategoryReferences(view: CategoryCatalogView, query: strin
 }
 
 export function getCategoryPresentation(view: CategoryCatalogView, category?: ReferenceCategory | string | null) {
-  const path = getCategoryPath(view, category).reverse();
+  const path = [...getCategoryPath(view, category)].reverse();
   const firstLocalized = (pick: (item: ReferenceCategory) => LocalizedText | null) =>
     path.map(pick).find((value): value is LocalizedText => Boolean(value));
 

@@ -10,6 +10,10 @@ const hostingConfig = existsSync(hostingConfigPath)
   ? JSON.parse(readFileSync(hostingConfigPath, "utf8")) as { r2: string | null }
   : { r2: null };
 const { r2 } = hostingConfig;
+const mediaBucketName = process.env.MARKETO_MEDIA_BUCKET_NAME?.trim();
+if (r2 && !mediaBucketName) {
+  throw new Error("MARKETO_MEDIA_BUCKET_NAME is required when the MARKETO_MEDIA binding is enabled.");
+}
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -21,7 +25,7 @@ const localBindingConfig = {
     ? [
       {
         binding: r2,
-        bucket_name: "site-creator-r2",
+        bucket_name: mediaBucketName!,
       },
     ]
     : [],

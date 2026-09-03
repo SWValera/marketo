@@ -4,6 +4,7 @@ import { createContext, startTransition, useCallback, useContext, useEffect, use
 import { usePathname, useRouter } from "next/navigation";
 import { LOCALE_COOKIE, LOCALE_STORAGE_KEY } from "@/lib/i18n/config";
 import { messages, translate, type Locale, type MessageKey } from "@/lib/i18n/messages";
+import { safeWriteBrowserStorage } from "@/lib/browser/storage";
 
 type I18nContextValue = {
   locale: Locale;
@@ -20,16 +21,16 @@ export function I18nProvider({ initialLocale, children }: { initialLocale: Local
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    safeWriteBrowserStorage("localStorage", LOCALE_STORAGE_KEY, locale);
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
     if (!messages[nextLocale] || nextLocale === locale) return;
     document.cookie = `${LOCALE_COOKIE}=${nextLocale}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
+    safeWriteBrowserStorage("localStorage", LOCALE_STORAGE_KEY, nextLocale);
     document.documentElement.lang = nextLocale;
     setLocaleState(nextLocale);
-    const clientLocalizedRoute = pathname === "/publish" || pathname === "/login" || pathname === "/profile/edit" || pathname === "/search";
+    const clientLocalizedRoute = pathname === "/publish" || pathname === "/login" || pathname === "/profile/edit";
     if (!clientLocalizedRoute) startTransition(() => router.refresh());
   }, [locale, pathname, router]);
 

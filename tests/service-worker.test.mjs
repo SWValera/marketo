@@ -18,12 +18,13 @@ function createWorkerHarness({
   let claimed = false;
   const cache = {
     async addAll(paths) { opened.push({ addAll: paths }); },
+    async match(request) { return match(request); },
     async put(request, response) { puts.push({ request, response }); return put(request, response); },
   };
   const caches = {
     async open(name) { opened.push({ name }); return open ? open(name, cache) : cache; },
-    match,
-    async keys() { return ["marketo-static-v5", "marketo-static-v6"]; },
+    async match() { throw new Error("global cache matching is forbidden"); },
+    async keys() { return ["foreign-application-cache", "marketo-static-v5", "marketo-static-v6"]; },
     async delete(name) { deleted.push(name); return true; },
   };
   const self = {
@@ -116,7 +117,7 @@ test("service worker bypasses API and never caches navigation HTML", async () =>
 test("service worker keeps offline navigation fallback and lifecycle work attached to events", async () => {
   const offline = { source: "offline" };
   const harness = createWorkerHarness({
-    match: async (request) => request === "/offline" ? offline : null,
+    match: async (request) => request === "/offline.html" ? offline : null,
     fetch: async () => { throw new Error("offline"); },
   });
   const navigationEvent = dispatchFetch(harness, {
@@ -131,7 +132,7 @@ test("service worker keeps offline navigation fallback and lifecycle work attach
   harness.handlers.get("install")({ waitUntil(value) { installWork = value; } });
   await installWork;
   assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v6"));
-  assert.ok(harness.opened.some((entry) => JSON.stringify(entry.addAll) === JSON.stringify(["/offline"])));
+  assert.ok(harness.opened.some((entry) => JSON.stringify(entry.addAll) === JSON.stringify(["/offline.html"])));
 
   let activateWork;
   harness.handlers.get("activate")({ waitUntil(value) { activateWork = value; } });
@@ -173,7 +174,7 @@ test("service worker cache-read failure falls back to the network", async () => 
   await event.lifetime;
 });
 
-test("service worker clones a cacheable response before an asynchronous cache open", async () => {
+test("service worker keeps cache lookup and write scoped to an asynchronous namespace open", async () => {
   let releaseOpen;
   const openGate = new Promise((resolve) => { releaseOpen = resolve; });
   let cloneCount = 0;
@@ -191,9 +192,9 @@ test("service worker clones a cacheable response before an asynchronous cache op
     mode: "same-origin",
     destination: "script",
   });
+  releaseOpen();
   assert.equal(await event.response, network);
   assert.equal(cloneCount, 1);
-  releaseOpen();
   await event.lifetime;
   assert.equal(harness.puts.length, 1);
 });

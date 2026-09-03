@@ -1,11 +1,15 @@
 "use client";
 
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/components/i18n-provider";
 import { localize } from "@/lib/i18n/config";
+import { readLruEntry, writeLruEntry } from "@/lib/reference-data/bounded-map";
 import type { ReferenceAttributeOption, ReferenceCategoryAttribute } from "@/lib/reference-data/types";
+import { activateModalFocus } from "@/lib/browser/modal";
 
+const DEFERRED_CACHE_MAX_ENTRIES = 128;
 const deferredCache = new Map<string, ReferenceAttributeOption[]>();
 
 export function ReferenceSelect({
@@ -27,6 +31,7 @@ export function ReferenceSelect({
 }) {
   const { locale, t } = useI18n();
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
   const [queryState, setQueryState] = useState({ cacheKey: "", value: "" });
   const [remoteState, setRemoteState] = useState<{ cacheKey: string; options: ReferenceAttributeOption[]; status: "ready" | "error" } | null>(null);
   const dependencyReady = !attribute.dependsOnKey || Boolean(parentOptionId);
@@ -38,7 +43,7 @@ export function ReferenceSelect({
 
   useEffect(() => {
     if (attribute.optionsLoadMode !== "deferred" || !dependencyReady || (!open && !value && multipleValues.length === 0)) return;
-    const cached = deferredCache.get(cacheKey);
+    const cached = readLruEntry(deferredCache, cacheKey);
     if (cached) return;
     const controller = new AbortController();
     const params = new URLSearchParams();
@@ -52,7 +57,7 @@ export function ReferenceSelect({
         return response.json() as Promise<{ options: ReferenceAttributeOption[] }>;
       })
       .then(({ options }) => {
-        deferredCache.set(cacheKey, options);
+        writeLruEntry(deferredCache, cacheKey, options, DEFERRED_CACHE_MAX_ENTRIES);
         setRemoteState({ cacheKey, options, status: "ready" });
       })
       .catch((error: unknown) => {
@@ -66,11 +71,10 @@ export function ReferenceSelect({
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const close = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", close);
+    const releaseFocus = dialogRef.current ? activateModalFocus(dialogRef.current, () => setOpen(false)) : () => undefined;
     return () => {
       document.body.style.overflow = previous;
-      window.removeEventListener("keydown", close);
+      releaseFocus();
     };
   }, [open]);
 
@@ -97,11 +101,11 @@ export function ReferenceSelect({
         : selected ? localize(selected.label, locale) : dependencyReady ? placeholder : t("reference.selectParentFirst")}</span>
       <ChevronDown size={18} />
     </button>
-    {open ? <div className="reference-picker-layer" role="presentation">
+    {open ? createPortal(<div className="reference-picker-layer" role="presentation">
       <button className="reference-picker-backdrop" type="button" onClick={() => setOpen(false)} aria-label={t("common.close")} />
-      <section className="reference-picker" role="dialog" aria-modal="true" aria-label={localize(attribute.label, locale)}>
+      <section ref={dialogRef} className="reference-picker" role="dialog" aria-modal="true" aria-label={localize(attribute.label, locale)} tabIndex={-1}>
         <header><div><strong>{localize(attribute.label, locale)}</strong><small>{t("reference.searchValue")}</small></div><button type="button" onClick={() => setOpen(false)} aria-label={t("common.close")}><X size={22} /></button></header>
-        <label className="reference-picker-search"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQueryState({ cacheKey, value: event.target.value })} placeholder={t("common.search")} /></label>
+        <label className="reference-picker-search"><Search size={18} /><input data-dialog-initial-focus aria-label={`${t("common.search")}: ${localize(attribute.label, locale)}`} value={query} onChange={(event) => setQueryState({ cacheKey, value: event.target.value })} placeholder={t("common.search")} /></label>
         <div className="reference-picker-list">
           <button type="button" className={isMultiple ? multipleValues.length === 0 ? "is-selected" : "" : !value ? "is-selected" : ""} onClick={() => {
             if (isMultiple) onMultipleChange?.([]);
@@ -126,6 +130,6 @@ export function ReferenceSelect({
           {status !== "loading" && filtered.length === 0 ? <p>{t("reference.noOptions")}</p> : null}
         </div>
       </section>
-    </div> : null}
+    </div>, document.body) : null}
   </>;
 }

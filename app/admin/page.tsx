@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Pending media must keep the moderator session and private cache policy. */
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Eye, ImageOff, ShieldCheck } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -8,13 +8,11 @@ import { ModerationAccessError, requireModerationPageAccess } from "@/lib/auth/m
 import { moderationRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizePositivePage } from "@/lib/data/pagination";
 
 export const metadata: Metadata = { title: "Модерация", robots: { index: false, follow: false } };
 
-function requestedPage(value: string | string[] | undefined) {
-  const parsed = Number(Array.isArray(value) ? value[0] : value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-}
+type AdminPageProps = { searchParams: Promise<{ page?: string | string[] }> };
 
 function logModerationReadFailure(scope: "queue" | "detail", error: unknown) {
   const record = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : {};
@@ -25,9 +23,13 @@ function logModerationReadFailure(scope: "queue" | "detail", error: unknown) {
   });
 }
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
+export default function AdminPage(props: AdminPageProps) {
+  return <AdminPageContent {...props} />;
+}
+
+async function AdminPageContent({ searchParams }: AdminPageProps) {
   const [{ t, locale }, params] = await Promise.all([getServerI18n(), searchParams]);
-  const page = requestedPage(params.page);
+  const page = normalizePositivePage(params.page);
   let authContext;
   try {
     authContext = await requireModerationPageAccess("/admin");
@@ -61,10 +63,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
 
   return <DashboardShell title={t("admin.title")} description={t("admin.description")} active="/admin" authContext={authContext} fallback="/">
-    {queue.items.length === 0 && queue.total === 0 ? <EmptyState
+    {queue.state === "empty" ? <EmptyState
       icon={<ShieldCheck size={30} />}
       title={t("admin.empty")}
       description={t("admin.emptyNote")}
+    /> : queue.state === "out_of_range" ? <EmptyState
+      icon={<AlertTriangle size={30} />}
+      title={t("admin.pageOutOfRangeTitle")}
+      description={t("admin.pageOutOfRangeNote")}
+      actionHref="/admin"
+      actionLabel={t("admin.firstPage")}
     /> : <section className="dashboard-card moderation-table" aria-labelledby="moderation-queue-title">
       <header>
         <div>
@@ -73,7 +81,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         <span><ShieldCheck size={15} /> {t("admin.pending")}</span>
       </header>
-      {queue.items.length ? <div className="moderation-list">
+      <div className="moderation-list">
         {queue.items.map((item) => <article className="moderation-row" key={item.id}>
           {item.imageUrl
             ? <img src={item.imageUrl} alt="" loading="lazy" />
@@ -88,15 +96,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <Link href={`/admin/${item.id}`} aria-label={`${t("admin.open")}: ${item.title}`} title={t("admin.open")}><Eye size={18} /></Link>
           </div>
         </article>)}
-      </div> : <EmptyState
-        icon={<AlertTriangle size={30} />}
-        title={t("admin.loadErrorTitle")}
-        description={t("admin.loadErrorNote")}
-        actionHref="/admin"
-        actionLabel={t("common.retry")}
-      />}
-      {page > 1 || queue.nextCursor ? <footer className="moderation-pagination" aria-label={t("admin.queueTitle")}>
-        {page > 1 ? <Link href={page === 2 ? "/admin" : `/admin?page=${page - 1}`}><ChevronLeft size={17} />{t("admin.previousPage")}</Link> : <span />}
+      </div>
+      {queue.page > 1 || queue.nextCursor ? <footer className="moderation-pagination" aria-label={t("admin.queueTitle")}>
+        {queue.page > 1 ? <Link href={queue.page === 2 ? "/admin" : `/admin?page=${queue.page - 1}`}><ChevronLeft size={17} />{t("admin.previousPage")}</Link> : <span />}
         {queue.nextCursor ? <Link href={`/admin?page=${queue.nextCursor}`}>{t("admin.nextPage")}<ChevronRight size={17} /></Link> : null}
       </footer> : null}
     </section>}

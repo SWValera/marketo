@@ -1,8 +1,8 @@
 {
-  "name": "Marketo — объявления Казахстана",
+  "name": "Marketo — Қазақстан хабарландырулары / объявления Казахстана",
   "short_name": "Marketo",
-  "description": "Товары, услуги, работа и недвижимость по всему Казахстану.",
-  "lang": "ru-KZ",
+  "description": "Қазақстандағы тауарлар, қызметтер, жұмыс және жылжымайтын мүлік / Товары, услуги, работа и недвижимость в Казахстане.",
+  "lang": "und",
   "dir": "ltr",
   "id": "/marketo-pwa-v1",
   "start_url": "/?source=pwa&mode=standalone",
@@ -23,7 +23,7 @@
     { "src": "/icons/marketo-pwa-maskable-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Подать объявление", "short_name": "Подать", "url": "/publish", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] }
+    { "name": "Каталог / Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Хабарландыру беру / Подать объявление", "short_name": "Жариялау / Подать", "url": "/publish", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

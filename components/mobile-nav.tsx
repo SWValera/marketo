@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { Heart, Home, MessageCircle, Plus, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/components/i18n-provider";

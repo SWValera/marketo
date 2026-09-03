@@ -14,6 +14,7 @@ import {
   searchCategoryReferences,
 } from "@/lib/reference-data/catalog";
 import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/reference-data/types";
+import { activateModalFocus } from "@/lib/browser/modal";
 
 export function CategoryPicker({
   value,
@@ -31,6 +32,7 @@ export function CategoryPicker({
   const [parentSlug, setParentSlug] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const selected = getCategoryBySlug(view, value);
   const selectedPath = getCategoryPath(view, value);
   const currentParent = getCategoryBySlug(view, parentSlug);
@@ -93,12 +95,11 @@ export function CategoryPicker({
       backdropRef.current?.style.setProperty("--category-picker-viewport-height", `${height}px`);
       backdropRef.current?.style.setProperty("--category-picker-viewport-top", `${offsetTop}px`);
     };
-    const close = (event: KeyboardEvent) => event.key === "Escape" && closePicker();
+    const releaseFocus = dialogRef.current ? activateModalFocus(dialogRef.current, closePicker) : () => undefined;
     syncVisualViewport();
     window.visualViewport?.addEventListener("resize", syncVisualViewport);
     window.visualViewport?.addEventListener("scroll", syncVisualViewport);
     window.addEventListener("resize", syncVisualViewport);
-    window.addEventListener("keydown", close);
     return () => {
       body.style.overflow = previous.overflow;
       body.style.position = previous.position;
@@ -110,7 +111,7 @@ export function CategoryPicker({
       window.visualViewport?.removeEventListener("resize", syncVisualViewport);
       window.visualViewport?.removeEventListener("scroll", syncVisualViewport);
       window.removeEventListener("resize", syncVisualViewport);
-      window.removeEventListener("keydown", close);
+      releaseFocus();
       window.requestAnimationFrame(() => trigger?.focus({ preventScroll: true }));
     };
   }, [open]);
@@ -118,7 +119,7 @@ export function CategoryPicker({
   const visibleItems = query.trim() ? searchResults : currentItems;
 
   return <>
-    <button ref={triggerRef} type="button" className="category-picker-trigger" onClick={openPicker} aria-haspopup="dialog">
+    <button ref={triggerRef} type="button" className="category-picker-trigger" onClick={openPicker} aria-haspopup="dialog" aria-expanded={open}>
       <span>
         {selected ? <><strong>{localize(selected.name, locale)}</strong><small>{selectedPath.map((item) => localize(item.name, locale)).join(" → ")}</small></> : t("categories.chooseExact")}
       </span>
@@ -126,7 +127,7 @@ export function CategoryPicker({
     </button>
     {open ? createPortal(
       <div ref={backdropRef} className="category-picker-backdrop" onMouseDown={closePicker}>
-        <section className="category-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="category-picker-title" onMouseDown={(event) => event.stopPropagation()}>
+        <section ref={dialogRef} className="category-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="category-picker-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
           <header>
             {parentSlug ? <button type="button" className="category-level-back" onClick={goBack} aria-label={t("common.back")}><ArrowLeft size={21} /></button> : null}
             <div>
@@ -138,7 +139,7 @@ export function CategoryPicker({
           </header>
           <label className="location-search category-search">
             <Search size={19} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("categories.search")} />
+            <input data-dialog-initial-focus aria-label={t("categories.search")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("categories.search")} />
           </label>
           {!query && parentSlug ? <div className="category-level-path">{getCategoryPath(view, parentSlug).map((item) => <span key={item.id}>{localize(item.name, locale)}</span>)}</div> : null}
           <div className="category-picker-results" role="listbox" aria-label={t("categories.choose")}>

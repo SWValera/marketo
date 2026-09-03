@@ -145,6 +145,19 @@ function numericValue(value: unknown) {
   return null;
 }
 
+export function isValidIsoCalendarDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() === month - 1
+    && candidate.getUTCDate() === day;
+}
+
 function respectsStep(value: number, min: number, step: number) {
   const quotient = (value - min) / step;
   return Math.abs(quotient - Math.round(quotient)) < 1e-8;
@@ -229,7 +242,7 @@ export function validatePublishAttributes(
       continue;
     }
     if (attribute.dataType === "date") {
-      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+      if (typeof value !== "string" || !isValidIsoCalendarDate(value)) {
         addError(errors, field, "invalid");
       }
       continue;

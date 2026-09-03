@@ -40,6 +40,11 @@ test("browser Supabase build guard accepts vinext definitions and legacy fallbac
 });
 
 test("browser Supabase build guard rejects unsafe, missing, and uninlined values without exposing them", () => {
+  assert.throws(() => assertPublicSupabaseBrowserBuild({}, {}), {
+    name: "Error",
+    message: "Missing required browser build variable: NEXT_PUBLIC_SUPABASE_URL.",
+  });
+
   const cases = [
     [{ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey }, {}],
     [{ NEXT_PUBLIC_SUPABASE_URL: "not a url", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey }, {}],

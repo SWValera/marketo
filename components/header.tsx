@@ -1,15 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { Bell, Heart, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { LocationPicker } from "@/components/location-picker";
+import { useEffect, useRef, useState } from "react";
+import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { PwaInstall } from "@/components/pwa-install";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/i18n-provider";
+import { activateModalFocus } from "@/lib/browser/modal";
 
 export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: string; searchPlaceholder?: string } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLElement>(null);
+  const storedLocation = useStoredLocation();
   const { t } = useI18n();
   const placeholder = searchPlaceholder ?? t("header.searchPlaceholder");
 
@@ -17,12 +20,13 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
     if (!menuOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
+    const releaseFocus = mobileMenuRef.current ? activateModalFocus(mobileMenuRef.current, () => setMenuOpen(false)) : () => undefined;
+    return () => { document.body.style.overflow = previous; releaseFocus(); };
   }, [menuOpen]);
 
   return (
     <header className="site-header">
-      <div className="header-inner">
+      <div className="header-inner" inert={menuOpen || undefined}>
         <Link href="/" className="brand" aria-label={t("header.homeAria")}>
           <span className="brand-mark">M</span>
           <span>Marketo</span>
@@ -34,6 +38,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           <Search size={18} aria-hidden="true" />
           <input name="q" aria-label={t("header.searchAria")} placeholder={placeholder} />
           {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
+          {storedLocation !== "all" ? <input type="hidden" name="city" value={storedLocation} /> : null}
           <button type="submit">{t("common.find")}</button>
         </form>
 
@@ -52,6 +57,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           className="menu-toggle"
           aria-label={menuOpen ? t("header.closeMenu") : t("header.openMenu")}
           aria-expanded={menuOpen}
+          aria-controls="marketo-mobile-menu"
           onClick={() => setMenuOpen((value) => !value)}
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -59,7 +65,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
       </div>
 
       {menuOpen && (
-        <><button className="mobile-menu-overlay" type="button" aria-label={t("header.closeMenu")} onClick={() => setMenuOpen(false)} /><nav className="mobile-menu" aria-label={t("header.mobileMenu")}>
+        <><button className="mobile-menu-overlay" type="button" aria-label={t("header.closeMenu")} onClick={() => setMenuOpen(false)} /><nav ref={mobileMenuRef} id="marketo-mobile-menu" className="mobile-menu" role="dialog" aria-modal="true" tabIndex={-1} aria-label={t("header.mobileMenu")}>
           <LanguageSwitcher />
           <LocationPicker className="mobile-location-trigger" />
           <Link href="/search" onClick={() => setMenuOpen(false)}>{t("header.catalog")}</Link>

@@ -114,6 +114,17 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
     setError("");
   }
 
+  function handleModeKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, current: Exclude<AuthMode, "update-password">) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const modes = ["login", "register", "recover"] as const;
+    const currentIndex = modes.indexOf(current);
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? modes.length - 1 : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + modes.length) % modes.length;
+    const nextMode = modes[nextIndex];
+    selectMode(nextMode);
+    document.getElementById(`auth-mode-${nextMode}`)?.focus();
+  }
+
   async function signIn() {
     const result = await getSupabaseBrowserClient().auth.signInWithPassword({
       email: normalizedEmail(email),
@@ -122,7 +133,6 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
     if (result.error) throw result.error;
     clearPendingFlow();
     router.replace(destination);
-    router.refresh();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -167,7 +177,6 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
         if (result.error) throw result.error;
         if (result.data.session) {
           router.replace(destination);
-          router.refresh();
           return;
         }
         rememberPendingAuth(cleanEmail, "signup");
@@ -196,7 +205,6 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       setMessage(t("auth.passwordUpdated"));
       window.setTimeout(() => {
         router.replace(destination);
-        router.refresh();
       }, 500);
     } catch (caught) {
       const authError = caught as { message?: string; status?: number };
@@ -256,9 +264,10 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
 
   return <form className="auth-form" onSubmit={(event) => void submit(event)} noValidate>
     {mode !== "update-password" ? <div className="auth-mode-tabs" role="tablist" aria-label={t("auth.modeAria")}>
-      {(["login", "register", "recover"] as const).map((value) => <button key={value} type="button" role="tab" aria-selected={mode === value} className={mode === value ? "is-active" : ""} onClick={() => selectMode(value)}>{t(`auth.mode.${value}`)}</button>)}
+      {(["login", "register", "recover"] as const).map((value) => <button id={`auth-mode-${value}`} key={value} type="button" role="tab" aria-controls="auth-mode-panel" aria-selected={mode === value} tabIndex={mode === value ? 0 : -1} className={mode === value ? "is-active" : ""} onKeyDown={(event) => handleModeKeyDown(event, value)} onClick={() => selectMode(value)}>{t(`auth.mode.${value}`)}</button>)}
     </div> : null}
 
+    <div id="auth-mode-panel" role={mode === "update-password" ? undefined : "tabpanel"} aria-labelledby={mode === "update-password" ? undefined : `auth-mode-${mode}`}>
     {pendingFlow ? <section className="auth-pending-state" aria-live="polite">
       <h2>{t("auth.checkEmailTitle")}</h2>
       <p>{t(pendingFlow === "signup" ? "auth.pendingSignupNote" : "auth.pendingRecoveryNote", { email: normalizedEmail(email) })}</p>
@@ -280,5 +289,6 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       {message ? <div id="auth-status" className="auth-feedback is-success" role="status">{message}</div> : null}
       <button className="auth-submit" type="submit" disabled={loading}>{loading ? t("auth.loading") : t(`auth.submit.${mode}`)}</button>
     </>}
+    </div>
   </form>;
 }

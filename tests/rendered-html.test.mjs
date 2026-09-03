@@ -19,7 +19,29 @@ const ids = {
   carBrandToyota: "30000000-0000-4000-8000-000000000001",
   jobEmployment: "20000000-0000-4000-8000-000000000002",
   serviceVisit: "20000000-0000-4000-8000-000000000003",
+  seller: "5abcdef0-0000-4000-8000-000000000001",
+  emptySeller: "5abcdef0-0000-4000-8000-000000000002",
+  missingSeller: "5abcdef0-0000-4000-8000-000000000003",
+  errorSeller: "5abcdef0-0000-4000-8000-000000000004",
 };
+
+const sellerListingRows = Array.from({ length: 49 }, (_, index) => ({
+  id: `60000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+  owner_id: ids.seller,
+  slug: `seller-offer-${index + 1}`,
+  title: `Seller offer ${index + 1}`,
+  price_minor: 1000 + index,
+  currency_code: "KZT",
+  category_id: ids.electronics,
+  settlement_id: ids.astana,
+  published_at: new Date(Date.UTC(2026, 0, 1, 0, 0, 49 - index)).toISOString(),
+  promoted_until: null,
+  status: "active",
+  deleted_at: null,
+  categories: { slug: "electronics" },
+  settlements: { id: ids.astana, name_ru: "Астана", name_kk: "Астана" },
+  listing_images: [{ storage_key: `seller/offer-${index + 1}.jpg`, sort_order: 0 }],
+}));
 
 const referenceTables = {
   countries: [{ id: ids.country, code: "KZ", slug: "kazakhstan", name_ru: "Казахстан", name_kk: "Қазақстан", currency_code: "KZT", currency_symbol: "₸", currency_exponent: 0, phone_code: "+7", sort_order: 10 }],
@@ -46,14 +68,56 @@ const referenceTables = {
   category_attribute_options: [
     { id: ids.carBrandToyota, attribute_id: ids.carBrand, parent_option_id: null, value: "toyota", label_ru: "Toyota", label_kk: "Toyota", sort_order: 10 },
   ],
+  seller_profiles: [
+    { id: ids.seller, display_name: "SEO Seller", avatar_path: `avatars/${ids.seller}/profile.webp`, settlement_id: ids.astana, bio: null, verified_at: null },
+    { id: ids.emptySeller, display_name: "Empty Seller", avatar_path: null, settlement_id: ids.astana, bio: null, verified_at: null },
+  ],
+  listings: sellerListingRows,
 };
 
+for (let index = referenceTables.categories.length; index < 1356; index += 1) {
+  referenceTables.categories.push({
+    id: `40000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    parent_id: ids.electronics,
+    slug: `synthetic-category-${index}`,
+    name_ru: `Тестовая категория ${index}`,
+    name_kk: `Сынақ санаты ${index}`,
+    icon_key: null,
+    tone_key: null,
+    search_placeholder_ru: null,
+    search_placeholder_kk: null,
+    title_placeholder_ru: null,
+    title_placeholder_kk: null,
+    description_hint_ru: null,
+    description_hint_kk: null,
+    price_mode: "price",
+    sort_order: index,
+  });
+}
+
 const originalFetch = globalThis.fetch;
+const supabaseRequestCounts = new Map();
+const sellerListingRangeRequests = [];
+const mediaGetRequests = [];
+const avatarBytes = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
 globalThis.fetch = async (input, init) => {
   const requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
   if (requestUrl.hostname !== "reference-test.supabase.co") return originalFetch(input, init);
+  supabaseRequestCounts.set(requestUrl.pathname, (supabaseRequestCounts.get(requestUrl.pathname) ?? 0) + 1);
   const table = requestUrl.pathname.split("/").at(-1);
+  if (table === "seller_profiles" && requestUrl.searchParams.get("id") === `eq.${ids.errorSeller}`) {
+    return new Response(JSON.stringify({
+      code: "08006",
+      message: "forced seller profile query failure",
+      details: null,
+      hint: null,
+    }), { status: 503, headers: { "content-type": "application/json" } });
+  }
   let rows = structuredClone(referenceTables[table] ?? []);
+  for (const column of ["id", "owner_id", "status", "slug"]) {
+    const filter = requestUrl.searchParams.get(column);
+    if (filter?.startsWith("eq.")) rows = rows.filter((row) => row[column] === filter.slice(3));
+  }
   const categoryId = requestUrl.searchParams.get("category_id");
   if (categoryId?.startsWith("eq.")) rows = rows.filter((row) => row.category_id === categoryId.slice(3));
   const attributeIds = requestUrl.searchParams.get("attribute_id");
@@ -61,7 +125,61 @@ globalThis.fetch = async (input, init) => {
     const allowed = new Set(attributeIds.slice(4, -1).split(","));
     rows = rows.filter((row) => allowed.has(row.attribute_id));
   }
-  return new Response(JSON.stringify(rows), { status: 200, headers: { "content-type": "application/json" } });
+  const requestMethod = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const requestHeaders = new Headers(input instanceof Request ? input.headers : undefined);
+  new Headers(init?.headers).forEach((value, key) => requestHeaders.set(key, value));
+  const range = requestHeaders.get("range");
+  const total = rows.length;
+  if (requestMethod === "HEAD") {
+    return new Response(null, {
+      status: 200,
+      headers: { "content-range": total === 0 ? "*/0" : `0-${total - 1}/${total}` },
+    });
+  }
+  if (requestUrl.searchParams.has("limit")) {
+    const offset = Number(requestUrl.searchParams.get("offset") ?? 0);
+    const limit = Number(requestUrl.searchParams.get("limit"));
+    if (table === "listings") {
+      sellerListingRangeRequests.push({ offset, limit, url: requestUrl.href });
+      if (offset > 0 && offset >= total) {
+        return new Response(JSON.stringify({
+          code: "PGRST103",
+          message: "Requested range not satisfiable",
+        }), {
+          status: 416,
+          headers: { "content-type": "application/json", "content-range": `*/${total}` },
+        });
+      }
+    }
+    rows = rows.slice(offset, offset + limit);
+  }
+  const rangeMatch = range?.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const offset = Number(rangeMatch[1]);
+    const end = Number(rangeMatch[2]);
+    if (table === "listings") sellerListingRangeRequests.push({ offset, limit: end - offset + 1, url: requestUrl.href });
+    rows = rows.slice(offset, end + 1);
+  }
+  return new Response(JSON.stringify(rows), {
+    status: 200,
+    headers: { "content-type": "application/json", "content-range": total === 0 ? "*/0" : `0-${Math.max(0, rows.length - 1)}/${total}` },
+  });
+};
+
+globalThis.__MARKETO_CLOUDFLARE_ENV__ = {
+  MARKETO_MEDIA: {
+    async get(storageKey) {
+      mediaGetRequests.push(storageKey);
+      if (storageKey !== referenceTables.seller_profiles[0].avatar_path) return null;
+      return {
+        body: avatarBytes.slice(),
+        httpEtag: '"seller-avatar-test"',
+        writeHttpMetadata(headers) {
+          headers.set("content-type", "application/octet-stream");
+        },
+      };
+    },
+  },
 };
 
 const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -75,14 +193,28 @@ async function render(pathname, locale = "ru") {
   return { response, html: await response.text() };
 }
 
+async function renderRsc(pathname, locale = "ru") {
+  const url = new URL(`http://localhost${pathname}`);
+  url.pathname = url.pathname === "/" ? "/.rsc" : `${url.pathname}.rsc`;
+  url.searchParams.set("_rsc", "");
+  const response = await worker.fetch(new Request(url, {
+    headers: { accept: "text/x-component", cookie: `marketo-locale=${locale}`, rsc: "1" },
+  }), env, ctx);
+  return { response, body: await response.arrayBuffer() };
+}
+
+function hasRobotsNoindex(html) {
+  return /<meta(?=[^>]*\bname=["']robots["'])(?=[^>]*\bcontent=["'][^"']*noindex)[^>]*>/i.test(html);
+}
+
 test("core routes render through the production worker", async () => {
   const routes = [
     ["/", "Лучшее рядом с вами"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
     ["/category/jobs", "Работа"], ["/category/services", "Услуги"], ["/category/cars", "Легковые автомобили"],
     ["/profile", "Войдите, чтобы открыть профиль"],
-    ["/favorites", "В избранном пока пусто"], ["/messages", "Сообщений пока нет"],
+    ["/favorites", "Войдите, чтобы открыть избранное"], ["/messages", "Войдите, чтобы написать продавцу"],
     ["/messages/new?listing=listing-id", "Войдите, чтобы написать продавцу"],
-    ["/notifications", "Уведомлений пока нет"], ["/login", "Добро пожаловать"],
+    ["/notifications", "Войдите, чтобы открыть уведомления"], ["/login", "Добро пожаловать"],
     ["/settings", "Настройки"], ["/help", "Помощь"], ["/offline", "Нет подключения"],
   ];
   for (const [pathname, expected] of routes) {
@@ -100,7 +232,7 @@ test("Kazakh locale renders server-side without changing routes", async () => {
     ["/category/jobs", "Жұмыс"],
     ["/category/services", "Қызметтер"],
     ["/profile", "Профильді ашу үшін кіріңіз"],
-    ["/notifications", "Әзірге хабарлама жоқ"],
+    ["/notifications", "Хабарламаларды ашу үшін кіріңіз"],
   ];
   for (const [pathname, expected] of routes) {
     const { response, html } = await render(pathname, "kk");
@@ -206,6 +338,144 @@ test("unknown user-data and unknown application routes use the designed 404 stat
   }
 });
 
+test("seller pagination has canonical redirects and non-indexable out-of-range responses", async () => {
+  const sellerPath = `/seller/${ids.seller}`;
+  const rangeRequestsBeforeValidPages = sellerListingRangeRequests.length;
+
+  const rootPage = await render(sellerPath);
+  assert.equal(rootPage.response.status, 200);
+  assert.match(rootPage.html, /SEO Seller/);
+  assert.match(rootPage.html, /Seller offer 1/);
+  assert.match(
+    rootPage.html,
+    new RegExp(`<img(?=[^>]*src="[^"]*avatars/${ids.seller}/profile\\.webp")(?=[^>]*alt="")[^>]*>`),
+  );
+  assert.equal(hasRobotsNoindex(rootPage.html), false);
+
+  const avatarPath = rootPage.html.match(new RegExp(`src="([^"]*avatars/${ids.seller}/profile\\.webp)"`))?.[1];
+  assert.equal(avatarPath, `/api/media/avatars/${ids.seller}/profile.webp`);
+  const deliveredAvatar = await worker.fetch(new Request(`http://localhost${avatarPath}`), env, ctx);
+  assert.equal(deliveredAvatar.status, 200);
+  assert.equal(deliveredAvatar.headers.get("content-type"), "image/webp");
+  assert.equal(deliveredAvatar.headers.get("cache-control"), "public, max-age=3600, s-maxage=3600");
+  assert.equal(deliveredAvatar.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(new Uint8Array(await deliveredAvatar.arrayBuffer()), avatarBytes);
+  assert.deepEqual(mediaGetRequests, [`avatars/${ids.seller}/profile.webp`]);
+
+  const mediaReadsBeforeRejectedPaths = mediaGetRequests.length;
+  const mismatchedAvatar = await worker.fetch(
+    new Request(`http://localhost/api/media/avatars/${ids.seller}/not-the-profile.webp`),
+    env,
+    ctx,
+  );
+  assert.equal(mismatchedAvatar.status, 404);
+  const invalidAvatar = await worker.fetch(
+    new Request("http://localhost/api/media/avatars/not-a-uuid/profile.webp"),
+    env,
+    ctx,
+  );
+  assert.equal(invalidAvatar.status, 404);
+  assert.equal(mediaGetRequests.length, mediaReadsBeforeRejectedPaths);
+
+  const explicitPageOne = await render(`${sellerPath}?page=1`);
+  assert.equal(explicitPageOne.response.status, 308);
+  assert.equal(new URL(explicitPageOne.response.headers.get("location"), "http://localhost").pathname, sellerPath);
+  assert.equal(new URL(explicitPageOne.response.headers.get("location"), "http://localhost").search, "");
+
+  const secondPage = await render(`${sellerPath}?page=2`);
+  assert.equal(secondPage.response.status, 200);
+  assert.match(secondPage.html, /Seller offer 25/);
+  assert.equal(hasRobotsNoindex(secondPage.html), false);
+
+  const lastPage = await render(`${sellerPath}?page=3`);
+  assert.equal(lastPage.response.status, 200);
+  assert.match(lastPage.html, /Seller offer 49/);
+  assert.equal(hasRobotsNoindex(lastPage.html), false);
+  assert.deepEqual(
+    sellerListingRangeRequests.slice(rangeRequestsBeforeValidPages).map(({ offset, limit }) => ({ offset, limit })),
+    [
+      { offset: 0, limit: 24 },
+      { offset: 24, limit: 24 },
+      { offset: 48, limit: 24 },
+    ],
+  );
+
+  for (const requestedPage of [4, Number.MAX_SAFE_INTEGER]) {
+    const rangeRequestsBefore = sellerListingRangeRequests.length;
+    const result = await render(`${sellerPath}?page=${requestedPage}`);
+    assert.equal(result.response.status, 404, `page=${requestedPage}`);
+    assert.equal(hasRobotsNoindex(result.html), true, `page=${requestedPage}`);
+    assert.equal(sellerListingRangeRequests.length, rangeRequestsBefore, `page=${requestedPage} must not issue a listings range request`);
+  }
+
+  const emptySellerPath = `/seller/${ids.emptySeller}`;
+  const emptyRoot = await render(emptySellerPath);
+  assert.equal(emptyRoot.response.status, 200);
+  assert.match(emptyRoot.html, /Активных объявлений пока нет/);
+  const emptyAvatar = emptyRoot.html.match(/<div class="seller-profile-avatar"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+  assert.match(emptyAvatar, /<svg/);
+  assert.doesNotMatch(emptyAvatar, /<img/);
+
+  const emptyOutOfRange = await render(`${emptySellerPath}?page=2`);
+  assert.equal(emptyOutOfRange.response.status, 404);
+  assert.equal(hasRobotsNoindex(emptyOutOfRange.html), true);
+});
+
+test("seller UUID routes redirect to lowercase without losing canonical pagination", async () => {
+  const sellerPath = `/seller/${ids.seller}`;
+  const uppercasePath = `/seller/${ids.seller.toUpperCase()}`;
+  const mixedCasePath = `/seller/${ids.seller.replace("abcdef", "AbCdEf")}`;
+
+  for (const pathname of [uppercasePath, mixedCasePath]) {
+    const result = await render(pathname);
+    assert.equal(result.response.status, 308, pathname);
+    const location = new URL(result.response.headers.get("location"), "http://localhost");
+    assert.equal(location.pathname, sellerPath);
+    assert.equal(location.search, "");
+  }
+
+  const upperSecondPage = await render(`${uppercasePath}?page=2`);
+  assert.equal(upperSecondPage.response.status, 308);
+  const secondPageLocation = new URL(upperSecondPage.response.headers.get("location"), "http://localhost");
+  assert.equal(secondPageLocation.pathname, sellerPath);
+  assert.equal(secondPageLocation.search, "?page=2");
+
+  const upperFirstPage = await render(`${uppercasePath}?page=1`);
+  assert.equal(upperFirstPage.response.status, 308);
+  const firstPageLocation = new URL(upperFirstPage.response.headers.get("location"), "http://localhost");
+  assert.equal(firstPageLocation.pathname, sellerPath);
+  assert.equal(firstPageLocation.search, "");
+
+  const readsBeforeInvalid = supabaseRequestCounts.get("/rest/v1/seller_profiles") ?? 0;
+  const invalid = await render("/seller/not-a-uuid?page=2");
+  assert.equal(invalid.response.status, 404);
+  assert.equal(supabaseRequestCounts.get("/rest/v1/seller_profiles") ?? 0, readsBeforeInvalid);
+});
+
+test("seller absence is 404 while an operational profile query failure is not", async () => {
+  const missing = await render(`/seller/${ids.missingSeller}`);
+  assert.equal(missing.response.status, 404);
+
+  const failed = await render(`/seller/${ids.errorSeller}`);
+  // vinext currently renders the root application error boundary with a 200
+  // document status. The semantic contract here is that an operational read
+  // failure reaches that error boundary and is never converted to the seller
+  // not-found/noindex response.
+  assert.notEqual(failed.response.status, 404);
+  assert.equal(hasRobotsNoindex(failed.html), false);
+  assert.match(failed.html, /Не удалось загрузить страницу/);
+  assert.doesNotMatch(failed.html, /Страница не найдена/);
+});
+
+test("missing asset probes bypass the application 404 render pipeline", async () => {
+  for (const pathname of ["/favicon.ico", "/apple-touch-icon.png", "/does-not-exist.js", "/.well-known/probe.json"]) {
+    const { response, html } = await render(pathname);
+    assert.equal(response.status, 404, pathname);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/plain/, pathname);
+    assert.equal(html, "Not Found", pathname);
+  }
+});
+
 test("category attributes route returns Supabase-backed filters without an elevated key", async () => {
   const { response, html } = await render(`/api/reference/categories/${ids.cars}/attributes`);
   assert.equal(response.status, 200);
@@ -213,4 +483,45 @@ test("category attributes route returns Supabase-backed filters without an eleva
   assert.equal(payload.categoryId, ids.cars);
   assert.equal(payload.attributes[0].key, "brand");
   assert.equal(payload.attributes[0].options[0].value, "toyota");
+});
+
+test("50 sequential direct warm Worker RSC requests keep aggregate payload bounded and execute one listing RPC per designated request", async () => {
+  const routes = ["/", "/categories", "/search", "/category/jobs", "/category/services", "/help", "/offline"];
+  const listingRoutes = new Set(["/", "/search", "/category/jobs", "/category/services"]);
+  const rpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
+  const rpcBefore = supabaseRequestCounts.get(rpcPath) ?? 0;
+  const geographyBefore = new Map(
+    ["countries", "regions", "settlements"].map((table) => [table, supabaseRequestCounts.get(`/rest/v1/${table}`) ?? 0]),
+  );
+  let expectedListingRequests = 0;
+  let totalBytes = 0;
+
+  for (let index = 0; index < 50; index += 1) {
+    const pathname = routes[index % routes.length];
+    const listingRpcBeforeRequest = supabaseRequestCounts.get(rpcPath) ?? 0;
+    const { response, body } = await renderRsc(pathname);
+    const listingRpcAfterRequest = supabaseRequestCounts.get(rpcPath) ?? 0;
+    const expectsListingRequest = listingRoutes.has(pathname);
+    assert.equal(response.status, 200, `${index + 1}: ${pathname}`);
+    assert.match(response.headers.get("content-type") ?? "", /text\/x-component/, pathname);
+    assert.equal(
+      listingRpcAfterRequest - listingRpcBeforeRequest,
+      expectsListingRequest ? 1 : 0,
+      `${index + 1}: ${pathname} must execute ${expectsListingRequest ? "exactly one" : "no"} catalog RPC`,
+    );
+    totalBytes += body.byteLength;
+    if (expectsListingRequest) expectedListingRequests += 1;
+  }
+
+  const rpcAfter = supabaseRequestCounts.get(rpcPath) ?? 0;
+  assert.equal(expectedListingRequests, 29, "the fixed 50-request route sequence must contain 29 listing-bearing requests");
+  assert.equal(rpcAfter - rpcBefore, 29, "one catalog RPC per listing-bearing direct RSC request");
+  assert.ok(totalBytes < 2_500_000, `50 RSC payloads unexpectedly retained full catalog data: ${totalBytes} bytes`);
+  for (const table of ["countries", "regions", "settlements"]) {
+    assert.equal(
+      supabaseRequestCounts.get(`/rest/v1/${table}`) ?? 0,
+      geographyBefore.get(table),
+      `${table} must not load during global server layout navigation`,
+    );
+  }
 });

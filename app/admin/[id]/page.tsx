@@ -14,6 +14,8 @@ export const metadata: Metadata = { title: "Проверка объявлени�
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type ModerationCasePageProps = { params: Promise<{ id: string }> };
+
 function logDetailFailure(error: unknown) {
   const record = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : {};
   console.error("[marketo-moderation] read failed", {
@@ -23,7 +25,11 @@ function logDetailFailure(error: unknown) {
   });
 }
 
-export default async function ModerationCasePage({ params }: { params: Promise<{ id: string }> }) {
+export default function ModerationCasePage(props: ModerationCasePageProps) {
+  return <ModerationCasePageContent {...props} />;
+}
+
+async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
   const [{ id }, { t, locale }] = await Promise.all([params, getServerI18n()]);
   let authContext;
   try {

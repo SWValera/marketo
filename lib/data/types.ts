@@ -4,6 +4,12 @@ export type PageResult<T> = {
   nextCursor: string | null;
 };
 
+export type NumberedPageResult<T> = PageResult<T> & {
+  page: number;
+  totalPages: number;
+  state: "ready" | "empty" | "out_of_range";
+};
+
 export type ListingSummary = {
   id: string;
   slug: string;
@@ -101,7 +107,8 @@ export type ChatSummary = {
   listingTitle: string | null;
   lastMessage: string | null;
   lastMessageAt: string | null;
-  unreadCount: number;
+  /** Null when the server has no bounded aggregate for this conversation. */
+  unreadCount: number | null;
 };
 
 export type Conversation = ChatSummary & {

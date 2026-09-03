@@ -2,13 +2,14 @@ import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
 import { getListingAttributeRecords } from "@/lib/data/supabase/listings";
 import type {
   MyListingSummary,
+  NumberedPageResult,
   OwnerDraftBundle,
-  PageResult,
 } from "@/lib/data/types";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
 import { protectedMediaUrl, publicMediaUrl } from "@/lib/media/public-url";
 import type { Json } from "@/lib/supabase/database.types";
+import { normalizePageSize, normalizePositivePage, pageWindow } from "../pagination.ts";
 
 const MAX_MY_LISTINGS_PAGE_SIZE = 50;
 
@@ -92,29 +93,41 @@ type MyListingRow = {
 export async function listMyListings(
   client: MarketoSupabaseClient,
   options: { page?: number; pageSize?: number; locale?: Locale } = {},
-): Promise<PageResult<MyListingSummary>> {
+): Promise<NumberedPageResult<MyListingSummary>> {
   const userId = await currentUserId(client);
-  const page = Math.max(Math.trunc(options.page ?? 1), 1);
-  const pageSize = Math.min(Math.max(Math.trunc(options.pageSize ?? 12), 1), MAX_MY_LISTINGS_PAGE_SIZE);
+  const page = normalizePositivePage(options.page);
+  const pageSize = normalizePageSize(options.pageSize, 12, MAX_MY_LISTINGS_PAGE_SIZE);
   const locale = options.locale ?? "ru";
-  const offset = (page - 1) * pageSize;
+  const countResponse = await client
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", userId)
+    .neq("status", "deleted")
+    .is("deleted_at", null);
+  if (countResponse.error || countResponse.count === null) {
+    throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: countResponse.error });
+  }
+  const pagination = pageWindow(countResponse.count, page, pageSize);
+  if (pagination.offset === null || pagination.rangeEnd === null) {
+    return { items: [], total: countResponse.count, nextCursor: null, page, totalPages: pagination.totalPages, state: pagination.outOfRange ? "out_of_range" : "empty" };
+  }
+  const offset = pagination.offset;
   const response = await client
     .from("listings")
     .select(
       "id, slug, title, price_minor, currency_code, status, created_at, updated_at, published_at, deleted_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
-      { count: "exact" },
     )
     .eq("owner_id", userId)
     .neq("status", "deleted")
     .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .order("id", { ascending: false })
-    .range(offset, offset + pageSize - 1);
-  if (response.error || response.count === null) {
+    .range(offset, pagination.rangeEnd);
+  if (response.error) {
     throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: response.error });
   }
   const rows = (response.data ?? []) as unknown as MyListingRow[];
-  if (rows.length === 0) return { items: [], total: response.count, nextCursor: null };
+  if (rows.length === 0) throw new OwnerListingDataError("LIST_UNAVAILABLE");
 
   const listingIds = rows.map((row) => row.id);
   const [imagesResult, feedback] = await Promise.all([
@@ -161,8 +174,11 @@ export async function listMyListings(
         rejectedAt: safeFeedback?.rejected_at ?? null,
       };
     }),
-    total: response.count,
-    nextCursor: offset + rows.length < response.count ? String(page + 1) : null,
+    total: countResponse.count,
+    nextCursor: offset + rows.length < countResponse.count ? String(page + 1) : null,
+    page,
+    totalPages: pagination.totalPages,
+    state: "ready",
   };
 }
 
@@ -310,4 +326,3 @@ export async function updateMyListingDraft(
   if (error) throw error;
   return data?.[0] ?? null;
 }
-

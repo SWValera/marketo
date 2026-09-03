@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { useRouter } from "next/navigation";
 import { Archive, CheckCircle2, ExternalLink, PenLine } from "lucide-react";
 import { useState } from "react";
@@ -43,7 +43,7 @@ export function OwnerListingActions({ listing }: { listing: Pick<MyListingSummar
   return <div className="owner-listing-actions">
     <div>
       {editable ? <Link prefetch={false} className="secondary-button" href={`/publish?listing=${listing.id}`}><PenLine size={16} />{t("common.edit")}</Link> : null}
-      {listing.status === "active" ? <Link className="secondary-button" href={`/listing/${listing.slug}`}><ExternalLink size={16} />{t("profile.openListing")}</Link> : null}
+      {listing.status === "active" ? <Link className="secondary-button" href={`/listing/${listing.id}-${listing.slug}`}><ExternalLink size={16} />{t("profile.openListing")}</Link> : null}
       {archivable ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("archive")}><Archive size={16} />{pending === "archive" ? t("profile.actionWorking") : listing.status === "pending" ? t("profile.withdrawListing") : t("profile.archiveListing")}</button> : null}
       {listing.status === "active" ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("sold")}><CheckCircle2 size={16} />{pending === "sold" ? t("profile.actionWorking") : t("profile.markSold")}</button> : null}
     </div>

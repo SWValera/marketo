@@ -54,7 +54,6 @@ export function ModerationDecision({ listingId }: { listingId: string }) {
       }
       setFeedback(t("admin.success"));
       router.replace("/admin");
-      router.refresh();
     } catch {
       setFeedback(t("admin.failed"));
     } finally {

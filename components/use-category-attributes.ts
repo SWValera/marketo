@@ -6,7 +6,9 @@ import {
   type CategoryAttributeReferenceData,
   type ReferenceDataEnvelope,
 } from "@/lib/reference-data/types";
+import { readLruEntry, writeLruEntry } from "@/lib/reference-data/bounded-map";
 
+const RESPONSE_CACHE_MAX_ENTRIES = 64;
 const responseCache = new Map<string, CategoryAttributeReferenceData>();
 
 export function useCategoryAttributes(
@@ -22,10 +24,10 @@ export function useCategoryAttributes(
   useEffect(() => {
     if (!categoryId) return;
     if (initial?.status === "ready" && initial.data.categoryId === categoryId) {
-      responseCache.set(categoryId, initial.data);
+      writeLruEntry(responseCache, categoryId, initial.data, RESPONSE_CACHE_MAX_ENTRIES);
       return;
     }
-    if (responseCache.has(categoryId)) return;
+    if (readLruEntry(responseCache, categoryId)) return;
 
     const controller = new AbortController();
     void fetch(`/api/reference/categories/${encodeURIComponent(categoryId)}/attributes`, {
@@ -37,7 +39,7 @@ export function useCategoryAttributes(
         return response.json() as Promise<CategoryAttributeReferenceData>;
       })
       .then((data) => {
-        responseCache.set(categoryId, data);
+        writeLruEntry(responseCache, categoryId, data, RESPONSE_CACHE_MAX_ENTRIES);
         setRequestState({ categoryId, status: "ready", data });
       })
       .catch((error: unknown) => {

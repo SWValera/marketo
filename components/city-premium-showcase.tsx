@@ -11,12 +11,14 @@ import {
   KeyRound,
   MapPin,
   PackageOpen,
+  Pause,
+  Play,
   RefreshCcw,
   Star,
   Store,
   Wrench,
 } from "lucide-react";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { useStoredLocation } from "@/components/location-picker";
@@ -24,8 +26,11 @@ import { useReferenceGeography } from "@/components/reference-geography-provider
 import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
 import { rotationIndexAt } from "@/lib/showcase-rotation";
+import { rotationFrameAt } from "@/lib/showcase-rotation";
+import { safeReadBrowserStorage, safeWriteBrowserStorage } from "@/lib/browser/storage";
 
 type PaidPlacement = {
   id: string;
@@ -38,6 +43,21 @@ type PaidPlacement = {
   locationKk: string;
   imageUrl: string | null;
 };
+
+const paidPlacementCache = createSingleFlightTtlCache<string, PaidPlacement[]>({
+  maxEntries: 20,
+  ttlMilliseconds: () => 60 * 1000,
+});
+
+async function requestPaidPlacements(cityId: string) {
+  const response = await fetch(`/api/showcase?city=${encodeURIComponent(cityId)}`, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("showcase_unavailable");
+  const payload = await response.json() as { placements?: PaidPlacement[] };
+  if (!Array.isArray(payload.placements)) throw new Error("showcase_invalid_response");
+  return payload.placements;
+}
 
 type BrandDefinition = {
   id: string;
@@ -92,7 +112,7 @@ function readRotationOffset(key: string) {
     loadedRotationOffsetKeys.add(key);
     const storageKey = rotationOffsetStorageKey(key);
     const stored = readRotationOffsetCookie(key)
-      ?? Number(window.localStorage.getItem(storageKey) ?? window.sessionStorage.getItem(storageKey) ?? 0);
+      ?? Number(safeReadBrowserStorage("localStorage", storageKey) ?? safeReadBrowserStorage("sessionStorage", storageKey) ?? 0);
     rotationOffsets.set(key, Number.isSafeInteger(stored) && stored >= 0 ? stored : 0);
   }
   return rotationOffsets.get(key) ?? 0;
@@ -105,9 +125,13 @@ function writeRotationOffset(key: string, value: number) {
     // localStorage survives the full document refresh used by some RSC
     // runtimes for locale changes; the compact cookie is a fallback for
     // privacy modes that clear Web Storage on a document navigation.
-    window.localStorage.setItem(storageKey, String(value));
-    window.sessionStorage.setItem(storageKey, String(value));
-    document.cookie = `${ROTATION_OFFSET_COOKIE}=${encodeURIComponent(JSON.stringify([key, value]))}; Path=/; Max-Age=2592000; SameSite=Lax`;
+    safeWriteBrowserStorage("localStorage", storageKey, String(value));
+    safeWriteBrowserStorage("sessionStorage", storageKey, String(value));
+    try {
+      document.cookie = `${ROTATION_OFFSET_COOKIE}=${encodeURIComponent(JSON.stringify([key, value]))}; Path=/; Max-Age=2592000; SameSite=Lax`;
+    } catch {
+      // The in-memory rotation remains usable when cookie storage is blocked.
+    }
   }
   for (const listener of rotationOffsetListeners) listener();
 }
@@ -124,23 +148,30 @@ function stableHash(value: string) {
 export function CityPremiumShowcase() {
   const { locale, t } = useI18n();
   const geography = useReferenceGeography();
+  const ensureGeographyLoaded = geography.ensureLoaded;
   const selectedLocation = useStoredLocation();
   const rotationKey = selectedLocation === "all" ? "all-kazakhstan" : selectedLocation;
   const selectedCity = selectedLocation === "all" ? undefined : getSettlement(geography.data, selectedLocation);
-  const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[] }>({ city: "", items: [] });
+  const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
+  const [paidRetry, setPaidRetry] = useState(0);
+  const [autoplayPaused, setAutoplayPaused] = useState(false);
 
   useEffect(() => {
     if (selectedLocation === "all") return;
-    const controller = new AbortController();
-    fetch(`/api/showcase?city=${encodeURIComponent(selectedLocation)}`, { signal: controller.signal, headers: { accept: "application/json" } })
-      .then(async (response) => response.ok ? response.json() as Promise<{ placements?: PaidPlacement[] }> : { placements: [] })
-      .then((payload) => setPaidState({ city: selectedLocation, items: payload.placements ?? [] }))
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, [selectedLocation]);
+    ensureGeographyLoaded();
+  }, [ensureGeographyLoaded, selectedLocation]);
+
+  useEffect(() => {
+    if (selectedLocation === "all") return;
+    let active = true;
+    void paidPlacementCache.getOrLoad(selectedLocation, () => requestPaidPlacements(selectedLocation))
+      .then((items) => { if (active) setPaidState({ city: selectedLocation, items, status: "ready" }); })
+      .catch(() => { if (active) setPaidState({ city: selectedLocation, items: [], status: "error" }); });
+    return () => { active = false; };
+  }, [paidRetry, selectedLocation]);
 
   const paid = useMemo(
-    () => paidState.city === selectedLocation ? paidState.items : [],
+    () => paidState.city === selectedLocation && paidState.status === "ready" ? paidState.items : [],
     [paidState, selectedLocation],
   );
   const items = useMemo(() => {
@@ -164,13 +195,23 @@ export function CityPremiumShowcase() {
   // cannot replace a running carousel with index zero.
   const getServerSnapshot = useCallback(() => rotationOffsets.get(rotationKey) ?? 0, [rotationKey]);
   const persistedOffset = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const timelineFrame = useShowcaseTimeline(items.length < 2);
+  const timelineFrame = useShowcaseTimeline(items.length < 2 || autoplayPaused);
   const activeIndex = rotationIndexAt(timelineFrame, items.length, persistedOffset);
   const advance = useCallback((delta: number) => {
     if (items.length < 2) return;
     const currentOffset = readRotationOffset(rotationKey) % items.length;
     writeRotationOffset(rotationKey, (currentOffset + delta + items.length) % items.length);
   }, [items.length, rotationKey]);
+  const toggleAutoplay = useCallback(() => {
+    if (items.length < 2) return;
+    const liveFrame = rotationFrameAt(Date.now());
+    const currentFrame = autoplayPaused ? 0 : liveFrame;
+    const currentIndex = rotationIndexAt(currentFrame, items.length, persistedOffset);
+    const nextPaused = !autoplayPaused;
+    const nextFrame = nextPaused ? 0 : liveFrame;
+    writeRotationOffset(rotationKey, ((currentIndex - nextFrame) % items.length + items.length) % items.length);
+    setAutoplayPaused(nextPaused);
+  }, [autoplayPaused, items.length, persistedOffset, rotationKey]);
 
   const visible = Array.from({ length: 3 }, (_, slot) => items[(activeIndex + slot) % items.length]).filter(Boolean);
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
@@ -186,15 +227,17 @@ export function CityPremiumShowcase() {
         <button type="button" onClick={() => advance(-1)} aria-label={t("showcase.previous")}><ArrowLeft size={19} /></button>
         <span>{items.length ? `${activeIndex + 1} / ${items.length}` : ""}</span>
         <button type="button" onClick={() => advance(1)} aria-label={t("showcase.next")}><ArrowRight size={19} /></button>
+        <button type="button" onClick={toggleAutoplay} aria-pressed={autoplayPaused} aria-label={t(autoplayPaused ? "showcase.resume" : "showcase.pause")}>{autoplayPaused ? <Play size={19} /> : <Pause size={19} />}</button>
       </div>
     </div>
+    {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
     <div className="showcase-grid" aria-live="off">
       {visible.map((item, slot) => {
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;
           return <Link className="showcase-card showcase-paid-card" href={`/listing/${item.listingId}-${item.slug}`} key={`${slot}-${item.id}`}>
             <span className="showcase-badge"><Star size={13} /> {t("showcase.premium")}</span>
-            <div className="showcase-media">{item.imageUrl ? <img src={item.imageUrl} alt="" /> : <Star size={42} />}</div>
+            <div className="showcase-media">{item.imageUrl ? <img src={item.imageUrl} alt="" decoding="async" /> : <Star size={42} />}</div>
             <div className="showcase-card-copy"><strong>{item.title}</strong><b>{price}</b><small><MapPin size={13} /> {locale === "kk" ? item.locationKk : item.locationRu}</small></div>
           </Link>;
         }

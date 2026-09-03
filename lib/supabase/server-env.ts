@@ -1,25 +1,10 @@
 import { env as cloudflareEnv } from "cloudflare:workers";
+import { validatePublicSupabaseConfig } from "./public-config-validation.ts";
 
 function readRuntimeString(name: string): string | undefined {
   const runtimeValue = (cloudflareEnv as unknown as Record<string, unknown>)[name];
   if (typeof runtimeValue === "string" && runtimeValue.length > 0) return runtimeValue;
   return process.env[name];
-}
-
-function validatePublicConfig(url: string, publishableKey: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not a valid URL.");
-  }
-  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
-    throw new Error("Supabase URL must use HTTPS outside local development.");
-  }
-  if (/^(?:sb_secret_|service_role)/i.test(publishableKey)) {
-    throw new Error("A server-only Supabase key was placed in a public variable.");
-  }
-  return { url: parsed.toString().replace(/\/$/, ""), publishableKey };
 }
 
 export function tryGetServerSupabasePublicConfig() {
@@ -29,7 +14,7 @@ export function tryGetServerSupabasePublicConfig() {
     ?? readRuntimeString("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
   if (!url || !publishableKey) return null;
-  return validatePublicConfig(url, publishableKey);
+  return validatePublicSupabaseConfig(url, publishableKey);
 }
 
 export function getServerSupabasePublicConfig() {

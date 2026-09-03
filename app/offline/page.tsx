@@ -9,5 +9,5 @@ export const metadata: Metadata = { title: "Нет подключения", robo
 
 export default async function OfflinePage() {
   const { t } = await getServerI18n();
-  return <><Header /><main className="page-shell subpage-main"><EmptyState icon={<WifiOff size={30} />} title={t("state.offlineTitle")} description={t("state.offlineNote")} actionHref="/" actionLabel={t("state.tryAgain")} /></main><MobileNav /></>;
+  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState icon={<WifiOff size={30} />} title={t("state.offlineTitle")} description={t("state.offlineNote")} actionHref="/" actionLabel={t("state.tryAgain")} /></main><MobileNav /></>;
 }

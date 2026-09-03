@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { Inbox } from "lucide-react";
 
 export function EmptyState({

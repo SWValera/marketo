@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { Save, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -11,12 +11,12 @@ import type { Profile } from "@/lib/data/types";
 import { updateCurrentAccountProfile } from "@/lib/data/supabase/profiles";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-function normalizePhone(value: string) {
+export function normalizeProfilePhone(value: string) {
   const digits = value.replace(/\D/g, "");
   if (!digits) return null;
   if (digits.length === 11 && digits.startsWith("8")) return `+7${digits.slice(1)}`;
   if (digits.length === 11 && digits.startsWith("7")) return `+${digits}`;
-  if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
+  if (/^[1-9]\d{7,14}$/.test(digits)) return `+${digits}`;
   return undefined;
 }
 
@@ -32,7 +32,7 @@ export function ProfileEditContent({ profile }: { profile: Profile }) {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = normalizeProfilePhone(phone);
     if (!displayName.trim() || !cityId) {
       setError(t("profile.requiredError"));
       return;
@@ -52,7 +52,6 @@ export function ProfileEditContent({ profile }: { profile: Profile }) {
         contactPhoneE164: normalizedPhone,
       });
       router.replace("/profile");
-      router.refresh();
     } catch {
       setError(t("profile.saveError"));
     } finally {
@@ -60,7 +59,7 @@ export function ProfileEditContent({ profile }: { profile: Profile }) {
     }
   }
 
-  return <main className="page-shell subpage-main profile-edit-page">
+  return <main id="main-content" tabIndex={-1} className="page-shell subpage-main profile-edit-page">
     <PageHeader fallback="/profile" eyebrow={t("nav.account")} title={t("profile.editTitle")} description={t("profile.editDescription")} />
     <form className="dashboard-card profile-edit-form" onSubmit={(event) => void save(event)}>
       <div className="profile-photo-control"><span><UserRound size={24} /></span><div><strong>{t("profile.photo")}</strong><p>{t("profile.photoAfterLogin")}</p></div></div>
@@ -75,4 +74,3 @@ export function ProfileEditContent({ profile }: { profile: Profile }) {
     </form>
   </main>;
 }
-

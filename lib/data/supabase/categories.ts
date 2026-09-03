@@ -50,7 +50,7 @@ export function mapCategoryReferenceRows(rows: readonly CategoryReferenceRow[]):
 export async function listCategoryLevel(client: MarketoSupabaseClient, parentId: string | null) {
   let request = client.from("categories").select(CATEGORY_COLUMNS).eq("is_active", true);
   request = parentId ? request.eq("parent_id", parentId) : request.is("parent_id", null);
-  const { data, error } = await request.order("sort_order").order("name_ru");
+  const { data, error } = await request.order("sort_order").order("name_ru").order("id");
   if (error) throw error;
   return data;
 }
@@ -65,6 +65,7 @@ export async function listActiveCategories(client: MarketoSupabaseClient) {
       .eq("is_active", true)
       .order("sort_order")
       .order("name_ru")
+      .order("id")
       .range(from, from + pageSize - 1);
     if (error) throw error;
     rows.push(...data);
@@ -108,6 +109,7 @@ export async function listAttributeOptions(
     const { data, error } = await request
       .order("sort_order")
       .order("label_ru")
+      .order("id")
       .range(from, from + pageSize - 1);
     if (error) throw error;
     rows.push(...data);
@@ -125,6 +127,8 @@ export async function searchCategories(client: MarketoSupabaseClient, query: str
     .eq("is_active", true)
     .or(`name_ru.ilike.%${safeQuery}%,name_kk.ilike.%${safeQuery}%`)
     .order("sort_order")
+    .order("name_ru")
+    .order("id")
     .limit(Math.min(limit, 50));
   if (error) throw error;
   return data;

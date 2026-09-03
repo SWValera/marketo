@@ -37,7 +37,7 @@ async function PublishPageContent({
 
   return <>
     <Header />
-    <main className="page-shell subpage-main publish-page">
+    <main id="main-content" tabIndex={-1} className="page-shell subpage-main publish-page">
       <PublishFormLoader
         requestedListingId={requestedListing ?? null}
         userId={authContext.user.id}

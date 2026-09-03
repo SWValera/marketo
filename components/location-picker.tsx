@@ -1,11 +1,13 @@
 "use client";
 
 import { Check, ChevronDown, MapPin, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@/components/i18n-provider";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
 import { localize } from "@/lib/i18n/config";
+import { safeReadBrowserStorage, safeWriteBrowserStorage } from "@/lib/browser/storage";
+import { activateModalFocus } from "@/lib/browser/modal";
 import {
   getFeaturedSettlements,
   getRegion,
@@ -26,14 +28,14 @@ function subscribeToLocation(callback: () => void) {
 }
 
 function readStoredLocation() {
-  return window.localStorage.getItem(LOCATION_STORAGE_KEY) || "all";
+  return safeReadBrowserStorage("localStorage", LOCATION_STORAGE_KEY) || "all";
 }
 
 export function useStoredLocation() {
-  const { data } = useReferenceGeography();
+  const geography = useReferenceGeography();
   const stored = useSyncExternalStore(subscribeToLocation, readStoredLocation, () => "all");
   if (stored === "all") return stored;
-  return getSettlement(data, stored)?.id ?? "all";
+  return getSettlement(geography.data, stored)?.id ?? (geography.status === "ready" ? "all" : stored);
 }
 
 export function LocationPicker({
@@ -51,22 +53,27 @@ export function LocationPicker({
 }) {
   const { locale, t } = useI18n();
   const geography = useReferenceGeography();
+  const ensureGeographyLoaded = geography.ensureLoaded;
   const storedSelection = useStoredLocation();
   const requestedSelection = value ?? storedSelection;
   const requestedSettlement = getSettlement(geography.data, requestedSelection);
   const selected = requestedSelection === "all" && allowAll ? "all" : requestedSettlement?.id ?? "";
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (requestedSelection !== "all") ensureGeographyLoaded();
+  }, [ensureGeographyLoaded, requestedSelection]);
 
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", closeOnEscape);
+    const releaseFocus = dialogRef.current ? activateModalFocus(dialogRef.current, () => setOpen(false)) : () => undefined;
     return () => {
       document.body.style.overflow = previous;
-      window.removeEventListener("keydown", closeOnEscape);
+      releaseFocus();
     };
   }, [open]);
 
@@ -89,7 +96,7 @@ export function LocationPicker({
   function choose(settlementId: string) {
     onChange?.(settlementId);
     if (value === undefined) {
-      window.localStorage.setItem(LOCATION_STORAGE_KEY, settlementId);
+      safeWriteBrowserStorage("localStorage", LOCATION_STORAGE_KEY, settlementId);
       window.dispatchEvent(new CustomEvent(LOCATION_EVENT, { detail: settlementId }));
     }
     setOpen(false);
@@ -98,14 +105,14 @@ export function LocationPicker({
 
   return (
     <>
-      <button type="button" className={`location-trigger ${compact ? "compact" : ""} ${className}`.trim()} onClick={() => setOpen(true)} aria-haspopup="dialog">
+      <button type="button" className={`location-trigger ${compact ? "compact" : ""} ${className}`.trim()} onClick={() => { ensureGeographyLoaded(); setOpen(true); }} aria-haspopup="dialog">
         <MapPin size={17} aria-hidden="true" /><span>{displayName}</span><ChevronDown size={15} aria-hidden="true" />
       </button>
       {open && createPortal(
         <div className="location-backdrop" role="presentation" onMouseDown={() => setOpen(false)}>
-          <section className="location-sheet" role="dialog" aria-modal="true" aria-labelledby="location-title" onMouseDown={(event) => event.stopPropagation()}>
+          <section ref={dialogRef} className="location-sheet" role="dialog" aria-modal="true" aria-labelledby="location-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
             <header><div><span className="section-kicker">{t("common.kazakhstan")}</span><h2 id="location-title">{t("location.choose")}</h2><p>{t("location.searchHelp")}</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label={t("location.close")}><X size={21} /></button></header>
-            <label className="location-search"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("location.searchPlaceholder")} /></label>
+            <label className="location-search"><Search size={19} /><input data-dialog-initial-focus aria-label={t("location.searchPlaceholder")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("location.searchPlaceholder")} /></label>
             {!query && featured.length > 0 ? <div className="popular-locations"><strong>{t("location.popular")}</strong><div>{featured.map((item) => <button type="button" key={item.id} onClick={() => choose(item.id)}>{localize(item.name, locale)}</button>)}</div></div> : null}
             {allowAll && !query ? <button type="button" className={`location-all ${selected === "all" ? "selected" : ""}`} onClick={() => choose("all")}><span><MapPin size={19} />{t("common.allKazakhstan")}</span>{selected === "all" && <Check size={18} />}</button> : null}
             <div className="location-results" role="listbox" aria-label={t("location.citiesAria")}>

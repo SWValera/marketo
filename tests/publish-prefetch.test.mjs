@@ -56,13 +56,21 @@ function isPublishTarget(value) {
   return value === "/publish" || Boolean(value?.startsWith("/publish?"));
 }
 
-function importedDefaultName(sourceFile, moduleName) {
+function importedLinkName(sourceFile) {
   for (const statement of sourceFile.statements) {
     if (
       ts.isImportDeclaration(statement)
       && ts.isStringLiteral(statement.moduleSpecifier)
-      && statement.moduleSpecifier.text === moduleName
-    ) return statement.importClause?.name?.text ?? null;
+    ) {
+      if (statement.moduleSpecifier.text === "next/link") return statement.importClause?.name?.text ?? null;
+      if (statement.moduleSpecifier.text === "@/components/app-link") {
+        const binding = statement.importClause?.namedBindings;
+        if (binding && ts.isNamedImports(binding)) {
+          const imported = binding.elements.find((element) => (element.propertyName ?? element.name).text === "AppLink");
+          if (imported) return imported.name.text;
+        }
+      }
+    }
   }
   return null;
 }
@@ -79,7 +87,7 @@ test("every repository publish Link explicitly disables speculative prefetch", a
 
   for (const file of files) {
     const sourceFile = parse(file.path, await readFile(file.url, "utf8"));
-    const linkName = importedDefaultName(sourceFile, "next/link");
+    const linkName = importedLinkName(sourceFile);
     visit(sourceFile, (node) => {
       if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName)) {
         if (linkName && node.tagName.text === linkName) {
@@ -129,7 +137,7 @@ test("EmptyState keeps prefetch opt-out caller-controlled", async () => {
   const path = "components/empty-state.tsx";
   const source = await readFile(new URL(path, root), "utf8");
   const sourceFile = parse(path, source);
-  const linkName = importedDefaultName(sourceFile, "next/link");
+  const linkName = importedLinkName(sourceFile);
   let forwardingFound = false;
   let optionalPropFound = false;
   visit(sourceFile, (node) => {
@@ -160,7 +168,7 @@ test("EmptyState keeps prefetch opt-out caller-controlled", async () => {
 test("dynamic mobile publish navigation carries the protected flag", async () => {
   const path = "components/mobile-nav.tsx";
   const sourceFile = parse(path, await readFile(new URL(path, root), "utf8"));
-  const linkName = importedDefaultName(sourceFile, "next/link");
+  const linkName = importedLinkName(sourceFile);
   let publishEntryFound = false;
   let protectedDynamicLinkFound = false;
 

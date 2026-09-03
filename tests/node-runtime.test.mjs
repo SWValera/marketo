@@ -49,3 +49,23 @@ test("all official TypeScript-importing commands use the shared runtime wrapper"
     assert.match(packageJson.scripts[command], /^node scripts\/run-with-sites-env\.mjs --node /, command);
   }
 });
+
+test("PGlite suites use bounded single-process WebAssembly compilation", async () => {
+  const runner = await readFile(new URL("scripts/test.mjs", root), "utf8");
+  for (const file of [
+    "premium-commercial-security.test.mjs",
+    "supabase-migrations.test.mjs",
+    "supabase-security.test.mjs",
+  ]) {
+    assert.match(runner, new RegExp(`["]${file.replaceAll(".", "\\.")}["]`), file);
+  }
+  for (const flag of [
+    "--wasm-num-compilation-tasks=1",
+    "--no-wasm-tier-up",
+    "--no-wasm-dynamic-tiering",
+    "--liftoff-only",
+  ]) {
+    assert.match(runner, new RegExp(`["]${flag.replaceAll("-", "\\-")}["]`), flag);
+  }
+  assert.match(runner, /for \(const testFile of pgliteTestFiles\)/);
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Building2, CarFront, PackageOpen, Wrench } from "lucide-react";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type HeroSlide = {

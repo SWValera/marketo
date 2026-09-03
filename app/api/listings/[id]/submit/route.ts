@@ -34,7 +34,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "reference_query_failed" }, { status: 503 });
     }
     const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
-    return NextResponse.json({ error: "listing_submit_failed" }, { status: code === "42501" ? 409 : 400 });
+    return NextResponse.json({ error: "listing_submit_failed" }, { status: code === "42501" ? 409 : 500 });
   }
 }
-

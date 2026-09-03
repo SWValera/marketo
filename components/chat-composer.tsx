@@ -1,33 +1,55 @@
 "use client";
 
-import { Paperclip, Send } from "lucide-react";
-import { useRef, useState } from "react";
+import { Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
+import { markConversationRead, sendTextMessage } from "@/lib/data/supabase/chat";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-export function ChatComposer() {
+export function ChatComposer({ conversationId, currentUserId }: { conversationId: string; currentUserId: string }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [message, setMessage] = useState("");
-  const [attachment, setAttachment] = useState("");
   const [status, setStatus] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [sending, setSending] = useState(false);
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    void markConversationRead(getSupabaseBrowserClient(), conversationId, currentUserId).catch(() => {
+      // A failed read marker must not hide an otherwise readable conversation.
+    });
+  }, [conversationId, currentUserId]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!message.trim()) {
+    const cleanMessage = message.trim();
+    if (!cleanMessage) {
       setStatus(t("messages.enterMessage"));
       return;
     }
-    setStatus(t("messages.accountRequired"));
+    if (Array.from(cleanMessage).length > 4000) {
+      setStatus(t("messages.messageTooLong"));
+      return;
+    }
+    setSending(true);
+    setStatus("");
+    try {
+      await sendTextMessage(getSupabaseBrowserClient(), conversationId, currentUserId, cleanMessage);
+      setMessage("");
+      setStatus(t("messages.sent"));
+      router.refresh();
+    } catch {
+      setStatus(t("messages.sendFailed"));
+    } finally {
+      setSending(false);
+    }
   }
 
-  return <form className="chat-composer-wrap" onSubmit={submit}>
+  return <form className="chat-composer-wrap" onSubmit={(event) => void submit(event)}>
     <div className="chat-composer">
-      <input ref={inputRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { setAttachment(event.target.files?.[0]?.name ?? ""); setStatus(""); }} />
-      <button type="button" aria-label={t("messages.attach")} onClick={() => inputRef.current?.click()}><Paperclip size={20} /></button>
-      <textarea rows={1} aria-label={t("messages.message")} placeholder={t("messages.placeholder")} value={message} onChange={(event) => { setMessage(event.target.value); setStatus(""); }} />
-      <button className="send-button" type="submit" aria-label={t("messages.send")}><Send size={19} /></button>
+      <textarea rows={1} maxLength={4000} aria-label={t("messages.message")} placeholder={t("messages.placeholder")} value={message} onChange={(event) => { setMessage(event.target.value); setStatus(""); }} />
+      <button className="send-button" type="submit" aria-label={t("messages.send")} disabled={sending}><Send size={19} /></button>
     </div>
-    {attachment ? <small className="composer-attachment">{t("messages.attachment", { name: attachment })}</small> : null}
     {status ? <small className="composer-status" role="status">{status}</small> : null}
   </form>;
 }

@@ -1,15 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PublishForm } from "@/components/publish-form";
 import { useI18n } from "@/components/i18n-provider";
-import { listActiveCategories, mapCategoryReferenceRows } from "@/lib/data/supabase/categories";
 import type { OwnerDraftBundle } from "@/lib/data/types";
 import {
-  createSingleFlightTtlLoader,
   isPublishLoadRetryable,
   PublishLoadError,
   publishLoginHref,
@@ -17,9 +15,7 @@ import {
   type PublishLoadFailure,
 } from "@/lib/publish/loader";
 import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/reference-data/types";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-const CATEGORY_CATALOG_TTL_MS = 5 * 60 * 1000;
+import { loadBrowserCategoryReferences } from "@/lib/reference-data/browser";
 
 type PublishProfileDefaults = {
   displayName: string;
@@ -37,13 +33,6 @@ type LoaderState =
   }
   | { requestKey: string; status: "failed"; reason: PublishLoadFailure };
 
-async function requestCategoryCatalog(): Promise<ReferenceDataEnvelope<CategoryReferenceData>> {
-  const rows = await listActiveCategories(getSupabaseBrowserClient());
-  return { status: "ready", data: mapCategoryReferenceRows(rows) };
-}
-
-const loadCategoryCatalog = createSingleFlightTtlLoader(requestCategoryCatalog, CATEGORY_CATALOG_TTL_MS);
-
 async function loadDraft(listingId: string): Promise<OwnerDraftBundle> {
   try {
     const response = await fetch(`/api/listings/${encodeURIComponent(listingId)}`, {
@@ -60,7 +49,7 @@ async function loadDraft(listingId: string): Promise<OwnerDraftBundle> {
 async function loadEditorData(requestedListingId: string | null) {
   const draft = requestedListingId ? await loadDraft(requestedListingId) : null;
   try {
-    const catalog = await loadCategoryCatalog();
+    const catalog = await loadBrowserCategoryReferences();
     return { catalog, draft };
   } catch {
     throw new PublishLoadError("temporary");

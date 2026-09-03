@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "@/components/app-link";
 import { AlertTriangle, Bell, CircleHelp, Heart, LayoutDashboard, LogIn, MessageCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
@@ -28,7 +28,7 @@ export async function DashboardShell({ title, description, active, children, aut
   return (
     <>
       <Header />
-      <main className="page-shell dashboard-page">
+      <main id="main-content" tabIndex={-1} className="page-shell dashboard-page">
         <aside className="dashboard-sidebar">
           {profile ? <div className="dashboard-user dashboard-user-authenticated">
             <span className="dashboard-avatar"><UserRound size={20} /></span>

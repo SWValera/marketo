@@ -10,12 +10,16 @@ import { getServerI18n } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Редактировать профиль", robots: { index: false, follow: false } };
 
-export default async function EditProfilePage() {
+export default function EditProfilePage() {
+  return <EditProfilePageContent />;
+}
+
+async function EditProfilePageContent() {
   const authContext = await profileRepository.current();
   if (authContext.status === "anonymous") redirect("/login?next=/profile/edit");
   if (authContext.status === "error") {
     const { t } = await getServerI18n();
-    return <><Header /><main className="page-shell subpage-main profile-edit-page"><EmptyState icon={<AlertTriangle size={30} />} title={t("profile.loadErrorTitle")} description={t("profile.loadErrorNote")} actionHref="/profile/edit?retry=1" actionLabel={t("common.retry")} /></main><MobileNav /></>;
+    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main profile-edit-page"><EmptyState icon={<AlertTriangle size={30} />} title={t("profile.loadErrorTitle")} description={t("profile.loadErrorNote")} actionHref="/profile/edit?retry=1" actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   return <><Header /><ProfileEditContent profile={authContext.profile} /><MobileNav /></>;
 }

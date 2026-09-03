@@ -1,4 +1,6 @@
-export type PublicSupabaseConfig = { url: string; publishableKey: string };
+import { validatePublicSupabaseConfig, type ValidatedPublicSupabaseConfig } from "./public-config-validation.ts";
+
+export type PublicSupabaseConfig = ValidatedPublicSupabaseConfig;
 
 export function getPublicSupabaseConfig(): PublicSupabaseConfig {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -12,9 +14,5 @@ export function getPublicSupabaseConfig(): PublicSupabaseConfig {
     );
   }
 
-  if (/^(?:sb_secret_|service_role)/i.test(publishableKey)) {
-    throw new Error("A server-only Supabase key was placed in a public variable.");
-  }
-
-  return { url: url.replace(/\/$/, ""), publishableKey };
+  return validatePublicSupabaseConfig(url, publishableKey);
 }
