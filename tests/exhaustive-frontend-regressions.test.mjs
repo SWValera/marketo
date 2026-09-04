@@ -142,15 +142,14 @@ test("unsupported product actions are not exposed as working controls", async ()
   assert.doesNotMatch(help, /href="\/help"/);
 });
 
-test("upload copy states the validator's intentionally narrow supported subset", async () => {
+test("upload UI accepts the normalized marketplace image formats", async () => {
   const [form, messages] = await Promise.all([
     source("components/publish-form.tsx"),
     source("lib/i18n/messages.ts"),
   ]);
-  assert.match(form, /accept="image\/jpeg,image\/png"/);
-  assert.match(messages, /baseline JPEG \(Huffman\) или неиндексированный PNG/);
-  assert.match(messages, /baseline JPEG с Huffman-кодированием либо неиндексированный PNG без дополнительных метаданных/);
-  assert.match(messages, /baseline JPEG \(Huffman\) немесе индекстелмеген PNG/);
+  assert.match(form, /accept="image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif,\.heic,\.heif"/);
+  assert.match(messages, /JPEG, PNG, WebP или HEIC\/HEIF/);
+  assert.match(messages, /JPEG, PNG, WebP немесе HEIC\/HEIF/);
 });
 
 test("every rendered main element is a valid target for the global skip link", async () => {

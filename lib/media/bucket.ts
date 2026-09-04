@@ -6,3 +6,8 @@ export function getListingMediaBucket(): R2Bucket {
   return bucket;
 }
 
+export function getListingImageProcessor(): ImagesBinding {
+  const images = env.IMAGES;
+  if (!images) throw new Error("IMAGES binding is not configured.");
+  return images;
+}

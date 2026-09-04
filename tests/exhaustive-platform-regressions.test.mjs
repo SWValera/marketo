@@ -53,7 +53,7 @@ test("install prompt failures are contained and clear stale prompt state", async
 
 test("artifact validator covers client assets, bindings and server-only credential markers", async () => {
   const validator = await source("scripts/validate-artifact.mjs");
-  for (const marker of ["client Vite manifest", "web app manifest", "service worker", "r2_buckets", "serverOnlyMarkers"]) {
+  for (const marker of ["client Vite manifest", "web app manifest", "service worker", "r2_buckets", "workerConfig.images", "serverOnlyMarkers"]) {
     assert.match(validator, new RegExp(marker));
   }
 });
@@ -66,6 +66,17 @@ test("R2 bucket identity is explicit per build environment and never hardcoded",
   assert.match(vite, /bucket_name:\s*mediaBucketName!/);
   assert.doesNotMatch(vite, /site-creator-r2/);
   assert.match(example, /^MARKETO_MEDIA_BUCKET_NAME=/m);
+});
+
+test("Cloudflare Images binding is explicit for upload normalization and delivery optimization", async () => {
+  const [vite, wrangler, worker] = await Promise.all([
+    source("vite.config.ts"),
+    source("wrangler.jsonc"),
+    source("worker/index.ts"),
+  ]);
+  assert.match(vite, /images:\s*\{ binding: "IMAGES" \}/);
+  assert.match(wrangler, /"images"[\s\S]*"binding": "IMAGES"/);
+  assert.match(worker, /IMAGES: ImagesBinding/);
 });
 
 test("sitemap fails closed on reference errors and emits canonical listing URLs", async () => {

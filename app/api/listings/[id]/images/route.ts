@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getListingMediaBucket } from "@/lib/media/bucket";
-import { listingImageLimits, validateListingImage } from "@/lib/media/image-validation";
+import { getListingImageProcessor, getListingMediaBucket } from "@/lib/media/bucket";
+import { listingImageLimits } from "@/lib/media/image-validation";
+import { normalizeListingImage } from "@/lib/media/image-normalization";
 import { isSameOriginMutationRequest } from "@/lib/http/same-origin";
 import { MultipartRequestError, parseBoundedMultipartFormData } from "@/lib/http/bounded-multipart";
 import { createListingImageStorageKey } from "@/lib/media/storage-key";
@@ -53,19 +54,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch {
     return NextResponse.json({ error: "media_storage_unavailable" }, { status: 503 });
   }
+  let images: ImagesBinding;
+  try {
+    images = getListingImageProcessor();
+  } catch {
+    return NextResponse.json({ error: "media_processing_unavailable" }, { status: 503 });
+  }
   let admin: ReturnType<typeof createSupabaseAdminClient>;
   try {
     admin = createSupabaseAdminClient();
   } catch {
     return NextResponse.json({ error: "media_metadata_unavailable" }, { status: 503 });
   }
-  const created: Array<{ id: string; storageKey: string; sortOrder: number }> = [];
+  const created: Array<{ id: string; storageKey: string; sortOrder: number; byteSize: number }> = [];
   const firstSortOrder = existing.length ? Math.max(...existing.map((image) => image.sort_order)) + 1 : 0;
   let uncommittedStorageKey: string | null = null;
 
   try {
     for (const [index, file] of files.entries()) {
-      const image = await validateListingImage(file);
+      const image = await normalizeListingImage(file, images);
+      if (existingBytes + created.reduce((total, item) => total + item.byteSize, 0) + image.byteSize > listingImageLimits.maxTotalBytes) {
+        throw new Error("normalized_photo_payload_too_large");
+      }
       const sortOrder = firstSortOrder + index;
       // The object identity must not depend on the racy sort-order snapshot.
       // A losing concurrent metadata insert can therefore delete only its own
@@ -94,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         mime_type: image.mimeType,
       }).select("id, storage_key, sort_order").single();
       if (metadataError) throw metadataError;
-      created.push({ id: metadata.id, storageKey: metadata.storage_key, sortOrder: metadata.sort_order });
+      created.push({ id: metadata.id, storageKey: metadata.storage_key, sortOrder: metadata.sort_order, byteSize: image.byteSize });
       uncommittedStorageKey = null;
     }
   } catch (error) {
@@ -126,8 +136,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (cleanupFailed) return NextResponse.json({ error: "photo_upload_cleanup_failed" }, { status: 503 });
     const message = error instanceof Error ? error.message : "photo_upload_failed";
     const clientError = /^(?:invalid_image_size|unsupported_image_content|image_mime_mismatch|image_dimensions_too_small|image_dimensions_too_large)$/.test(message);
-    return NextResponse.json({ error: clientError ? message : "photo_upload_failed" }, { status: clientError ? 400 : 500 });
+    const tooLarge = /^(?:normalized_image_too_large|normalized_photo_payload_too_large)$/.test(message);
+    return NextResponse.json(
+      { error: clientError ? message : tooLarge ? "photo_payload_too_large" : "photo_upload_failed" },
+      { status: clientError ? 400 : tooLarge ? 413 : 503 },
+    );
   }
 
-  return NextResponse.json({ images: created }, { status: 201 });
+  return NextResponse.json({
+    images: created.map((image) => ({ id: image.id, storageKey: image.storageKey, sortOrder: image.sortOrder })),
+  }, { status: 201 });
 }

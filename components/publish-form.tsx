@@ -65,6 +65,24 @@ import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/referen
 
 type PhotoPreview = { name: string; url: string; file: File };
 
+const listingPhotoMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
+const listingPhotoExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+
+function isAcceptedListingPhoto(file: File) {
+  const mimeType = file.type.trim().toLowerCase();
+  const extension = file.name.slice(file.name.lastIndexOf(".") + 1).toLowerCase();
+  return listingPhotoMimeTypes.has(mimeType)
+    || ((!mimeType || mimeType === "application/octet-stream") && listingPhotoExtensions.has(extension));
+}
+
 type PublishProfileDefaults = {
   displayName: string;
   contactPhone: string;
@@ -355,10 +373,9 @@ export function PublishForm({
 
   function addPhotos(files: FileList | null) {
     if (!files) return;
-    const allowed = new Set(["image/jpeg", "image/png"]);
     const available = Math.max(0, 12 - existingImages.length - photos.length);
     const candidates = Array.from(files).slice(0, available);
-    if (candidates.length === 0 || candidates.some((file) => !allowed.has(file.type) || file.size > 12 * 1024 * 1024)) {
+    if (candidates.length === 0 || candidates.some((file) => !isAcceptedListingPhoto(file) || file.size > 12 * 1024 * 1024)) {
       setGlobalError(t("publish.photoFileError"));
       return;
     }
@@ -707,7 +724,7 @@ export function PublishForm({
           {step === 2 && <div className="publish-panel" ref={(node) => setFieldRef("photos", node)}>
             <div className="panel-heading"><span><Camera size={22} /></span><div><h2>{t("publish.addPhotos")}</h2><p>{t("publish.photosNote")}</p></div></div>
             {existingImages.length > 0 ? <div className="existing-photo-grid">{existingImages.map((image, index) => <article key={image.id}><img src={image.url} alt={t("publish.existingPhoto", { count: index + 1 })} />{index === 0 ? <b>{t("publish.mainPhoto")}</b> : null}</article>)}</div> : null}
-            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png" multiple onChange={(event) => addPhotos(event.target.files)} /></label>
+            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple onChange={(event) => addPhotos(event.target.files)} /></label>
             {photos.length > 0 && <div className="photo-preview-grid">{photos.map((photo, index) => <article key={`${photo.name}-${index}`}><img src={photo.url} alt={t("publish.preview", { count: index + 1 })} />{existingImages.length === 0 && index === 0 && <b>{t("publish.mainPhoto")}</b>}<div><button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} aria-label={t("publish.moveLeft")}><ChevronLeft size={16} /></button><GripVertical size={16} /><button type="button" disabled={index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={t("publish.moveRight")}><ChevronRight size={16} /></button><button type="button" className="remove-photo" onClick={() => removePhoto(index)} aria-label={t("publish.removePhoto")}><Trash2 size={16} /></button></div></article>)}</div>}
             {fieldError("photos")}
             <div className="photo-tips"><ShieldCheck size={19} /><div><strong>{t("publish.photoTip")}</strong><p>{t("publish.photoTipNote")}</p></div></div>

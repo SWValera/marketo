@@ -72,6 +72,9 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   if (workerConfig.main !== "index.js" || workerConfig.assets?.binding !== "ASSETS" || workerConfig.assets?.directory !== "../client") {
     throw artifactError("Generated Worker configuration has an invalid entry or assets binding.");
   }
+  if (workerConfig.images?.binding !== "IMAGES") {
+    throw artifactError("Generated Worker configuration must contain the IMAGES binding.");
+  }
   if (sourceHosting?.r2) {
     const bindings = (workerConfig.r2_buckets ?? []).filter((item) => item?.binding === sourceHosting.r2);
     if (bindings.length !== 1 || typeof bindings[0]?.bucket_name !== "string" || !bindings[0].bucket_name.trim()) {

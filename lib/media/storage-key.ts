@@ -26,7 +26,7 @@ export function createListingImageStorageKey(input: {
   ownerId: string;
   listingId: string;
   digest: string;
-  extension: "jpg" | "png";
+  extension: "jpg" | "png" | "webp" | "avif";
   nonce?: string;
 }) {
   const unique = input.nonce ?? crypto.randomUUID();

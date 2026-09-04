@@ -6,5 +6,6 @@ declare namespace Cloudflare {
     SUPABASE_SECRET_KEY?: string;
     SUPABASE_SERVICE_ROLE_KEY?: string;
     MARKETO_MEDIA?: R2Bucket;
+    IMAGES?: ImagesBinding;
   }
 }

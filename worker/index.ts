@@ -4,13 +4,7 @@ import handler from "vinext/server/app-router-entry";
 
 interface Env {
   ASSETS: Fetcher;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
+  IMAGES: ImagesBinding;
 }
 
 interface ExecutionContext {
@@ -33,7 +27,9 @@ const worker = {
       return handleImageOptimization(request, {
         fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
+          // vinext negotiates this value from its fixed JPEG/WebP/AVIF allowlist.
+          const outputFormat = format as ImageOutputOptions["format"];
+          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format: outputFormat, quality });
           return result.response();
         },
       }, allowedWidths);

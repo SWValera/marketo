@@ -64,14 +64,18 @@ not expose private phone fields publicly.
 1. An authenticated owner calls create_listing_draft.
 2. One transaction writes listing, private contact and validated typed category
    attributes.
-3. The server image route verifies owner/editable status and checks file magic,
-   dimensions, MIME, per-file/total size and SHA-256.
-4. The route writes to R2, verifies the object, then inserts image metadata with
-   the server-only Supabase client. Failed batches compensate database and R2.
-5. The owner calls submit_listing, which validates required data and moves the
+3. The server image route verifies owner/editable status and enforces bounded
+   multipart, per-file and total input limits.
+4. Cloudflare Images decodes JPEG, PNG, WebP or HEIC/HEIF, verifies the real
+   format and dimensions, applies EXIF orientation, scales down to 2560 px and
+   emits a metadata-free WebP. Source bytes are never persisted.
+5. The route verifies and hashes the normalized output, writes it to R2, then
+   inserts image metadata with the server-only Supabase client. Failed batches
+   compensate database and R2.
+6. The owner calls submit_listing, which validates required data and moves the
    listing to pending.
-6. A moderator-only RPC may approve pending → active.
-7. Public search and media RLS expose only active, published, non-deleted
+7. A moderator-only RPC may approve pending → active.
+8. Public search and media RLS expose only active, published, non-deleted
    listings.
 
 localStorage contains only an explicit recovery reference. It is removed after
@@ -132,6 +136,7 @@ Server only:
 
 - SUPABASE_SECRET_KEY (or legacy service-role fallback)
 - MARKETO_MEDIA R2 binding
+- IMAGES binding for trusted decode, orientation, resizing and WebP normalization
 
 Migration tooling only:
 

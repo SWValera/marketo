@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { deflateSync, inflateSync } from "node:zlib";
 import { validateListingImage } from "../lib/media/image-validation.ts";
+import { normalizeListingImage } from "../lib/media/image-normalization.ts";
 
 const root = new URL("../", import.meta.url);
 
@@ -80,6 +81,50 @@ const REAL_WEBP_ALPHA = Buffer.from(
 
 function imageFile(bytes, name, type) {
   return new File([bytes], name, { type });
+}
+
+function fakeImagesBinding({
+  sourceInfo = { format: "image/heic", fileSize: 64, width: 8064, height: 6048 },
+  outputInfo = { format: "image/webp", fileSize: REAL_WEBP.length, width: 2560, height: 1920 },
+  outputBytes = REAL_WEBP,
+  outputContentType = "image/webp",
+  outputStatus = 200,
+  failTransform = false,
+} = {}) {
+  let infoCalls = 0;
+  const calls = { transform: null, output: null };
+  return {
+    calls,
+    binding: {
+      async info(stream) {
+        await new Response(stream).arrayBuffer();
+        infoCalls += 1;
+        return infoCalls === 1 ? sourceInfo : outputInfo;
+      },
+      input(stream) {
+        return {
+          transform(options) {
+            calls.transform = options;
+            return {
+              async output(outputOptions) {
+                calls.output = outputOptions;
+                if (failTransform) throw new Error("transform unavailable");
+                await new Response(stream).arrayBuffer();
+                return {
+                  response() {
+                    return new Response(outputBytes, {
+                      status: outputStatus,
+                      headers: { "content-type": outputContentType },
+                    });
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    },
+  };
 }
 
 function findPngChunk(bytes, wanted) {
@@ -207,6 +252,43 @@ test("listing image validator accepts real baseline JPEG and fully checked PNG p
   rewritePngCrc(oversizedPng, 8);
   await assert.rejects(validateListingImage(imageFile(oversizedPng, "oversized.png", "image/png")), /image_dimensions_too_large/);
   await assert.rejects(validateListingImage(new File(["<svg xmlns='http://www.w3.org/2000/svg'/>"] , "image.svg", { type: "image/svg+xml" })), /unsupported_image_content/);
+});
+
+test("listing image normalization accepts a 48 MP iPhone HEIC and stores a bounded metadata-free WebP", async () => {
+  const fake = fakeImagesBinding();
+  const file = imageFile(new Uint8Array(64), "IMG_0001.HEIC", "image/heic");
+  const image = await normalizeListingImage(file, fake.binding);
+
+  assert.deepEqual({ width: image.width, height: image.height, mime: image.mimeType, extension: image.extension }, {
+    width: 2560,
+    height: 1920,
+    mime: "image/webp",
+    extension: "webp",
+  });
+  assert.equal(image.byteSize, REAL_WEBP.length);
+  assert.match(image.sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(fake.calls.transform, { width: 2560, height: 2560, fit: "scale-down" });
+  assert.deepEqual(fake.calls.output, { format: "image/webp", quality: 84, anim: false });
+});
+
+test("listing image normalization rejects MIME mismatches and unavailable transformations", async () => {
+  const mismatch = fakeImagesBinding();
+  await assert.rejects(
+    normalizeListingImage(imageFile(new Uint8Array(64), "spoofed.png", "image/png"), mismatch.binding),
+    /image_mime_mismatch/,
+  );
+
+  const unavailable = fakeImagesBinding({ failTransform: true });
+  await assert.rejects(
+    normalizeListingImage(imageFile(new Uint8Array(64), "IMG_0002.HEIF", "image/heif"), unavailable.binding),
+    /image_processing_failed/,
+  );
+
+  const svg = fakeImagesBinding({ sourceInfo: { format: "image/svg+xml" } });
+  await assert.rejects(
+    normalizeListingImage(imageFile(new Uint8Array(64), "vector.svg", "image/svg+xml"), svg.binding),
+    /unsupported_image_content/,
+  );
 });
 
 test("listing image validator rejects synthetic, truncated, malformed, and ambiguous JPEG structures", async () => {
@@ -386,9 +468,7 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(publish, /method: currentListingId \? "PATCH" : "POST"/);
   assert.match(publish, /\/images`/);
   assert.match(publish, /\/submit`/);
-  assert.match(publish, /image\/jpeg,image\/png/);
-  assert.doesNotMatch(publish, /image\/webp/);
-  assert.doesNotMatch(publish, /image\/avif/);
+  assert.match(publish, /image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif/);
   assert.match(loader, /loadBrowserCategoryReferences/);
   assert.doesNotMatch(loader, /listActiveCategories|mapCategoryReferenceRows/);
   assert.doesNotMatch(loader, /CATEGORY_COLUMNS/);
@@ -401,7 +481,8 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.doesNotMatch(publishPage, /getCategoryReferences|getMyListingDraftBundle/);
   assert.match(draftRoute, /create_listing_draft/);
   for (const status of [401, 404, 409, 503]) assert.match(draftReadRoute, new RegExp(`status: ${status}`));
-  assert.match(imageRoute, /validateListingImage/);
+  assert.match(imageRoute, /normalizeListingImage/);
+  assert.match(imageRoute, /getListingImageProcessor/);
   assert.match(imageRoute, /listing\.owner_id !== authData\.user\.id/);
   assert.match(imageRoute, /bucket\.put/);
   assert.match(imageRoute, /stored\.size !== image\.byteSize/);
