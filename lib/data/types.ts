@@ -1,3 +1,5 @@
+import type { CategoryAttributeDataType, LocalizedText } from "@/lib/reference-data/types";
+
 export type PageResult<T> = {
   items: T[];
   total: number;
@@ -22,15 +24,25 @@ export type ListingSummary = {
   categorySlug: string;
   cityId: string;
   promoted: boolean;
-  /** Category-defined values returned by the listing repository when available. */
+  /** Optional category values used only when a caller explicitly hydrates them. */
   attributes?: Record<string, string | number | boolean>;
 };
 
 export type ListingDetail = ListingSummary & {
   description: string;
+  categoryId: string;
+  categoryName: LocalizedText;
+  categorySearchPlaceholder: LocalizedText | null;
   attributes: Record<string, string | number | boolean>;
   /** Localized display labels for option-backed attributes. */
   attributeDisplayValues?: Record<string, string>;
+  /** Ordered public definitions for the populated listing characteristics. */
+  attributeDefinitions: Array<{
+    key: string;
+    label: LocalizedText;
+    dataType: CategoryAttributeDataType;
+    unit: LocalizedText | null;
+  }>;
   sellerId: string;
   sellerName: string;
   /** Public contact returned only when the listing access policy allows it. */

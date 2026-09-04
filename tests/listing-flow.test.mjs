@@ -430,5 +430,9 @@ test("public listing detail renders the resolved seller name", async () => {
     /if \(!seller\?\.display_name\) throw new PublicListingDataError\("INVALID_RELATION"\);/,
   );
   assert.match(repositories, /sellerName: seller\.display_name/);
+  assert.match(repositories, /category\.id !== row\.category_id/);
+  assert.match(repositories, /attributeDefinitions: hydrated\.definitions/);
   assert.match(page, /<strong>\{listing\.sellerName\}<\/strong>/);
+  assert.match(page, /listing\.attributeDefinitions\.flatMap/);
+  assert.doesNotMatch(page, /getCategoryReferences|getCategoryAttributeReferences/);
 });

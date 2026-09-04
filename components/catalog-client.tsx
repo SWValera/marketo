@@ -21,6 +21,7 @@ import {
   isCategoryWithin,
 } from "@/lib/reference-data/catalog";
 import type { ListingSummary } from "@/lib/data/types";
+import { readListingAttributePreview } from "@/lib/data/listing-filter-preview";
 import { getSettlement } from "@/lib/reference-data/geography";
 import type {
   CategoryAttributeReferenceData,
@@ -172,7 +173,14 @@ export function CatalogClient({
         if (value === "" || value === false) return true;
         const rangeMatch = key.match(/^(.*)_(min|max)$/);
         const attributeKey = rangeMatch?.[1] ?? key;
-        const listingValue = item.attributes?.[attributeKey];
+        const preview = readListingAttributePreview(item.attributes, attributeKey);
+        if (!preview.known) {
+          // Unapplied filters are only a client-side preview. Cards intentionally
+          // omit attribute hydration on the fast path, so unknown values must
+          // remain visible until the authoritative server query is submitted.
+          return true;
+        }
+        const listingValue = preview.value;
         if (rangeMatch) {
           const candidate = Number(listingValue);
           const boundary = Number(value);

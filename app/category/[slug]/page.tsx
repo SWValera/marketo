@@ -27,10 +27,12 @@ type CategoryPageProps = {
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  const catalog = await getCategoryReferences();
+  const [{ slug }, catalog, { locale }] = await Promise.all([
+    params,
+    getCategoryReferences(),
+    getServerI18n(),
+  ]);
   const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), slug);
-  const { locale } = await getServerI18n();
   const name = category ? localize(category.name, locale) : "";
   return catalog.status !== "ready" ? { robots: { index: false, follow: true } } : category ? {
     title: `${name} — Marketo`,
@@ -45,16 +47,18 @@ export default function CategoryPage(props: CategoryPageProps) {
 }
 
 async function CategoryPageContent({ params, searchParams }: CategoryPageProps) {
-  const { slug } = await params;
-  const catalog = await getCategoryReferences();
+  const [{ slug }, parsed, catalog, { locale, t }] = await Promise.all([
+    params,
+    searchParams.then(parseCatalogSearchParams),
+    getCategoryReferences(),
+    getServerI18n(),
+  ]);
   const view = createCategoryCatalogView(catalog.data);
   const category = getCategoryBySlug(view, slug);
   if (catalog.status === "ready" && !category) notFound();
-  const { locale, t } = await getServerI18n();
   if (!category) {
     return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/help" actionLabel={t("nav.help")} /></main><MobileNav /></>;
   }
-  const parsed = parseCatalogSearchParams(await searchParams);
   const requestedCategory = getCategoryBySlug(view, parsed.categorySlug);
   const filteredCategory = requestedCategory && isCategoryWithin(view, requestedCategory.slug, category.slug)
     ? requestedCategory

@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { listHomeCategories } from "../lib/data/supabase/categories.ts";
+import { listActiveCategories, listHomeCategories } from "../lib/data/supabase/categories.ts";
 import { resolveAuthenticatedUserId } from "../lib/data/supabase/authenticated-user.ts";
 import { fetchHomeListingPreview } from "../lib/data/home-listing-preview.ts";
-import { listPublishedListingPreview } from "../lib/data/supabase/listings.ts";
+import { readListingAttributePreview } from "../lib/data/listing-filter-preview.ts";
+import { listPublishedListingCards, listPublishedListingPreview } from "../lib/data/supabase/listings.ts";
 
 const root = new URL("../", import.meta.url);
 
@@ -72,6 +73,29 @@ function previewClient(rows, responseError = null) {
   };
 }
 
+function catalogPageOneClient(response) {
+  const calls = [];
+  const request = {
+    order(column, options) {
+      calls.push({ operation: "order", column, options });
+      return this;
+    },
+    async range(from, to) {
+      calls.push({ operation: "range", from, to });
+      return response;
+    },
+  };
+  return {
+    calls,
+    client: {
+      rpc(name, args, options) {
+        calls.push({ operation: "rpc", name, args, options });
+        return request;
+      },
+    },
+  };
+}
+
 test("Home listing preview is one bounded data RPC without exact count or attribute hydration", async () => {
   const fixture = previewClient(Array.from({ length: 20 }, (_, index) => listingRow(index + 1)));
   const rows = await listPublishedListingPreview(fixture.client, { limit: 12 });
@@ -103,6 +127,48 @@ test("Home listing preview remains bounded and propagates data failures", async 
   await assert.rejects(listPublishedListingPreview(failed.client), (error) => error === expected);
 });
 
+test("catalog page one combines exact count and data in one RPC", async () => {
+  const rows = [listingRow(1), listingRow(2)];
+  const fixture = catalogPageOneClient({ data: rows, error: null, count: rows.length });
+
+  const page = await listPublishedListingCards(fixture.client, { page: 1, limit: 60 });
+  assert.equal(page.total, 2);
+  assert.equal(page.state, "ready");
+  assert.deepEqual(page.items, rows);
+  assert.deepEqual(fixture.calls.filter((call) => call.operation === "rpc").map((call) => call.options), [
+    { count: "exact" },
+  ]);
+  assert.deepEqual(fixture.calls.filter((call) => call.operation === "range"), [
+    { operation: "range", from: 0, to: 59 },
+  ]);
+});
+
+test("catalog page-one fast path handles empty, continued and malformed count responses", async () => {
+  const emptyFixture = catalogPageOneClient({ data: [], error: null, count: 0 });
+  const empty = await listPublishedListingCards(emptyFixture.client, { page: 1, limit: 24 });
+  assert.deepEqual(empty, {
+    items: [], total: 0, page: 1, totalPages: 0, nextPage: null, state: "empty",
+  });
+  assert.equal(emptyFixture.calls.filter((call) => call.operation === "rpc").length, 1);
+
+  const continuedRows = Array.from({ length: 60 }, (_, index) => listingRow(index + 1));
+  const continuedFixture = catalogPageOneClient({ data: continuedRows, error: null, count: 61 });
+  const continued = await listPublishedListingCards(continuedFixture.client, { page: 1, limit: 60 });
+  assert.equal(continued.totalPages, 2);
+  assert.equal(continued.nextPage, 2);
+  assert.equal(continued.items.length, 60);
+
+  for (const response of [
+    { data: [], error: null, count: null },
+    { data: [], error: null, count: -1 },
+    { data: null, error: null, count: 0 },
+    { data: [listingRow(1)], error: null, count: 0 },
+  ]) {
+    const malformed = catalogPageOneClient(response);
+    await assert.rejects(listPublishedListingCards(malformed.client, { page: 1 }));
+  }
+});
+
 test("browser Home preview is request-driven, no-store and rejects malformed/error responses", async () => {
   const calls = [];
   const expected = listingSummary();
@@ -119,7 +185,7 @@ test("browser Home preview is request-driven, no-store and rejects malformed/err
   await assert.rejects(fetchHomeListingPreview(undefined, async () => Response.json({ items: [{ id: "incomplete" }] })), /home_listing_preview_failed/);
 });
 
-test("Home category query loads only roots and their immediate children", async () => {
+test("Home category query starts both bounded hierarchy pages without a sequential waterfall", async () => {
   const rootRows = [
     { id: "root-a", parent_id: null, sort_order: 1 },
     { id: "root-b", parent_id: null, sort_order: 2 },
@@ -134,7 +200,7 @@ test("Home category query loads only roots and their immediate children", async 
     from(table) {
       const currentQuery = queryNumber++;
       calls.push({ operation: "from", table, currentQuery });
-      const result = currentQuery === 0 ? rootRows : childRows;
+      const result = currentQuery === 0 ? rootRows : currentQuery === 1 ? childRows : [];
       const builder = {
         select(columns) {
           calls.push({ operation: "select", columns, currentQuery });
@@ -148,15 +214,14 @@ test("Home category query loads only roots and their immediate children", async 
           calls.push({ operation: "is", column, value, currentQuery });
           return this;
         },
-        in(column, values) {
-          calls.push({ operation: "in", column, values, currentQuery });
-          return this;
-        },
         order() {
           return this;
         },
         async range(from, to) {
           calls.push({ operation: "range", from, to, currentQuery });
+          if (currentQuery === 2) {
+            return { data: null, error: { code: "PGRST103", message: "Requested range not satisfiable" } };
+          }
           return { data: result, error: null };
         },
         then(resolve, reject) {
@@ -172,15 +237,96 @@ test("Home category query loads only roots and their immediate children", async 
     { ...rootRows[0], child_count: 1 },
     { ...rootRows[1], child_count: 1 },
   ]);
-  assert.deepEqual(calls.filter((call) => call.operation === "in"), [{
-    operation: "in",
-    column: "parent_id",
-    values: ["root-a", "root-b"],
-    currentQuery: 1,
-  }]);
-  assert.equal(calls.filter((call) => call.operation === "range").length, 1);
+  assert.equal(calls.filter((call) => call.operation === "range").length, 2);
   assert.equal(calls.some((call) => call.operation === "range" && call.currentQuery === 0), false);
-  assert.deepEqual(calls.filter((call) => call.operation === "select" && call.currentQuery === 1).map((call) => call.columns), ["id, parent_id"]);
+  assert.deepEqual(calls.filter((call) => call.operation === "range").map(({ from, to }) => ({ from, to })), [
+    { from: 0, to: 999 },
+    { from: 1000, to: 1999 },
+  ]);
+  assert.deepEqual(calls.filter((call) => call.operation === "select" && call.currentQuery !== 0).map((call) => call.columns), ["id, parent_id", "id, parent_id"]);
+});
+
+test("full category reference pages are requested concurrently and continue in bounded waves", async () => {
+  const pending = [];
+  const client = {
+    from() {
+      return {
+        select() { return this; },
+        eq() { return this; },
+        order() { return this; },
+        range(from, to) {
+          return new Promise((resolve) => pending.push({ from, to, resolve }));
+        },
+      };
+    },
+  };
+
+  const loading = listActiveCategories(client);
+  await Promise.resolve();
+  assert.equal(pending.length, 2, "both Supabase pages must start before either resolves");
+  assert.deepEqual(pending.map(({ from, to }) => ({ from, to })), [
+    { from: 0, to: 999 },
+    { from: 1000, to: 1999 },
+  ]);
+  pending[0].resolve({ data: [{ id: "root" }], error: null });
+  pending[1].resolve({ data: null, error: { code: "PGRST103", message: "Requested range not satisfiable" } });
+  assert.deepEqual(await loading, [{ id: "root" }]);
+
+  const ranges = [];
+  const continuedClient = {
+    from() {
+      return {
+        select() { return this; },
+        eq() { return this; },
+        order() { return this; },
+        async range(from, to) {
+          ranges.push({ from, to });
+          if (from === 3_000) {
+            return { data: null, error: { code: "PGRST103", message: "Requested range not satisfiable" } };
+          }
+          const length = from < 2_000 ? 1_000 : from === 2_000 ? 1 : 0;
+          return {
+            data: Array.from({ length }, (_, index) => ({ id: `${from + index}` })),
+            error: null,
+          };
+        },
+      };
+    },
+  };
+  const continued = await listActiveCategories(continuedClient);
+  assert.equal(continued.length, 2_001);
+  assert.deepEqual(ranges, [
+    { from: 0, to: 999 },
+    { from: 1_000, to: 1_999 },
+    { from: 2_000, to: 2_999 },
+    { from: 3_000, to: 3_999 },
+  ]);
+
+  const failedClient = {
+    from() {
+      return {
+        select() { return this; },
+        eq() { return this; },
+        order() { return this; },
+        async range(from) {
+          return from === 0
+            ? { data: [], error: { code: "08006", message: "connection failure" } }
+            : { data: null, error: { code: "PGRST103", message: "Requested range not satisfiable" } };
+        },
+      };
+    },
+  };
+  await assert.rejects(listActiveCategories(failedClient), (error) => (
+    error?.code === "08006" && error?.message === "connection failure"
+  ));
+});
+
+test("missing card attributes remain visible until authoritative server filter navigation", () => {
+  assert.deepEqual(readListingAttributePreview(undefined, "brand"), { known: false });
+  assert.deepEqual(readListingAttributePreview({}, "brand"), { known: false });
+  assert.deepEqual(readListingAttributePreview({ brand: "toyota" }, "brand"), { known: true, value: "toyota" });
+  assert.deepEqual(readListingAttributePreview({ electric: false }, "electric"), { known: true, value: false });
+  assert.deepEqual(readListingAttributePreview({ year: 0 }, "year"), { known: true, value: 0 });
 });
 
 test("Home initial render omits listing I/O and loads a bounded preview only after tab intent", async () => {
@@ -209,7 +355,11 @@ test("Home initial render omits listing I/O and loads a bounded preview only aft
 
   const previewMethod = repositories.match(/async\s+preview[\s\S]*?\n\s*},\n\s*async\s+list/)?.[0] ?? "";
   assert.doesNotMatch(previewMethod, /hydrateAttributes|getListingAttributeRecords/);
-  assert.match(repositories, /async\s+list[\s\S]*?listPublishedListingCards[\s\S]*?hydrateAttributes/);
+  const listMethod = repositories.match(/async\s+list[\s\S]*?\n\s*},\n\s*async\s+favorites/)?.[0] ?? "";
+  assert.match(listMethod, /listPublishedListingCards/);
+  assert.doesNotMatch(listMethod, /hydrateAttributes|getListingAttributeRecords/);
+  const catalogClient = await readFile(new URL("components/catalog-client.tsx", root), "utf8");
+  assert.match(catalogClient, /readListingAttributePreview\(item\.attributes, attributeKey\)/);
 });
 
 test("listing cards defer the Supabase browser SDK until favorite state is requested", async () => {

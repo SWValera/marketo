@@ -19,10 +19,20 @@ const ids = {
   carBrandToyota: "30000000-0000-4000-8000-000000000001",
   jobEmployment: "20000000-0000-4000-8000-000000000002",
   serviceVisit: "20000000-0000-4000-8000-000000000003",
+  electronicsStorage: "20000000-0000-4000-8000-000000000004",
   seller: "5abcdef0-0000-4000-8000-000000000001",
   emptySeller: "5abcdef0-0000-4000-8000-000000000002",
   missingSeller: "5abcdef0-0000-4000-8000-000000000003",
   errorSeller: "5abcdef0-0000-4000-8000-000000000004",
+};
+
+const electronicsCategoryRelation = {
+  id: ids.electronics,
+  slug: "electronics",
+  name_ru: "Электроника",
+  name_kk: "Электроника",
+  search_placeholder_ru: "Например, iPhone 15",
+  search_placeholder_kk: "Мысалы, iPhone 15",
 };
 
 const sellerListingRows = Array.from({ length: 49 }, (_, index) => ({
@@ -30,6 +40,7 @@ const sellerListingRows = Array.from({ length: 49 }, (_, index) => ({
   owner_id: ids.seller,
   slug: `seller-offer-${index + 1}`,
   title: `Seller offer ${index + 1}`,
+  description: `Seller offer ${index + 1} description`,
   price_minor: 1000 + index,
   currency_code: "KZT",
   category_id: ids.electronics,
@@ -38,9 +49,37 @@ const sellerListingRows = Array.from({ length: 49 }, (_, index) => ({
   promoted_until: null,
   status: "active",
   deleted_at: null,
-  categories: { slug: "electronics" },
+  categories: { ...electronicsCategoryRelation },
   settlements: { id: ids.astana, name_ru: "Астана", name_kk: "Астана" },
   listing_images: [{ storage_key: `seller/offer-${index + 1}.jpg`, sort_order: 0 }],
+}));
+
+const invalidCategoryRelationListing = {
+  ...sellerListingRows[0],
+  id: "60000000-0000-4000-9000-000000000001",
+  owner_id: ids.missingSeller,
+  slug: "invalid-category-relation",
+  categories: {
+    ...electronicsCategoryRelation,
+    id: ids.transport,
+    slug: "transport",
+  },
+};
+
+const catalogListingRows = sellerListingRows.slice(0, 2).map((row) => ({
+  id: row.id,
+  slug: row.slug,
+  title: row.title,
+  price_minor: row.price_minor,
+  currency_code: row.currency_code,
+  category_id: row.category_id,
+  category_slug: row.categories.slug,
+  settlement_id: row.settlement_id,
+  location_name_ru: row.settlements.name_ru,
+  location_name_kk: row.settlements.name_kk,
+  published_at: row.published_at,
+  promoted: false,
+  primary_image_storage_key: row.listing_images[0].storage_key,
 }));
 
 const referenceTables = {
@@ -64,6 +103,7 @@ const referenceTables = {
     { id: ids.carBrand, category_id: ids.cars, key: "brand", label_ru: "Марка", label_kk: "Маркасы", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
     { id: ids.jobEmployment, category_id: ids.jobs, key: "employment", label_ru: "Тип занятости", label_kk: "Жұмыспен қамту түрі", data_type: "select", unit_ru: null, unit_kk: null, is_required: true, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
     { id: ids.serviceVisit, category_id: ids.services, key: "visit", label_ru: "Выезд к клиенту", label_kk: "Клиентке бару", data_type: "boolean", unit_ru: null, unit_kk: null, is_required: false, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "exact", options_load_mode: "eager", depends_on_key: null, is_visible: true, sort_order: 10 },
+    { id: ids.electronicsStorage, category_id: ids.electronics, key: "storage", label_ru: "Память", label_kk: "Жад", data_type: "number", unit_ru: "ГБ", unit_kk: "ГБ", is_required: false, is_filterable: true, is_searchable: false, inherits_to_children: false, validation: {}, filter_mode: "range", options_load_mode: "eager", depends_on_key: null, is_active: true, is_visible: true, sort_order: 20 },
   ],
   category_attribute_options: [
     { id: ids.carBrandToyota, attribute_id: ids.carBrand, parent_option_id: null, value: "toyota", label_ru: "Toyota", label_kk: "Toyota", sort_order: 10 },
@@ -72,7 +112,19 @@ const referenceTables = {
     { id: ids.seller, display_name: "SEO Seller", avatar_path: `avatars/${ids.seller}/profile.webp`, settlement_id: ids.astana, bio: null, verified_at: null },
     { id: ids.emptySeller, display_name: "Empty Seller", avatar_path: null, settlement_id: ids.astana, bio: null, verified_at: null },
   ],
-  listings: sellerListingRows,
+  listings: [...sellerListingRows, invalidCategoryRelationListing],
+  listing_attribute_values: [{
+    listing_id: sellerListingRows[0].id,
+    attribute_id: ids.electronicsStorage,
+    text_value: null,
+    number_value: 256,
+    boolean_value: null,
+    date_value: null,
+    number_min_value: null,
+    number_max_value: null,
+  }],
+  listing_attribute_option_values: [],
+  search_catalog_listing_cards: catalogListingRows,
 };
 
 for (let index = referenceTables.categories.length; index < 1356; index += 1) {
@@ -132,6 +184,11 @@ globalThis.fetch = async (input, init) => {
   if (attributeIds?.startsWith("in.(")) {
     const allowed = new Set(attributeIds.slice(4, -1).split(","));
     rows = rows.filter((row) => allowed.has(row.attribute_id));
+  }
+  const listingIds = requestUrl.searchParams.get("listing_id");
+  if (listingIds?.startsWith("in.(")) {
+    const allowed = new Set(listingIds.slice(4, -1).split(","));
+    rows = rows.filter((row) => allowed.has(row.listing_id));
   }
   const requestMethod = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const requestHeaders = new Headers(input instanceof Request ? input.headers : undefined);
@@ -266,6 +323,34 @@ test("core routes render through the production worker", async () => {
   }
 });
 
+test("listing detail uses its validated category relation and populated public characteristics", async () => {
+  const listing = sellerListingRows[0];
+  const path = `/listing/${listing.id}-${listing.slug}`;
+  const categoryCallsBefore = supabaseRequestCounts.get("/rest/v1/categories") ?? 0;
+
+  const ru = await render(path, "ru");
+  assert.equal(ru.response.status, 200);
+  assert.match(ru.html, /Seller offer 1/);
+  assert.match(ru.html, /Электроника/);
+  assert.match(ru.html, /Память/);
+  assert.match(ru.html, /256 ГБ/);
+  assert.match(ru.html, /Например, iPhone 15/);
+
+  const kk = await render(path, "kk");
+  assert.equal(kk.response.status, 200);
+  assert.match(kk.html, /Жад/);
+  assert.match(kk.html, /256 ГБ/);
+  assert.match(kk.html, /Мысалы, iPhone 15/);
+  assert.equal(supabaseRequestCounts.get("/rest/v1/categories") ?? 0, categoryCallsBefore,
+    "listing detail must not load the full category catalog");
+
+  const invalidPath = `/listing/${invalidCategoryRelationListing.id}-${invalidCategoryRelationListing.slug}`;
+  const invalid = await render(invalidPath);
+  assert.notEqual(invalid.response.status, 404);
+  assert.match(invalid.html, /Не удалось загрузить страницу/);
+  assert.doesNotMatch(invalid.html, /Seller offer 1 description/);
+});
+
 test("Home listing preview stays idle until its explicit public API request", async () => {
   const rpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
   const before = supabaseRequestCounts.get(rpcPath) ?? 0;
@@ -274,7 +359,9 @@ test("Home listing preview stays idle until its explicit public API request", as
   }), env, ctx);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { items: [] });
+  const payload = await response.json();
+  assert.equal(payload.items.length, 2);
+  assert.deepEqual(payload.items.map((item) => item.id), catalogListingRows.map((item) => item.id));
   assert.equal((supabaseRequestCounts.get(rpcPath) ?? 0) - before, 1);
 });
 

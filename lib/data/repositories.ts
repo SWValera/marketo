@@ -16,6 +16,7 @@ import { cache } from "react";
 import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
+import type { CategoryAttributeDataType } from "@/lib/reference-data/types";
 import { createSupabasePublicServerClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { tryGetServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 import { getPublicSellerProfile } from "@/lib/data/supabase/profiles";
@@ -75,7 +76,10 @@ function dateLabel(value: string | null, locale: Locale) {
 
 async function hydrateAttributes(listingIds: string[], locale: Locale) {
   const result = await getListingAttributeRecords(createSupabasePublicServerClient(), listingIds);
-  const attributesById = new Map(result.attributes.map((row) => [row.id, row]));
+  const publicAttributes = result.attributes
+    .filter((row) => row.is_active && row.is_visible)
+    .sort((left, right) => left.sort_order - right.sort_order || left.id.localeCompare(right.id));
+  const attributesById = new Map(publicAttributes.map((row) => [row.id, row]));
   const optionsById = new Map(result.options.map((row) => [row.id, row]));
   const stable = new Map<string, Record<string, string | number | boolean>>();
   const display = new Map<string, Record<string, string>>();
@@ -101,7 +105,18 @@ async function hydrateAttributes(listingIds: string[], locale: Locale) {
     const currentDisplay = ensure<Record<string, string>>(display, row.listing_id, () => ({}));
     currentDisplay[definition.key] = currentDisplay[definition.key] ? `${currentDisplay[definition.key]}, ${localized}` : localized;
   }
-  return { stable, display };
+  return {
+    stable,
+    display,
+    definitions: publicAttributes.map((attribute) => ({
+      key: attribute.key,
+      label: { ru: attribute.label_ru, kk: attribute.label_kk },
+      dataType: attribute.data_type as CategoryAttributeDataType,
+      unit: attribute.unit_ru && attribute.unit_kk
+        ? { ru: attribute.unit_ru, kk: attribute.unit_kk }
+        : null,
+    })),
+  };
 }
 
 type CatalogListingCardRow = Awaited<ReturnType<typeof listPublishedListingPreview>>[number];
@@ -150,9 +165,19 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
   const client = createSupabasePublicServerClient();
   const row = await getListingDetailByRouteKey(client, slug);
   if (!row) return null;
-  const category = row.categories as unknown as { slug?: string } | null;
+  const category = row.categories as unknown as {
+    id?: string;
+    slug?: string;
+    name_ru?: string;
+    name_kk?: string;
+    search_placeholder_ru?: string | null;
+    search_placeholder_kk?: string | null;
+  } | null;
   const settlement = row.settlements as unknown as { id?: string; name_ru?: string; name_kk?: string } | null;
-  if (!row.id || !row.slug || !row.title || typeof row.description !== "string" || !category?.slug || !settlement?.id || !row.owner_id) {
+  if (!row.id || !row.slug || !row.title || typeof row.description !== "string"
+    || !row.category_id || !category?.id || category.id !== row.category_id
+    || !category.slug || !category.name_ru || !category.name_kk
+    || !settlement?.id || !row.owner_id) {
     throw new PublicListingDataError("INVALID_ROW");
   }
   const [hydrated, seller] = await Promise.all([
@@ -168,6 +193,11 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
     slug: row.slug,
     title: row.title,
     description: row.description,
+    categoryId: row.category_id,
+    categoryName: { ru: category.name_ru, kk: category.name_kk },
+    categorySearchPlaceholder: category.search_placeholder_ru && category.search_placeholder_kk
+      ? { ru: category.search_placeholder_ru, kk: category.search_placeholder_kk }
+      : null,
     priceLabel: price.label,
     priceAmount: price.amount,
     locationLabel: locale === "kk" ? settlement.name_kk ?? settlement.name_ru ?? "" : settlement.name_ru ?? settlement.name_kk ?? "",
@@ -178,6 +208,7 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
     promoted: Boolean(row.promoted_until && new Date(row.promoted_until) > new Date()),
     attributes: hydrated.stable.get(row.id) ?? {},
     attributeDisplayValues: hydrated.display.get(row.id) ?? {},
+    attributeDefinitions: hydrated.definitions,
     sellerId: row.owner_id,
     sellerName: seller.display_name,
     contactPhone: null,
@@ -199,9 +230,12 @@ export const listingRepository = {
     const locale = filters.locale ?? "ru";
     const page = await listPublishedListingCards(createSupabasePublicServerClient(), filters);
     const rows = validateCatalogListingRows(page.items);
-    const hydrated = await hydrateAttributes(rows.map((row) => row.id), locale);
     return {
-      items: rows.map((row) => mapCatalogListingSummary(row, locale, hydrated.stable.get(row.id) ?? {})),
+      // Attribute filters are already applied by the catalog RPC. Card payloads
+      // do not render attributes, so hydrating them here only creates extra
+      // sequential database waves. The client keeps unknown preview values
+      // visible until the user applies the next authoritative server query.
+      items: rows.map((row) => mapCatalogListingSummary(row, locale)),
       total: page.total,
       nextCursor: page.nextPage === null ? null : String(page.nextPage),
       page: page.page,

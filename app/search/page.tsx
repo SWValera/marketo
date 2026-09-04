@@ -9,6 +9,7 @@ import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
 import { createCategoryCatalogView, getCategoryBySlug, getCategoryDescendantIds, getCategoryRoot } from "@/lib/reference-data/catalog";
 import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
+import { EMPTY_CATEGORIES } from "@/lib/reference-data/types";
 
 export const metadata: Metadata = {
   title: "Каталог объявлений",
@@ -19,15 +20,15 @@ export const metadata: Metadata = {
 export default async function SearchPage({ searchParams }: { searchParams: Promise<CatalogSearchParams> }) {
   const parsed = parseCatalogSearchParams(await searchParams);
   const [catalog, i18n] = await Promise.all([
-    getCategoryReferences(),
+    parsed.categorySlug ? getCategoryReferences() : Promise.resolve(null),
     getServerI18n(),
   ]);
-  const view = createCategoryCatalogView(catalog.data);
+  const view = createCategoryCatalogView(catalog?.data ?? EMPTY_CATEGORIES);
   const category = getCategoryBySlug(view, parsed.categorySlug);
   const rootCategory = getCategoryRoot(view, category);
   const { locale, t } = i18n;
-  if (parsed.categorySlug && (catalog.status !== "ready" || !category)) {
-    const unavailable = catalog.status !== "ready";
+  if (parsed.categorySlug && (catalog?.status !== "ready" || !category)) {
+    const unavailable = catalog?.status !== "ready";
     return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState
       title={unavailable ? t("reference.categoriesUnavailableTitle") : t("catalog.emptyTitle")}
       description={unavailable ? t("reference.categoriesUnavailable") : t("catalog.emptyDescription")}

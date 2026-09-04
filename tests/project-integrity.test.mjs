@@ -116,7 +116,7 @@ test("mobile category selection renders one Supabase-backed level and catalog fi
   assert.match(cascade, /getCategoryChildren\(view, parent\)/);
   assert.match(catalog, /<CategoryCascade/);
   assert.match(catalog, /isCategoryWithin\(catalogView, item\.categorySlug, categorySlug\)/);
-  assert.match(catalog, /item\.attributes\?\.\[attributeKey\]/);
+  assert.match(catalog, /readListingAttributePreview\(item\.attributes, attributeKey\)/);
   assert.match(catalog, /params\.set\(`f_\$\{key\}`/);
   assert.match(catalog, /document\.body\.style\.overflow = "hidden"/);
   assert.match(picker, /window\.visualViewport/);
@@ -223,7 +223,9 @@ test("listing reads use Supabase while disconnected user domains stay honest and
   assert.match(repositories, /listPublishedListingCards\(createSupabasePublicServerClient\(\), filters\)/);
   assert.match(repositories, /const client = createSupabasePublicServerClient\(\)/);
   assert.match(repositories, /getListingDetailByRouteKey\(client, slug\)/);
-  assert.match(repositories, /hydrateAttributes\(rows\.map\(\(row\) => row\.id\), locale\)/);
+  assert.match(repositories, /hydrateAttributes\(\[row\.id\], locale\)/);
+  const catalogListMethod = repositories.match(/async\s+list[\s\S]*?\n\s*},\n\s*async\s+favorites/)?.[0] ?? "";
+  assert.doesNotMatch(catalogListMethod, /hydrateAttributes|getListingAttributeRecords/);
   assert.match(listings, /from\("listing_attribute_values"\)/);
   assert.match(listings, /from\("listing_attribute_option_values"\)/);
   for (const adapter of ["profileRepository", "chatRepository", "notificationRepository", "moderationRepository"]) {

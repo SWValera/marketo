@@ -3,6 +3,8 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { CategoryPriceMode, CategoryReferenceData } from "@/lib/reference-data/types";
 
 const CATEGORY_COLUMNS = "id, parent_id, slug, name_ru, name_kk, icon_key, tone_key, search_placeholder_ru, search_placeholder_kk, title_placeholder_ru, title_placeholder_kk, description_hint_ru, description_hint_kk, price_mode, sort_order" as const;
+const CATEGORY_REFERENCE_PAGE_SIZE = 1000;
+const CATEGORY_REFERENCE_PAGE_CONCURRENCY = 2;
 
 type CategoryReferenceRow = Pick<
   Database["public"]["Tables"]["categories"]["Row"],
@@ -24,6 +26,40 @@ type CategoryReferenceRow = Pick<
 >;
 
 export type HomeCategoryReferenceRow = CategoryReferenceRow & { child_count: number };
+
+function isUnsatisfiedPositiveRange(error: unknown, from: number) {
+  return from > 0
+    && typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "PGRST103";
+}
+
+async function collectCategoryReferencePages<Row>(
+  loadPage: (from: number, to: number) => Promise<Row[]>,
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  const batchSize = CATEGORY_REFERENCE_PAGE_SIZE * CATEGORY_REFERENCE_PAGE_CONCURRENCY;
+
+  for (let batchStart = 0; ; batchStart += batchSize) {
+    const pages = await Promise.all(
+      Array.from({ length: CATEGORY_REFERENCE_PAGE_CONCURRENCY }, (_, index) => {
+        const from = batchStart + index * CATEGORY_REFERENCE_PAGE_SIZE;
+        return loadPage(from, from + CATEGORY_REFERENCE_PAGE_SIZE - 1);
+      }),
+    );
+
+    const firstIncompletePage = pages.findIndex((page) => page.length < CATEGORY_REFERENCE_PAGE_SIZE);
+    if (firstIncompletePage >= 0) {
+      const hasRowsAfterGap = pages.slice(firstIncompletePage + 1).some((page) => page.length > 0);
+      if (hasRowsAfterGap) throw new Error("category_reference_pagination_inconsistent");
+      rows.push(...pages.slice(0, firstIncompletePage + 1).flat());
+      return rows;
+    }
+
+    rows.push(...pages.flat());
+  }
+}
 
 export function mapCategoryReferenceRows(rows: readonly CategoryReferenceRow[]): CategoryReferenceData {
   return {
@@ -58,9 +94,7 @@ export async function listCategoryLevel(client: MarketoSupabaseClient, parentId:
 }
 
 export async function listActiveCategories(client: MarketoSupabaseClient) {
-  const rows = [];
-  const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
+  return collectCategoryReferencePages(async (from, to) => {
     const { data, error } = await client
       .from("categories")
       .select(CATEGORY_COLUMNS)
@@ -68,45 +102,54 @@ export async function listActiveCategories(client: MarketoSupabaseClient) {
       .order("sort_order")
       .order("name_ru")
       .order("id")
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    rows.push(...data);
-    if (data.length < pageSize) return rows;
-  }
+      .range(from, to);
+    if (error) {
+      if (isUnsatisfiedPositiveRange(error, from)) return [];
+      throw error;
+    }
+    return data;
+  });
 }
 
-/**
- * The Home page needs root tiles and only their immediate child counts. Loading
- * every leaf adds more than a thousand irrelevant rows to its cold path.
- */
-export async function listHomeCategories(client: MarketoSupabaseClient): Promise<HomeCategoryReferenceRow[]> {
-  const roots = await listCategoryLevel(client, null);
-  if (roots.length === 0) return [];
-
-  const children: Array<{ id: string; parent_id: string | null }> = [];
-  const pageSize = 1000;
-  const rootIds = roots.map((category) => category.id);
-  for (let from = 0; ; from += pageSize) {
+async function listActiveCategoryParents(client: MarketoSupabaseClient) {
+  return collectCategoryReferencePages(async (from, to) => {
     const { data, error } = await client
       .from("categories")
       .select("id, parent_id")
       .eq("is_active", true)
-      .in("parent_id", rootIds)
       .order("id")
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    children.push(...data);
-    if (data.length < pageSize) {
-      const childCounts = new Map<string, number>();
-      for (const child of children) {
-        if (child.parent_id) childCounts.set(child.parent_id, (childCounts.get(child.parent_id) ?? 0) + 1);
-      }
-      return roots.map((category) => ({
-        ...category,
-        child_count: childCounts.get(category.id) ?? 0,
-      }));
+      .range(from, to);
+    if (error) {
+      if (isUnsatisfiedPositiveRange(error, from)) return [];
+      throw error;
+    }
+    return data;
+  });
+}
+
+/**
+ * The Home page needs full root presentation rows and immediate child counts.
+ * A compact id/parent hierarchy is loaded beside the roots in the same network
+ * wave, avoiding both full leaf presentation payloads and a serial child query.
+ */
+export async function listHomeCategories(client: MarketoSupabaseClient): Promise<HomeCategoryReferenceRow[]> {
+  const [roots, hierarchy] = await Promise.all([
+    listCategoryLevel(client, null),
+    listActiveCategoryParents(client),
+  ]);
+  if (roots.length === 0) return [];
+
+  const rootIds = new Set(roots.map((category) => category.id));
+  const childCounts = new Map<string, number>();
+  for (const category of hierarchy) {
+    if (category.parent_id && rootIds.has(category.parent_id)) {
+      childCounts.set(category.parent_id, (childCounts.get(category.parent_id) ?? 0) + 1);
     }
   }
+  return roots.map((category) => ({
+    ...category,
+    child_count: childCounts.get(category.id) ?? 0,
+  }));
 }
 
 export async function getCategoryAttributes(client: MarketoSupabaseClient, categoryId: string) {

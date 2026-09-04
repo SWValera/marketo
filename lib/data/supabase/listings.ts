@@ -35,8 +35,12 @@ function catalogSearchArguments(filters: ListingQuery) {
   };
 }
 
-function orderedCatalogRequest(client: MarketoSupabaseClient, filters: ListingQuery) {
-  let request = client.rpc("search_catalog_listing_cards", catalogSearchArguments(filters));
+function orderedCatalogRequest(
+  client: MarketoSupabaseClient,
+  filters: ListingQuery,
+  options?: { count: "exact" },
+) {
+  let request = client.rpc("search_catalog_listing_cards", catalogSearchArguments(filters), options);
   if (filters.sort === "cheap") {
     request = request.order("price_minor", { ascending: true, nullsFirst: false });
   } else if (filters.sort === "expensive") {
@@ -50,6 +54,25 @@ function orderedCatalogRequest(client: MarketoSupabaseClient, filters: ListingQu
 export async function listPublishedListingCards(client: MarketoSupabaseClient, filters: ListingQuery = {}) {
   const pageSize = normalizePageSize(filters.limit, 24, 60);
   const page = normalizePositivePage(filters.page);
+  if (page === 1) {
+    const response = await orderedCatalogRequest(client, filters, { count: "exact" }).range(0, pageSize - 1);
+    if (response.error) throw response.error;
+    if (!Number.isSafeInteger(response.count) || (response.count ?? -1) < 0) {
+      throw new Error("catalog_listing_count_unavailable");
+    }
+    if (!Array.isArray(response.data)) throw new Error("catalog_listing_page_invalid");
+    const total = response.count as number;
+    const expectedLength = Math.min(pageSize, total);
+    if (response.data.length !== expectedLength) throw new Error("catalog_listing_page_inconsistent");
+    return {
+      items: response.data,
+      total,
+      page,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
+      nextPage: total > pageSize ? 2 : null,
+      state: total === 0 ? "empty" as const : "ready" as const,
+    };
+  }
   const countResponse = await client.rpc(
     "search_catalog_listing_cards",
     catalogSearchArguments(filters),
@@ -296,7 +319,7 @@ export async function getListingDetailByRouteKey(client: MarketoSupabaseClient, 
   const uuidPrefix = routeKey.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:-|$)/i)?.[0].slice(0, 36);
   let request = client
     .from("listings")
-    .select("*, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
+    .select("*, categories(id, slug, name_ru, name_kk, search_placeholder_ru, search_placeholder_kk), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
     .order("sort_order", { referencedTable: "listing_images" })
     .limit(1, { referencedTable: "listing_images" });
   request = uuidPrefix ? request.eq("id", uuidPrefix) : request.eq("slug", routeKey);
@@ -317,7 +340,7 @@ export async function getListingAttributeRecords(client: MarketoSupabaseClient, 
   const optionIds = [...new Set(optionResult.data.map((row) => row.option_id))];
   const [attributeResult, optionsResult] = await Promise.all([
     attributeIds.length
-      ? client.from("category_attributes").select("id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, sort_order").in("id", attributeIds)
+      ? client.from("category_attributes").select("id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, is_active, is_visible, sort_order").in("id", attributeIds)
       : Promise.resolve({ data: [], error: null }),
     optionIds.length
       ? client.from("category_attribute_options").select("id, value, label_ru, label_kk").in("id", optionIds)

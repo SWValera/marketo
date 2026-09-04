@@ -11,8 +11,6 @@ import { ListingActions } from "@/components/listing-actions";
 import { listingRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
-import { createCategoryCatalogView, getCategoryBySlug } from "@/lib/reference-data/catalog";
-import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
 
 type ListingPageProps = { params: Promise<{ slug: string }> };
 
@@ -26,8 +24,7 @@ function metadataDescription(value: string) {
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  const { locale } = await getServerI18n();
+  const [{ slug }, { locale }] = await Promise.all([params, getServerI18n()]);
   const listing = await listingRepository.findBySlug(slug, locale);
   if (!listing) notFound();
   const canonical = canonicalListingPath(listing);
@@ -44,22 +41,18 @@ export default function ListingPage(props: ListingPageProps) {
 }
 
 async function ListingPageContent({ params }: ListingPageProps) {
-  const { slug } = await params;
-  const { locale, t } = await getServerI18n();
+  const [{ slug }, { locale, t }] = await Promise.all([params, getServerI18n()]);
   const listing = await listingRepository.findBySlug(slug, locale);
   if (!listing) notFound();
   const canonicalPath = canonicalListingPath(listing);
   if (`/listing/${slug}` !== canonicalPath) permanentRedirect(canonicalPath);
-  const catalog = await getCategoryReferences();
-  const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), listing.categorySlug);
-  const categoryAttributes = category ? await getCategoryAttributeReferences(category.id) : undefined;
-  const characteristics = (categoryAttributes?.data.attributes ?? []).flatMap((attribute) => {
+  const characteristics = listing.attributeDefinitions.flatMap((attribute) => {
     const raw = listing.attributes[attribute.key];
     if (raw === undefined || raw === false || raw === "") return [];
-    const option = attribute.options.find((item) => item.value === raw);
-    const value = attribute.dataType === "boolean" ? t("common.yes") : listing.attributeDisplayValues?.[attribute.key] ?? (option ? localize(option.label, locale) : String(raw));
+    const value = attribute.dataType === "boolean" ? t("common.yes") : listing.attributeDisplayValues?.[attribute.key] ?? String(raw);
     return [{ label: localize(attribute.label, locale), value: `${value}${attribute.unit ? ` ${localize(attribute.unit, locale)}` : ""}` }];
   });
   const fallback = `/category/${listing.categorySlug}`;
-  return <><Header categorySlug={listing.categorySlug} searchPlaceholder={localize(category?.searchPlaceholder, locale)} /><main id="main-content" tabIndex={-1} className="page-shell listing-page"><PageHeader fallback={fallback} eyebrow={category ? localize(category.name, locale) : t("listing.advert")} title={listing.title} description={`${listing.locationLabel} · ${listing.publishedLabel}`} /><nav className="breadcrumbs"><Link href="/">{t("common.home")}</Link><span>/</span><Link href={fallback}>{category ? localize(category.name, locale) : t("common.catalog")}</Link><span>/</span><span>{listing.title}</span></nav><div className="listing-layout"><section>{listing.imageUrl ? <div className="gallery-main"><img src={listing.imageUrl} alt={listing.title} decoding="async" /></div> : <EmptyState title={t("listing.photosMissing")} description={t("listing.photosMissingNote")} />} {characteristics.length ? <article className="detail-card"><h2>{t("listing.characteristics")}</h2><dl className="characteristics-grid">{characteristics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></article> : null}<article className="detail-card"><h2>{t("listing.description")}</h2><p>{listing.description}</p></article><article className="detail-card"><h2>{t("listing.location")}</h2><p><MapPin size={17} /> {listing.locationLabel}</p></article></section><aside className="seller-column"><article className="price-card"><h2>{listing.title}</h2><div className="detail-price">{listing.priceLabel}</div><ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} /></article><Link className="seller-card" href={`/seller/${listing.sellerId}`}><div className="avatar"><UserRound size={22} /></div><div><strong>{listing.sellerName}</strong><small>{t("listing.openSeller")}</small></div></Link></aside></div></main><MobileNav /></>;
+  const categoryName = localize(listing.categoryName, locale);
+  return <><Header categorySlug={listing.categorySlug} searchPlaceholder={localize(listing.categorySearchPlaceholder, locale)} /><main id="main-content" tabIndex={-1} className="page-shell listing-page"><PageHeader fallback={fallback} eyebrow={categoryName || t("listing.advert")} title={listing.title} description={`${listing.locationLabel} · ${listing.publishedLabel}`} /><nav className="breadcrumbs"><Link href="/">{t("common.home")}</Link><span>/</span><Link href={fallback}>{categoryName || t("common.catalog")}</Link><span>/</span><span>{listing.title}</span></nav><div className="listing-layout"><section>{listing.imageUrl ? <div className="gallery-main"><img src={listing.imageUrl} alt={listing.title} decoding="async" /></div> : <EmptyState title={t("listing.photosMissing")} description={t("listing.photosMissingNote")} />} {characteristics.length ? <article className="detail-card"><h2>{t("listing.characteristics")}</h2><dl className="characteristics-grid">{characteristics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl></article> : null}<article className="detail-card"><h2>{t("listing.description")}</h2><p>{listing.description}</p></article><article className="detail-card"><h2>{t("listing.location")}</h2><p><MapPin size={17} /> {listing.locationLabel}</p></article></section><aside className="seller-column"><article className="price-card"><h2>{listing.title}</h2><div className="detail-price">{listing.priceLabel}</div><ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} /></article><Link className="seller-card" href={`/seller/${listing.sellerId}`}><div className="avatar"><UserRound size={22} /></div><div><strong>{listing.sellerName}</strong><small>{t("listing.openSeller")}</small></div></Link></aside></div></main><MobileNav /></>;
 }
