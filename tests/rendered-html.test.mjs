@@ -99,12 +99,14 @@ const originalFetch = globalThis.fetch;
 const supabaseRequestCounts = new Map();
 const sellerListingRangeRequests = [];
 const mediaGetRequests = [];
+let categoryResponseGate = null;
 const avatarBytes = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
 globalThis.fetch = async (input, init) => {
   const requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
   if (requestUrl.hostname !== "reference-test.supabase.co") return originalFetch(input, init);
   supabaseRequestCounts.set(requestUrl.pathname, (supabaseRequestCounts.get(requestUrl.pathname) ?? 0) + 1);
   const table = requestUrl.pathname.split("/").at(-1);
+  if (table === "categories" && categoryResponseGate) await categoryResponseGate;
   if (table === "seller_profiles" && requestUrl.searchParams.get("id") === `eq.${ids.errorSeller}`) {
     return new Response(JSON.stringify({
       code: "08006",
@@ -117,6 +119,12 @@ globalThis.fetch = async (input, init) => {
   for (const column of ["id", "owner_id", "status", "slug"]) {
     const filter = requestUrl.searchParams.get(column);
     if (filter?.startsWith("eq.")) rows = rows.filter((row) => row[column] === filter.slice(3));
+  }
+  const parentId = requestUrl.searchParams.get("parent_id");
+  if (parentId === "is.null") rows = rows.filter((row) => row.parent_id === null);
+  if (parentId?.startsWith("in.(")) {
+    const allowed = new Set(parentId.slice(4, -1).split(","));
+    rows = rows.filter((row) => allowed.has(row.parent_id));
   }
   const categoryId = requestUrl.searchParams.get("category_id");
   if (categoryId?.startsWith("eq.")) rows = rows.filter((row) => row.category_id === categoryId.slice(3));
@@ -207,6 +215,39 @@ function hasRobotsNoindex(html) {
   return /<meta(?=[^>]*\bname=["']robots["'])(?=[^>]*\bcontent=["'][^"']*noindex)[^>]*>/i.test(html);
 }
 
+test("Home streams its shell before bounded category data resolves and performs no listing RPC", async () => {
+  let releaseCategories;
+  categoryResponseGate = new Promise((resolve) => {
+    releaseCategories = resolve;
+  });
+  const listingRpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
+  const listingCallsBefore = supabaseRequestCounts.get(listingRpcPath) ?? 0;
+  const categoryCallsBefore = supabaseRequestCounts.get("/rest/v1/categories") ?? 0;
+  let reader;
+  try {
+    const response = await worker.fetch(new Request("http://localhost/", {
+      headers: { accept: "text/html", cookie: "marketo-locale=ru" },
+    }), env, ctx);
+    assert.equal(response.status, 200);
+    reader = response.body.getReader();
+    const first = await Promise.race([
+      reader.read(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Home shell did not stream before category data")), 2_000)),
+    ]);
+    assert.equal(first.done, false);
+    assert.ok(first.value.byteLength > 0);
+  } finally {
+    releaseCategories?.();
+    categoryResponseGate = null;
+  }
+  while (!(await reader.read()).done) {
+    // Drain the response so the bounded category queries complete before the next test.
+  }
+  assert.equal(supabaseRequestCounts.get(listingRpcPath) ?? 0, listingCallsBefore);
+  assert.equal((supabaseRequestCounts.get("/rest/v1/categories") ?? 0) - categoryCallsBefore, 3,
+    "the 1,352 immediate-child fixture requires two deterministic 1,000-row pages after the root query");
+});
+
 test("core routes render through the production worker", async () => {
   const routes = [
     ["/", "Лучшее рядом с вами"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
@@ -223,6 +264,18 @@ test("core routes render through the production worker", async () => {
     assert.match(html, new RegExp(expected), pathname);
     assert.match(html, /class="back-button|marketo-kz|Marketo/, pathname);
   }
+});
+
+test("Home listing preview stays idle until its explicit public API request", async () => {
+  const rpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
+  const before = supabaseRequestCounts.get(rpcPath) ?? 0;
+  const response = await worker.fetch(new Request("http://localhost/api/listings?view=home-preview", {
+    headers: { accept: "application/json", cookie: "marketo-locale=ru" },
+  }), env, ctx);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { items: [] });
+  assert.equal((supabaseRequestCounts.get(rpcPath) ?? 0) - before, 1);
 });
 
 test("Kazakh locale renders server-side without changing routes", async () => {
@@ -485,9 +538,9 @@ test("category attributes route returns Supabase-backed filters without an eleva
   assert.equal(payload.attributes[0].options[0].value, "toyota");
 });
 
-test("50 sequential direct warm Worker RSC requests keep aggregate payload bounded and execute one listing RPC per designated request", async () => {
+test("50 sequential direct warm Worker RSC requests keep aggregate payload bounded and avoid hidden Home listing work", async () => {
   const routes = ["/", "/categories", "/search", "/category/jobs", "/category/services", "/help", "/offline"];
-  const listingRoutes = new Set(["/", "/search", "/category/jobs", "/category/services"]);
+  const listingRoutes = new Set(["/search", "/category/jobs", "/category/services"]);
   const rpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
   const rpcBefore = supabaseRequestCounts.get(rpcPath) ?? 0;
   const geographyBefore = new Map(
@@ -514,8 +567,8 @@ test("50 sequential direct warm Worker RSC requests keep aggregate payload bound
   }
 
   const rpcAfter = supabaseRequestCounts.get(rpcPath) ?? 0;
-  assert.equal(expectedListingRequests, 29, "the fixed 50-request route sequence must contain 29 listing-bearing requests");
-  assert.equal(rpcAfter - rpcBefore, 29, "one catalog RPC per listing-bearing direct RSC request");
+  assert.equal(expectedListingRequests, 21, "the fixed 50-request route sequence must contain 21 listing-bearing requests");
+  assert.equal(rpcAfter - rpcBefore, 21, "one catalog RPC per listing-bearing direct RSC request");
   assert.ok(totalBytes < 2_500_000, `50 RSC payloads unexpectedly retained full catalog data: ${totalBytes} bytes`);
   for (const table of ["countries", "regions", "settlements"]) {
     assert.equal(

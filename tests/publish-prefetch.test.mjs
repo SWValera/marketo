@@ -126,9 +126,9 @@ test("every repository publish Link explicitly disables speculative prefetch", a
     "components/owner-listing-actions.tsx": 1,
   });
   assert.deepEqual(emptyStateFiles.sort(), [
-    "app/page.tsx",
     "app/profile/page.tsx",
     "components/catalog-client.tsx",
+    "components/home-marketplace-tabs.tsx",
   ]);
   assert.deepEqual(explicitRouterPrefetch, []);
 });

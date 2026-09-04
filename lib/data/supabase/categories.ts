@@ -23,6 +23,8 @@ type CategoryReferenceRow = Pick<
   | "sort_order"
 >;
 
+export type HomeCategoryReferenceRow = CategoryReferenceRow & { child_count: number };
+
 export function mapCategoryReferenceRows(rows: readonly CategoryReferenceRow[]): CategoryReferenceData {
   return {
     categories: rows.map((category) => ({
@@ -70,6 +72,40 @@ export async function listActiveCategories(client: MarketoSupabaseClient) {
     if (error) throw error;
     rows.push(...data);
     if (data.length < pageSize) return rows;
+  }
+}
+
+/**
+ * The Home page needs root tiles and only their immediate child counts. Loading
+ * every leaf adds more than a thousand irrelevant rows to its cold path.
+ */
+export async function listHomeCategories(client: MarketoSupabaseClient): Promise<HomeCategoryReferenceRow[]> {
+  const roots = await listCategoryLevel(client, null);
+  if (roots.length === 0) return [];
+
+  const children: Array<{ id: string; parent_id: string | null }> = [];
+  const pageSize = 1000;
+  const rootIds = roots.map((category) => category.id);
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client
+      .from("categories")
+      .select("id, parent_id")
+      .eq("is_active", true)
+      .in("parent_id", rootIds)
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    children.push(...data);
+    if (data.length < pageSize) {
+      const childCounts = new Map<string, number>();
+      for (const child of children) {
+        if (child.parent_id) childCounts.set(child.parent_id, (childCounts.get(child.parent_id) ?? 0) + 1);
+      }
+      return roots.map((category) => ({
+        ...category,
+        child_count: childCounts.get(category.id) ?? 0,
+      }));
+    }
   }
 }
 

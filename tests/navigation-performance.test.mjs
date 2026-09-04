@@ -45,6 +45,54 @@ test("application links disable speculative RSC prefetch unless explicitly opted
   assert.match(appLink, /return <a \{\.\.\.props\} href=\{href\} \/>/);
 });
 
+test("listing intent prefetch waits for deliberate hover, cancels transient intent and deduplicates", async () => {
+  const { createIntentPrefetchController } = await import(new URL("lib/navigation/intent-prefetch.ts", root));
+  const scheduled = new Map();
+  let nextHandle = 1;
+  let requests = 0;
+  const clock = {
+    schedule(callback, delayMilliseconds) {
+      const handle = nextHandle++;
+      scheduled.set(handle, { callback, delayMilliseconds });
+      return handle;
+    },
+    cancel(handle) {
+      scheduled.delete(handle);
+    },
+  };
+  const controller = createIntentPrefetchController(() => { requests += 1; }, 150, clock);
+
+  controller.schedule();
+  assert.equal(requests, 0);
+  assert.equal(scheduled.size, 1);
+  assert.equal([...scheduled.values()][0].delayMilliseconds, 150);
+  controller.cancel();
+  assert.equal(scheduled.size, 0);
+  assert.equal(requests, 0);
+
+  controller.schedule();
+  const pending = [...scheduled.values()][0];
+  scheduled.clear();
+  pending.callback();
+  assert.equal(requests, 1);
+  controller.schedule();
+  controller.request();
+  assert.equal(requests, 1);
+  assert.equal(scheduled.size, 0);
+
+  const disposableController = createIntentPrefetchController(() => { requests += 1; }, 150, clock);
+  disposableController.schedule();
+  disposableController.dispose();
+  assert.equal(scheduled.size, 0, "unmount must cancel pending intent");
+
+  const card = await source("components/listing-card.tsx");
+  assert.match(card, /createIntentPrefetchController\(\(\) => router\.prefetch\(href\)\)/);
+  assert.match(card, /onMouseEnter:\s*intentPrefetch\.schedule/);
+  assert.match(card, /onMouseLeave:\s*intentPrefetch\.cancel/);
+  assert.match(card, /onClick:\s*intentPrefetch\.cancel/);
+  assert.doesNotMatch(card, /on(?:TouchStart|PointerEnter|Focus):/);
+});
+
 test("catalog filters navigate only on explicit apply and route state remounts predictably", async () => {
   const client = await source("components/catalog-client.tsx");
   assert.match(client, /function\s+navigateWithFilters\s*\([^)]*\)[\s\S]*?router\.replace\s*\(/);

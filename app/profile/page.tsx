@@ -99,7 +99,12 @@ export default async function ProfilePage({
 
   let listings: Awaited<ReturnType<typeof listingRepository.mine>> | null = null;
   try {
-    listings = await listingRepository.mine({ page, pageSize: PAGE_SIZE, locale });
+    listings = await listingRepository.mine({
+      page,
+      pageSize: PAGE_SIZE,
+      locale,
+      authenticatedUserId: authContext.user.id,
+    });
   } catch (error) {
     logOwnerListingReadFailure(error);
   }

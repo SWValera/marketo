@@ -1,4 +1,5 @@
 import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import { resolveAuthenticatedUserId } from "@/lib/data/supabase/authenticated-user";
 import { getListingAttributeRecords } from "@/lib/data/supabase/listings";
 import type {
   MyListingSummary,
@@ -61,10 +62,12 @@ function dateLabel(value: string, locale: Locale) {
   }).format(new Date(value));
 }
 
-async function currentUserId(client: MarketoSupabaseClient) {
-  const { data, error } = await client.auth.getUser();
-  if (error || !data.user) throw new OwnerListingDataError("AUTHENTICATION_REQUIRED", { cause: error });
-  return data.user.id;
+async function currentUserId(client: MarketoSupabaseClient, authenticatedUserId?: string) {
+  try {
+    return await resolveAuthenticatedUserId(client, authenticatedUserId);
+  } catch (error) {
+    throw new OwnerListingDataError("AUTHENTICATION_REQUIRED", { cause: error });
+  }
 }
 
 async function rejectionFeedback(client: MarketoSupabaseClient, listingId: string | null = null) {
@@ -92,9 +95,9 @@ type MyListingRow = {
 
 export async function listMyListings(
   client: MarketoSupabaseClient,
-  options: { page?: number; pageSize?: number; locale?: Locale } = {},
+  options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string } = {},
 ): Promise<NumberedPageResult<MyListingSummary>> {
-  const userId = await currentUserId(client);
+  const userId = await currentUserId(client, options.authenticatedUserId);
   const page = normalizePositivePage(options.page);
   const pageSize = normalizePageSize(options.pageSize, 12, MAX_MY_LISTINGS_PAGE_SIZE);
   const locale = options.locale ?? "ru";

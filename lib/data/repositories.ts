@@ -13,7 +13,7 @@ import type {
   Profile,
 } from "@/lib/data/types";
 import { cache } from "react";
-import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, type ListingQuery } from "@/lib/data/supabase/listings";
+import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
 import { createSupabasePublicServerClient, createSupabaseServerClient } from "@/lib/supabase/server";
@@ -104,6 +104,47 @@ async function hydrateAttributes(listingIds: string[], locale: Locale) {
   return { stable, display };
 }
 
+type CatalogListingCardRow = Awaited<ReturnType<typeof listPublishedListingPreview>>[number];
+type ValidCatalogListingCardRow = CatalogListingCardRow & {
+  id: string;
+  slug: string;
+  title: string;
+  category_slug: string;
+  settlement_id: string;
+  published_at: string;
+};
+
+function validateCatalogListingRows(rows: CatalogListingCardRow[]) {
+  return rows.map((row) => {
+    if (!row.id || !row.slug || !row.title || !row.category_slug || !row.settlement_id || !row.published_at) {
+      throw new PublicListingDataError("INVALID_ROW");
+    }
+    return row as ValidCatalogListingCardRow;
+  });
+}
+
+function mapCatalogListingSummary(
+  row: ValidCatalogListingCardRow,
+  locale: Locale,
+  attributes?: Record<string, string | number | boolean>,
+): ListingSummary {
+  const price = priceParts(row.price_minor, row.currency_code, locale);
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    priceLabel: price.label,
+    priceAmount: price.amount,
+    locationLabel: locale === "kk" ? row.location_name_kk ?? row.location_name_ru ?? "" : row.location_name_ru ?? row.location_name_kk ?? "",
+    publishedLabel: dateLabel(row.published_at, locale),
+    imageUrl: publicMediaUrl(row.primary_image_storage_key),
+    categorySlug: row.category_slug,
+    cityId: row.settlement_id,
+    promoted: Boolean(row.promoted),
+    ...(attributes ? { attributes } : {}),
+  };
+}
+
 const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<ListingDetail | null> => {
   if (!tryGetServerSupabasePublicConfig()) throw new PublicListingDataError("UNCONFIGURED");
   const client = createSupabasePublicServerClient();
@@ -144,35 +185,23 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
 });
 
 export const listingRepository = {
+  async preview(filters: Omit<ListingRepositoryQuery, "page"> = {}): Promise<ListingSummary[]> {
+    if (!tryGetServerSupabasePublicConfig()) throw new PublicListingDataError("UNCONFIGURED");
+    const locale = filters.locale ?? "ru";
+    const rows = validateCatalogListingRows(await listPublishedListingPreview(
+      createSupabasePublicServerClient(),
+      filters,
+    ));
+    return rows.map((row) => mapCatalogListingSummary(row, locale));
+  },
   async list(filters: ListingRepositoryQuery = {}): Promise<CatalogListingsPage> {
     if (!tryGetServerSupabasePublicConfig()) throw new PublicListingDataError("UNCONFIGURED");
     const locale = filters.locale ?? "ru";
     const page = await listPublishedListingCards(createSupabasePublicServerClient(), filters);
-    const rows = page.items.map((row) => {
-      if (!row.id || !row.slug || !row.title || !row.category_slug || !row.settlement_id || !row.published_at) {
-        throw new PublicListingDataError("INVALID_ROW");
-      }
-      return row as typeof row & { id: string; slug: string; title: string; category_slug: string; settlement_id: string; published_at: string };
-    });
+    const rows = validateCatalogListingRows(page.items);
     const hydrated = await hydrateAttributes(rows.map((row) => row.id), locale);
     return {
-      items: rows.map((row) => {
-        const price = priceParts(row.price_minor, row.currency_code, locale);
-        return {
-          id: row.id,
-          slug: row.slug,
-          title: row.title,
-          priceLabel: price.label,
-          priceAmount: price.amount,
-          locationLabel: locale === "kk" ? row.location_name_kk ?? row.location_name_ru ?? "" : row.location_name_ru ?? row.location_name_kk ?? "",
-          publishedLabel: dateLabel(row.published_at, locale),
-          imageUrl: publicMediaUrl(row.primary_image_storage_key),
-          categorySlug: row.category_slug,
-          cityId: row.settlement_id,
-          promoted: Boolean(row.promoted),
-          attributes: hydrated.stable.get(row.id) ?? {},
-        };
-      }),
+      items: rows.map((row) => mapCatalogListingSummary(row, locale, hydrated.stable.get(row.id) ?? {})),
       total: page.total,
       nextCursor: page.nextPage === null ? null : String(page.nextPage),
       page: page.page,
@@ -185,7 +214,7 @@ export const listingRepository = {
     if (context.status !== "authenticated") throw new FavoriteDataError("AUTHENTICATION_REQUIRED");
     return listFavoriteListings(await createSupabaseServerClient(), context.user.id, options);
   },
-  async mine(options: { page?: number; pageSize?: number; locale?: Locale } = {}): Promise<NumberedPageResult<MyListingSummary>> {
+  async mine(options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string } = {}): Promise<NumberedPageResult<MyListingSummary>> {
     return listMyListings(await createSupabaseServerClient(), options);
   },
   async findBySlug(slug: string, locale: Locale = "ru"): Promise<ListingDetail | null> {

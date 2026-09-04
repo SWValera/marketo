@@ -3,7 +3,7 @@
 import { AppLink as Link } from "@/components/app-link";
 import { Heart } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   loadFavoriteStore,
   readFavoriteStore,
@@ -13,6 +13,7 @@ import {
 } from "@/components/favorite-store";
 import type { ListingSummary } from "@/lib/data/types";
 import { useI18n } from "@/components/i18n-provider";
+import { createIntentPrefetchController } from "@/lib/navigation/intent-prefetch";
 
 export function ListingCard({ listing }: { listing: ListingSummary }) {
   const { t } = useI18n();
@@ -25,10 +26,22 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
   const placeholders: Record<string, string> = { transport: "🚙", "real-estate": "🏠", electronics: "📱", "home-garden": "🛋️", personal: "👕", jobs: "💼", services: "🛠️", hobby: "🚲", business: "🏪", animals: "🐾", free: "🎁", exchange: "🔄" };
   const placeholder = placeholders[listing.categorySlug] ?? "📦";
   const href = `/listing/${listing.id}-${listing.slug}`;
+  const intentPrefetch = useMemo(
+    () => createIntentPrefetchController(() => router.prefetch(href)),
+    [href, router],
+  );
 
   useEffect(() => {
     void loadFavoriteStore();
   }, []);
+
+  useEffect(() => () => intentPrefetch.dispose(), [intentPrefetch]);
+
+  const intentPrefetchProps = {
+    onClick: intentPrefetch.cancel,
+    onMouseEnter: intentPrefetch.schedule,
+    onMouseLeave: intentPrefetch.cancel,
+  };
 
   async function toggleFavorite() {
     if (favoritePending) return;
@@ -49,7 +62,7 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
 
   return (
     <article className="listing-card">
-      <Link href={href} className="listing-image-wrap" aria-label={listing.title}>
+      <Link href={href} className="listing-image-wrap" aria-label={listing.title} {...intentPrefetchProps}>
         <span className="listing-placeholder" aria-hidden="true">{placeholder}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {listing.imageUrl ? <img className="listing-image" src={listing.imageUrl} alt="" loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
@@ -69,7 +82,7 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
       {favoriteError ? <span className="sr-only" id={`favorite-error-${listing.id}`} role="alert">{t("auth.errorGeneric")}</span> : null}
       <div className="listing-body">
         <p className="listing-price">{listing.priceLabel}</p>
-        <Link href={href} className="listing-title">{listing.title}</Link>
+        <Link href={href} className="listing-title" {...intentPrefetchProps}>{listing.title}</Link>
         <p className="listing-location">{listing.locationLabel}</p>
         <p className="listing-time">{listing.publishedLabel}</p>
       </div>

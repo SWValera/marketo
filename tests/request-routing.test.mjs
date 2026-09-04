@@ -38,6 +38,7 @@ test("public marketplace reads bypass Supabase session refresh", () => {
     "/seller/00000000-0000-0000-0000-000000000000",
     "/seller/00000000-0000-0000-0000-000000000000.rsc",
     "/api/listings",
+    "/api/listings?view=home-preview",
     "/api/reference/categories/category-id/attributes",
     "/api/showcase?city=almaty",
   ]) {

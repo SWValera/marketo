@@ -1,8 +1,5 @@
 "use client";
 
-import { addFavorite, listFavoriteListingIds, removeFavorite } from "@/lib/data/supabase/favorites";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-
 export type FavoriteStoreSnapshot = {
   authenticated: boolean;
   error: boolean;
@@ -19,7 +16,29 @@ const initialSnapshot: FavoriteStoreSnapshot = {
 
 let snapshot = initialSnapshot;
 let loadPromise: Promise<FavoriteStoreSnapshot> | null = null;
+let dependenciesPromise: Promise<{
+  addFavorite: typeof import("@/lib/data/supabase/favorites").addFavorite;
+  getSupabaseBrowserClient: typeof import("@/lib/supabase/browser").getSupabaseBrowserClient;
+  listFavoriteListingIds: typeof import("@/lib/data/supabase/favorites").listFavoriteListingIds;
+  removeFavorite: typeof import("@/lib/data/supabase/favorites").removeFavorite;
+}> | null = null;
 const listeners = new Set<() => void>();
+
+function loadFavoriteDependencies() {
+  dependenciesPromise ??= Promise.all([
+    import("@/lib/data/supabase/favorites"),
+    import("@/lib/supabase/browser"),
+  ]).then(([favorites, browser]) => ({
+    addFavorite: favorites.addFavorite,
+    getSupabaseBrowserClient: browser.getSupabaseBrowserClient,
+    listFavoriteListingIds: favorites.listFavoriteListingIds,
+    removeFavorite: favorites.removeFavorite,
+  })).catch((error) => {
+    dependenciesPromise = null;
+    throw error;
+  });
+  return dependenciesPromise;
+}
 
 function publish(next: FavoriteStoreSnapshot) {
   snapshot = next;
@@ -44,6 +63,7 @@ export function loadFavoriteStore() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     try {
+      const { getSupabaseBrowserClient, listFavoriteListingIds } = await loadFavoriteDependencies();
       const client = getSupabaseBrowserClient();
       const userResult = await client.auth.getUser();
       if (userResult.error) throw userResult.error;
@@ -80,6 +100,7 @@ export function loadFavoriteStore() {
 export async function toggleFavoriteListing(listingId: string) {
   const current = await loadFavoriteStore();
   if (!current.authenticated) return current.error ? "error" as const : "authentication_required" as const;
+  const { addFavorite, getSupabaseBrowserClient, removeFavorite } = await loadFavoriteDependencies();
   const client = getSupabaseBrowserClient();
   const userResult = await client.auth.getUser();
   if (userResult.error) return "error" as const;

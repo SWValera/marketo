@@ -84,6 +84,17 @@ export async function listPublishedListingCards(client: MarketoSupabaseClient, f
   };
 }
 
+export async function listPublishedListingPreview(
+  client: MarketoSupabaseClient,
+  filters: Omit<ListingQuery, "page"> = {},
+) {
+  const limit = normalizePageSize(filters.limit, 12, 24);
+  const { data, error } = await orderedCatalogRequest(client, filters).range(0, limit - 1);
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("catalog_listing_preview_invalid");
+  return data;
+}
+
 type SellerListingCardRow = {
   id: string;
   slug: string;

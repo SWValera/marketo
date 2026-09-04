@@ -1,6 +1,7 @@
 import {
   getCategoryAttributes,
   listActiveCategories,
+  listHomeCategories,
   listActiveCountries,
   listActiveRegions,
   listAttributeOptions,
@@ -14,6 +15,7 @@ import {
   type CategoryAttributeReferenceData,
   type CategoryReferenceData,
   type GeographyReferenceData,
+  type ReferenceCategory,
   type ReferenceCategoryAttribute,
   type ReferenceAttributeOption,
   type ReferenceDataEnvelope,
@@ -53,6 +55,14 @@ const categoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<C
   maxEntries: 1,
   ttlMilliseconds: envelopeTtl,
 });
+type HomeCategoryReferenceData = {
+  categories: Array<ReferenceCategory & { childCount: number }>;
+};
+const EMPTY_HOME_CATEGORIES: HomeCategoryReferenceData = { categories: [] };
+const homeCategoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<HomeCategoryReferenceData>>({
+  maxEntries: 1,
+  ttlMilliseconds: envelopeTtl,
+});
 const attributeCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<CategoryAttributeReferenceData>>({
   maxEntries: ATTRIBUTE_CACHE_MAX_ENTRIES,
   ttlMilliseconds: envelopeTtl,
@@ -87,6 +97,24 @@ export async function getCategoryReferences(): Promise<ReferenceDataEnvelope<Cat
       return ready(mapCategoryReferenceRows(rows));
     } catch {
       return failed(EMPTY_CATEGORIES);
+    }
+  });
+}
+
+export async function getHomeCategoryReferences(): Promise<ReferenceDataEnvelope<HomeCategoryReferenceData>> {
+  return homeCategoryCache.getOrLoad("home-categories", async () => {
+    if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_HOME_CATEGORIES);
+    try {
+      const rows = await listHomeCategories(createSupabasePublicServerClient());
+      const mapped = mapCategoryReferenceRows(rows);
+      return ready({
+        categories: mapped.categories.map((category, index) => ({
+          ...category,
+          childCount: rows[index].child_count,
+        })),
+      });
+    } catch {
+      return failed(EMPTY_HOME_CATEGORIES);
     }
   });
 }

@@ -6,6 +6,7 @@ const root = new URL("../", import.meta.url);
 
 test("Home follows Header → Search → City Premium Showcase → Catalog/Listings", async () => {
   const home = await readFile(new URL("app/page.tsx", root), "utf8");
+  const tabs = await readFile(new URL("components/home-marketplace-tabs.tsx", root), "utf8");
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
   const headerPosition = home.indexOf("<Header />");
   const showcasePosition = home.indexOf("<CityPremiumShowcase />");
@@ -13,7 +14,8 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   assert.ok(headerPosition >= 0 && headerPosition < showcasePosition && showcasePosition < tabsPosition);
   assert.match(header, /<form className="header-search" action="\/search">/);
   assert.match(home, /catalog=\{catalogPanel\}/);
-  assert.match(home, /listings=\{listingsPanel\}/);
+  assert.match(tabs, /active === "catalog" \? catalog : listingsPanel/);
+  assert.match(tabs, /fetchHomeListingPreview\(controller\.signal\)/);
 });
 
 test("showcase uses the persistent elapsed-time timeline with locale-stable offsets and explicit pause", async () => {

@@ -3,8 +3,21 @@ import { listingRepository } from "@/lib/data/repositories";
 import { isSameOriginMutationRequest } from "@/lib/http/same-origin";
 import { preparePublishDraft, PublishReferenceError } from "@/lib/publish/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getServerI18n } from "@/lib/i18n/server";
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.get("view") === "home-preview") {
+    try {
+      const { locale } = await getServerI18n();
+      const items = await listingRepository.preview({ locale, limit: 12 });
+      return NextResponse.json({ items }, { headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      console.error("[marketo-home-listings] read failed", {
+        name: error instanceof Error ? error.name : "Error",
+      });
+      return NextResponse.json({ error: "listing_preview_unavailable" }, { status: 503 });
+    }
+  }
   return NextResponse.json(await listingRepository.list());
 }
 
@@ -54,4 +67,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "draft_save_failed" }, { status: 500 });
   }
 }
-

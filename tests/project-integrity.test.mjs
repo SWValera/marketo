@@ -179,7 +179,7 @@ test("home search, City Premium Showcase and primary calls to action navigate to
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
   assert.match(home, /<Link(?=[^>]*\bhref="\/publish")(?=[^>]*\bprefetch=\{false\})[^>]*\bclassName="primary-action"/);
   assert.match(home, /<CityPremiumShowcase \/>/);
-  assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} listings=\{listingsPanel\} \/>/);
+  assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} \/>/);
   assert.match(showcase, /href=\{`\/listing\/\$\{item\.listingId\}-\$\{item\.slug\}`\}/);
   assert.match(header, /<form className="header-search" action="\/search">/);
   assert.match(header, /<input name="q"/);
