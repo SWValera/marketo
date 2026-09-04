@@ -24,7 +24,7 @@ function createWorkerHarness({
   const caches = {
     async open(name) { opened.push({ name }); return open ? open(name, cache) : cache; },
     async match() { throw new Error("global cache matching is forbidden"); },
-    async keys() { return ["foreign-application-cache", "marketo-static-v5", "marketo-static-v6", "marketo-static-v7"]; },
+    async keys() { return ["foreign-application-cache", "marketo-static-v5", "marketo-static-v6", "marketo-static-v7", "marketo-static-v8"]; },
     async delete(name) { deleted.push(name); return true; },
   };
   const self = {
@@ -54,7 +54,7 @@ function dispatchFetch(harness, request) {
   return { response: responsePromise, lifetime: Promise.all(lifetimePromises) };
 }
 
-test("service worker v7 serves static cache hits without an eager network request", async () => {
+test("service worker v8 serves static cache hits without an eager network request", async () => {
   const cached = { source: "cache" };
   let fetchCount = 0;
   const harness = createWorkerHarness({
@@ -74,7 +74,7 @@ test("service worker v7 serves static cache hits without an eager network reques
   assert.equal(harness.puts.length, 0);
 });
 
-test("service worker v7 stores an eligible cache miss before resolving the response", async () => {
+test("service worker v8 stores an eligible cache miss before resolving the response", async () => {
   const storedCopy = { source: "clone" };
   const network = { ok: true, clone: () => storedCopy };
   const harness = createWorkerHarness({ fetch: async () => network });
@@ -87,7 +87,7 @@ test("service worker v7 stores an eligible cache miss before resolving the respo
   const event = dispatchFetch(harness, request);
   assert.equal(await event.response, network);
   await event.lifetime;
-  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v7"));
+  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v8"));
   assert.deepEqual(harness.puts, [{ request, response: storedCopy }]);
 });
 
@@ -131,13 +131,13 @@ test("service worker keeps offline navigation fallback and lifecycle work attach
   let installWork;
   harness.handlers.get("install")({ waitUntil(value) { installWork = value; } });
   await installWork;
-  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v7"));
+  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v8"));
   assert.ok(harness.opened.some((entry) => JSON.stringify(entry.addAll) === JSON.stringify(["/offline.html"])));
 
   let activateWork;
   harness.handlers.get("activate")({ waitUntil(value) { activateWork = value; } });
   await activateWork;
-  assert.deepEqual(harness.deleted, ["marketo-static-v5", "marketo-static-v6"]);
+  assert.deepEqual(harness.deleted, ["marketo-static-v5", "marketo-static-v6", "marketo-static-v7"]);
   assert.equal(harness.claimed(), true);
 });
 

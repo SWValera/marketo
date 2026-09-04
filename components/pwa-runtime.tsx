@@ -65,6 +65,18 @@ export function PwaRuntime() {
         checkForUpdate();
       }
     };
+    const onPageShow = () => {
+      // iOS can restore an installed PWA from its back/forward cache without
+      // producing a visibility transition. Check again whenever that document
+      // becomes the active page.
+      if (newControllerNeedsReload.current) {
+        setReloadAvailable(true);
+      } else if (registration?.waiting) {
+        setWaitingWorker(registration.waiting);
+      } else {
+        checkForUpdate();
+      }
+    };
     const onInstallingStateChange = () => {
       if (installingWorker?.state === "installed" && navigator.serviceWorker.controller) {
         setWaitingWorker(installingWorker);
@@ -88,6 +100,8 @@ export function PwaRuntime() {
       registration.addEventListener("updatefound", onUpdateFound);
       if (registration.installing) onUpdateFound();
       document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("pageshow", onPageShow);
+      window.addEventListener("online", checkForUpdate);
       if (!registration.waiting && controlledAtRegistration) checkForUpdate();
     }).catch(() => undefined);
 
@@ -97,6 +111,8 @@ export function PwaRuntime() {
       registration?.removeEventListener("updatefound", onUpdateFound);
       installingWorker?.removeEventListener("statechange", onInstallingStateChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", checkForUpdate);
       if (intervalId !== undefined) window.clearInterval(intervalId);
     };
   }, [reloadOnce]);

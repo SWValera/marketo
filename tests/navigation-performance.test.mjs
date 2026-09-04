@@ -244,6 +244,10 @@ test("PWA runtime detects releases promptly without discarding an in-progress dr
   assert.match(runtime, /setInterval\([\s\S]*?visibilityState\s*===\s*["']visible["'][\s\S]*?checkForUpdate\(\)/);
   assert.match(runtime, /addEventListener\("visibilitychange", onVisibilityChange\)/);
   assert.match(runtime, /removeEventListener\("visibilitychange", onVisibilityChange\)/);
+  assert.match(runtime, /addEventListener\("pageshow", onPageShow\)/);
+  assert.match(runtime, /removeEventListener\("pageshow", onPageShow\)/);
+  assert.match(runtime, /addEventListener\("online", checkForUpdate\)/);
+  assert.match(runtime, /removeEventListener\("online", checkForUpdate\)/);
   assert.match(runtime, /updateCheckInFlight/);
   assert.match(runtime, /if \(activationRequested\.current\)[\s\S]*reloadOnce\(\)[\s\S]*setReloadAvailable\(true\)/);
   assert.match(runtime, /activationRequested\.current = true/);

@@ -62,7 +62,10 @@ function browserRuntime(): ClientImageRuntime {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-      const context = canvas.getContext("2d", { alpha: false, colorSpace: "srgb" });
+      // Older iOS WebKit builds can reject the newer colorSpace option even
+      // though their 2D canvas encoder is otherwise fully usable.
+      const context = canvas.getContext("2d", { alpha: false, colorSpace: "srgb" })
+        ?? canvas.getContext("2d", { alpha: false });
       if (!context) throw new Error("image_encode_failed");
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, width, height);
@@ -98,8 +101,10 @@ export function clientListingImageSize(width: number, height: number) {
 
 /**
  * Decode on the user's device and upload only a bounded, metadata-free JPEG.
- * iOS browsers use WebKit's native HEIC decoder; other supported browser image
- * formats follow the same path, so the R2 upload contract is deterministic.
+ * The iOS photo picker exports a JPEG when the input requests JPEG/PNG/WebP.
+ * Newer WebKit builds may also hand this function HEIC directly; every
+ * decodable source follows the same path, so the R2 upload contract is
+ * deterministic.
  */
 export async function normalizeListingPhotoForUpload(file: File, runtime: ClientImageRuntime = browserRuntime()) {
   if (file.size < 32 || file.size > MAX_SOURCE_BYTES) throw new Error("invalid_image_size");

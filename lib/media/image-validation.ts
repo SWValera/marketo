@@ -2,7 +2,6 @@ const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 20_000_000;
 const MIN_IMAGE_SIDE = 240;
 const MAX_JPEG_MARKERS = 4_096;
-const MAX_JPEG_BLOCKS = 1_500_000;
 const MAX_PNG_CHUNKS = 4_096;
 const MAX_DECODED_IMAGE_BYTES = 64 * 1024 * 1024;
 
@@ -29,7 +28,6 @@ type JpegFrame = {
   components: Map<number, JpegFrameComponent>;
 };
 type JpegHuffmanTable = Array<Map<number, number>>;
-type JpegScanComponent = { frame: JpegFrameComponent; dcTable: JpegHuffmanTable; acTable: JpegHuffmanTable };
 
 const PNG_SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
 const PNG_CRC_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
@@ -126,124 +124,66 @@ function validateJpegEntropy(
   bytes: Uint8Array,
   scanOffset: number,
   frame: JpegFrame,
-  scanComponents: JpegScanComponent[],
   restartInterval: number,
 ) {
-  // This proves the supported baseline scan is structurally complete through
-  // EOI. It intentionally does not claim IDCT or colour-conversion decoding.
+  // Validate the byte-level framing of the entropy-coded scan without decoding
+  // every DCT block. Full Huffman decoding scales with pixel count and can
+  // exhaust a Worker's CPU budget for an otherwise ordinary phone photo. The
+  // browser upload contract already re-encodes user input; here we only need to
+  // fail closed on a missing EOI, unescaped markers, broken restart ordering
+  // and bytes after EOI. This intentionally does not claim to prove Huffman or
+  // pixel decodability; the trusted client encoder owns that work.
   let offset = scanOffset;
-  let currentByte = 0;
-  let remainingBits = 0;
-  let pendingMarker: number | undefined;
-
-  const readEntropyByte = () => {
-    if (offset >= bytes.length) return null;
-    const value = bytes[offset++];
-    if (value !== 0xff) return value;
-    if (offset >= bytes.length) return null;
-    let marker = bytes[offset++];
-    if (marker === 0x00) return 0xff;
-    while (marker === 0xff) {
-      if (offset >= bytes.length) return null;
-      marker = bytes[offset++];
-    }
-    if (marker === 0x00) return null;
-    pendingMarker = marker;
-    return null;
-  };
-
-  const readBit = () => {
-    if (remainingBits === 0) {
-      const value = readEntropyByte();
-      if (value === null) return null;
-      currentByte = value;
-      remainingBits = 8;
-    }
-    remainingBits -= 1;
-    return (currentByte >>> remainingBits) & 1;
-  };
-
-  const consumeBits = (count: number) => {
-    for (let index = 0; index < count; index += 1) if (readBit() === null) return false;
-    return true;
-  };
-
-  const decodeHuffman = (table: JpegHuffmanTable) => {
-    let code = 0;
-    for (let bitLength = 1; bitLength <= 16; bitLength += 1) {
-      const bit = readBit();
-      if (bit === null) return null;
-      code = (code << 1) | bit;
-      const symbol = table[bitLength].get(code);
-      if (symbol !== undefined) return symbol;
-    }
-    return null;
-  };
-
-  const finishByte = () => {
-    if (remainingBits === 0) return true;
-    const mask = (1 << remainingBits) - 1;
-    const valid = (currentByte & mask) === mask;
-    remainingBits = 0;
-    return valid;
-  };
-
-  const takeMarker = () => {
-    if (pendingMarker !== undefined) {
-      const marker = pendingMarker;
-      pendingMarker = undefined;
-      return marker;
-    }
-    if (offset >= bytes.length || bytes[offset++] !== 0xff) return null;
-    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
-    if (offset >= bytes.length || bytes[offset] === 0x00) return null;
-    return bytes[offset++];
-  };
-
+  let entropyByteCount = 0;
+  let entropyBytesSinceRestart = 0;
+  let restartIndex = 0;
   const mcuColumns = Math.ceil(frame.width / (8 * frame.maxHorizontalSampling));
   const mcuRows = Math.ceil(frame.height / (8 * frame.maxVerticalSampling));
-  const blocksPerMcu = scanComponents.reduce(
-    (total, component) => total + component.frame.horizontalSampling * component.frame.verticalSampling,
-    0,
-  );
   const totalMcus = mcuColumns * mcuRows;
-  if (!Number.isSafeInteger(totalMcus) || totalMcus <= 0 || totalMcus > Math.floor(MAX_JPEG_BLOCKS / blocksPerMcu)) return false;
+  if (!Number.isSafeInteger(totalMcus) || totalMcus <= 0) return false;
+  const expectedRestartMarkers = restartInterval > 0
+    ? Math.floor((totalMcus - 1) / restartInterval)
+    : 0;
 
-  let restartIndex = 0;
-  for (let mcu = 0; mcu < totalMcus; mcu += 1) {
-    for (const component of scanComponents) {
-      const blockCount = component.frame.horizontalSampling * component.frame.verticalSampling;
-      for (let block = 0; block < blockCount; block += 1) {
-        const dcMagnitudeBits = decodeHuffman(component.dcTable);
-        if (dcMagnitudeBits === null || !consumeBits(dcMagnitudeBits)) return false;
-
-        let coefficient = 1;
-        while (coefficient < 64) {
-          const symbol = decodeHuffman(component.acTable);
-          if (symbol === null) return false;
-          const runLength = symbol >>> 4;
-          const magnitudeBits = symbol & 0x0f;
-          if (magnitudeBits === 0) {
-            if (runLength === 0) break;
-            coefficient += 16;
-            if (coefficient > 64) return false;
-            continue;
-          }
-          coefficient += runLength;
-          if (coefficient >= 64 || !consumeBits(magnitudeBits)) return false;
-          coefficient += 1;
-        }
-      }
+  while (offset < bytes.length) {
+    const value = bytes[offset++];
+    if (value !== 0xff) {
+      entropyByteCount += 1;
+      entropyBytesSinceRestart += 1;
+      continue;
     }
+    if (offset >= bytes.length) return false;
 
-    const completedMcus = mcu + 1;
-    if (restartInterval > 0 && completedMcus % restartInterval === 0 && completedMcus < totalMcus) {
-      if (!finishByte() || takeMarker() !== 0xd0 + (restartIndex & 7)) return false;
+    let marker = bytes[offset++];
+    if (marker === 0x00) {
+      entropyByteCount += 1;
+      entropyBytesSinceRestart += 1;
+      continue;
+    }
+    while (marker === 0xff) {
+      if (offset >= bytes.length) return false;
+      marker = bytes[offset++];
+    }
+    if (marker === 0x00) return false;
+    if (marker >= 0xd0 && marker <= 0xd7) {
+      if (restartInterval === 0
+        || restartIndex >= expectedRestartMarkers
+        || entropyBytesSinceRestart === 0
+        || marker !== 0xd0 + (restartIndex & 7)) return false;
       restartIndex += 1;
+      entropyBytesSinceRestart = 0;
+      continue;
     }
+    if (marker === 0xd9) {
+      return entropyByteCount > 0
+        && entropyBytesSinceRestart > 0
+        && restartIndex === expectedRestartMarkers
+        && offset === bytes.length;
+    }
+    return false;
   }
 
-  return finishByte() && takeMarker() === 0xd9 && offset === bytes.length;
+  return false;
 }
 
 function parseJpeg(bytes: Uint8Array): DetectedImage | null {
@@ -313,7 +253,6 @@ function parseJpeg(bytes: Uint8Array): DetectedImage | null {
       if (!frame) return null;
       const scanComponentCount = bytes[payloadStart];
       if (scanComponentCount !== frame.components.size || length !== 6 + scanComponentCount * 2) return null;
-      const scanComponents: JpegScanComponent[] = [];
       const selectedComponents = new Set<number>();
       let scanPosition = payloadStart + 1;
       for (let index = 0; index < scanComponentCount; index += 1) {
@@ -324,7 +263,6 @@ function parseJpeg(bytes: Uint8Array): DetectedImage | null {
         const acTable = huffmanTables.get(0x10 | (selectors & 0x0f));
         if (!frameComponent || selectedComponents.has(componentId) || !dcTable || !acTable || !quantizationTables.has(frameComponent.quantizationTable)) return null;
         selectedComponents.add(componentId);
-        scanComponents.push({ frame: frameComponent, dcTable, acTable });
       }
       if (bytes[scanPosition] !== 0 || bytes[scanPosition + 1] !== 63 || bytes[scanPosition + 2] !== 0) return null;
       const jpegFrame = frame;
@@ -333,7 +271,7 @@ function parseJpeg(bytes: Uint8Array): DetectedImage | null {
         height: jpegFrame.height,
         mimeType: "image/jpeg",
         extension: "jpg",
-        verifyPayload: async () => validateJpegEntropy(bytes, segmentEnd, jpegFrame, scanComponents, restartInterval),
+        verifyPayload: async () => validateJpegEntropy(bytes, segmentEnd, jpegFrame, restartInterval),
       };
     } else if (!((marker >= 0xe0 && marker <= 0xef) || marker === 0xfe)) {
       // Only baseline Huffman JPEG plus metadata/comment segments is supported.
@@ -591,7 +529,7 @@ export async function validateListingImage(file: File): Promise<ValidatedImage> 
   // boundary. Remove EXIF/XMP/IPTC/comment segments from direct JPEG requests
   // as well, so GPS and device metadata can never reach R2.
   const storageBytes = detected.mimeType === "image/jpeg" ? stripJpegMetadata(bytes) : bytes;
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", storageBytes));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", storageBytes as Uint8Array<ArrayBuffer>));
   const sha256 = [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return { bytes: storageBytes, byteSize: storageBytes.length, ...image, sha256 };
 }

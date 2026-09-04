@@ -786,7 +786,7 @@ export function PublishForm({
           {step === 2 && <div className="publish-panel" ref={(node) => setFieldRef("photos", node)}>
             <div className="panel-heading"><span><Camera size={22} /></span><div><h2>{t("publish.addPhotos")}</h2><p>{t("publish.photosNote")}</p></div></div>
             {existingImages.length > 0 ? <div className="existing-photo-grid">{existingImages.map((image, index) => <article key={image.id}><img src={image.url} alt={t("publish.existingPhoto", { count: index + 1 })} />{index === 0 ? <b>{t("publish.mainPhoto")}</b> : null}</article>)}</div> : null}
-            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{processingPhotos ? t("publish.processingPhotos") : t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple disabled={processingPhotos} onChange={(event) => {
+            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{processingPhotos ? t("publish.processingPhotos") : t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processingPhotos} onChange={(event) => {
               const selected = Array.from(event.currentTarget.files ?? []);
               event.currentTarget.value = "";
               void addPhotos(selected);

@@ -30,7 +30,7 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.doesNotMatch(favicon, /#0C79D8|#2E9EFF/);
   const worker = await readFile(new URL("public/sw.js", root), "utf8");
   const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
-  assert.match(worker, /marketo-static-v7/);
+  assert.match(worker, /marketo-static-v8/);
   assert.match(worker, /"\/offline\.html"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
   assert.match(worker, /request\.mode === "navigate"[\s\S]*fetch\(request\)/);

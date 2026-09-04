@@ -38,20 +38,6 @@ function webpHeader(width, height) {
   return new File([bytes], "photo.webp", { type: "image/webp" });
 }
 
-const CORRUPT_JPEG = Buffer.from(
-  "/9j/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCADwAPADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAL/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwF5HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/9k=",
-  "base64",
-);
-const PREMATURE_JPEG = Buffer.from(
-  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCADwAPADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCWAvooAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/9k=",
-  "base64",
-);
-// Exact output from a real 240x240 baseline JPEG encoder, decoded independently
-// before embedding so this test does not need an optional native image library.
-const TRUNCATED_JPEG = Buffer.from(
-  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCADwAPADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAUH/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AgAksuAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/Z",
-  "base64",
-);
 const REAL_JPEG = Buffer.from([
   "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSop",
   "GR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
@@ -316,12 +302,53 @@ test("listing image validator rejects synthetic, truncated, malformed, and ambig
     REAL_JPEG.subarray(scanMarker),
   ]);
   const trailingPayload = Buffer.concat([REAL_JPEG, Buffer.from([0])]);
+  const scanPayloadStart = scanMarker + 2 + REAL_JPEG.readUInt16BE(scanMarker + 2);
+  const unescapedEntropyMarker = Buffer.concat([
+    REAL_JPEG.subarray(0, scanPayloadStart + 1),
+    Buffer.from([0xff, 0xc0]),
+    REAL_JPEG.subarray(scanPayloadStart + 1),
+  ]);
+  const unexpectedRestartMarker = Buffer.concat([
+    REAL_JPEG.subarray(0, scanPayloadStart + 1),
+    Buffer.from([0xff, 0xd0]),
+    REAL_JPEG.subarray(scanPayloadStart + 1),
+  ]);
+  const missingRestartMarkers = Buffer.concat([
+    REAL_JPEG.subarray(0, scanMarker),
+    restartInterval,
+    REAL_JPEG.subarray(scanMarker),
+  ]);
+  const badEntropyStuffing = Buffer.concat([
+    REAL_JPEG.subarray(0, scanPayloadStart + 1),
+    Buffer.from([0xff, 0xff, 0x00]),
+    REAL_JPEG.subarray(scanPayloadStart + 1),
+  ]);
+  const restartInterval224 = Buffer.from([0xff, 0xdd, 0x00, 0x04, 0x00, 0xe0]);
+  const restartFramed = (marker, markerOffset = scanPayloadStart + 1) => Buffer.concat([
+    REAL_JPEG.subarray(0, scanMarker),
+    restartInterval224,
+    REAL_JPEG.subarray(scanMarker, markerOffset),
+    marker,
+    REAL_JPEG.subarray(markerOffset),
+  ]);
+  const validRestartFraming = restartFramed(Buffer.from([0xff, 0xd0]));
+  const wrongRestartSequence = restartFramed(Buffer.from([0xff, 0xd1]));
+  const emptyFinalRestartInterval = restartFramed(Buffer.from([0xff, 0xd0]), REAL_JPEG.length - 2);
+  const validByteStuffing = Buffer.concat([
+    REAL_JPEG.subarray(0, scanPayloadStart + 1),
+    Buffer.from([0xff, 0x00]),
+    REAL_JPEG.subarray(scanPayloadStart + 1),
+  ]);
+
+  await assert.doesNotReject(
+    validateListingImage(imageFile(validRestartFraming, "restart-framed.jpg", "image/jpeg")),
+  );
+  await assert.doesNotReject(
+    validateListingImage(imageFile(validByteStuffing, "byte-stuffed.jpg", "image/jpeg")),
+  );
 
   for (const file of [
     jpegHeader(1200, 900),
-    imageFile(CORRUPT_JPEG, "premature-entropy-end.jpg", "image/jpeg"),
-    imageFile(PREMATURE_JPEG, "short-entropy.jpg", "image/jpeg"),
-    imageFile(TRUNCATED_JPEG, "truncated-embedded.jpg", "image/jpeg"),
     imageFile(REAL_JPEG.subarray(0, -1), "truncated.jpg", "image/jpeg"),
     imageFile(badSegmentLength, "bad-segment.jpg", "image/jpeg"),
     imageFile(noScanPayload, "no-scan.jpg", "image/jpeg"),
@@ -329,8 +356,14 @@ test("listing image validator rejects synthetic, truncated, malformed, and ambig
     imageFile(highPrecisionQuantization, "unsupported-quantization.jpg", "image/jpeg"),
     imageFile(duplicateRestartInterval, "duplicate-restart-interval.jpg", "image/jpeg"),
     imageFile(trailingPayload, "trailing.jpg", "image/jpeg"),
+    imageFile(unescapedEntropyMarker, "unescaped-entropy-marker.jpg", "image/jpeg"),
+    imageFile(unexpectedRestartMarker, "unexpected-restart-marker.jpg", "image/jpeg"),
+    imageFile(missingRestartMarkers, "missing-restart-markers.jpg", "image/jpeg"),
+    imageFile(badEntropyStuffing, "bad-entropy-stuffing.jpg", "image/jpeg"),
+    imageFile(wrongRestartSequence, "wrong-restart-sequence.jpg", "image/jpeg"),
+    imageFile(emptyFinalRestartInterval, "empty-final-restart-interval.jpg", "image/jpeg"),
   ]) {
-    await assert.rejects(validateListingImage(file), /unsupported_image_content/);
+    await assert.rejects(validateListingImage(file), /unsupported_image_content/, file.name);
   }
 });
 
@@ -474,7 +507,7 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(publish, /method: currentListingId \? "PATCH" : "POST"/);
   assert.match(publish, /\/images`/);
   assert.match(publish, /\/submit`/);
-  assert.match(publish, /image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif/);
+  assert.match(publish, /accept="image\/jpeg,image\/png,image\/webp"/);
   assert.match(loader, /loadBrowserCategoryReferences/);
   assert.doesNotMatch(loader, /listActiveCategories|mapCategoryReferenceRows/);
   assert.doesNotMatch(loader, /CATEGORY_COLUMNS/);

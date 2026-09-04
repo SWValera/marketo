@@ -64,7 +64,9 @@ not expose private phone fields publicly.
 1. An authenticated owner calls create_listing_draft.
 2. One transaction writes listing, private contact and validated typed category
    attributes.
-3. The browser decodes JPEG, PNG, WebP or HEIC/HEIF with the device image
+3. The file picker requests JPEG, PNG or WebP so iOS exports Photos-library
+   sources as JPEG. Newer WebKit versions may still provide HEIC/HEIF directly;
+   the browser decodes any of these sources with the device image
    decoder, applies orientation, scales down to 2560 px and emits a JPEG. In the
    supported UI, source bytes stay on the device and photos are processed one at
    a time to bound mobile memory use.
