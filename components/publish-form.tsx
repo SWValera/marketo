@@ -24,6 +24,7 @@ import { ReferenceSelect } from "@/components/reference-select";
 import { useCategoryAttributes } from "@/components/use-category-attributes";
 import type { OwnerDraftBundle, OwnerDraftImage } from "@/lib/data/types";
 import { localize } from "@/lib/i18n/config";
+import { normalizeListingPhotoForUpload } from "@/lib/media/client-image-normalization";
 import { protectedMediaUrl } from "@/lib/media/public-url";
 import { MODERATION_REJECTION_REASONS } from "@/lib/moderation/policy";
 import {
@@ -64,6 +65,7 @@ import {
 import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/reference-data/types";
 
 type PhotoPreview = { name: string; url: string; file: File };
+type UploadedPhoto = { id: string; storageKey: string; sortOrder: number };
 
 const listingPhotoMimeTypes = new Set([
   "image/jpeg",
@@ -81,6 +83,14 @@ function isAcceptedListingPhoto(file: File) {
   const extension = file.name.slice(file.name.lastIndexOf(".") + 1).toLowerCase();
   return listingPhotoMimeTypes.has(mimeType)
     || ((!mimeType || mimeType === "application/octet-stream") && listingPhotoExtensions.has(extension));
+}
+
+function isUploadedPhoto(value: unknown): value is UploadedPhoto {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const photo = value as Partial<UploadedPhoto>;
+  return typeof photo.id === "string"
+    && typeof photo.storageKey === "string"
+    && Number.isSafeInteger(photo.sortOrder);
 }
 
 type PublishProfileDefaults = {
@@ -133,6 +143,8 @@ export function PublishForm({
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [processingPhotos, setProcessingPhotos] = useState(false);
+  const processingPhotosRef = useRef(false);
   const [categorySlug, setCategorySlug] = useState(initialDraft?.categorySlug ?? "");
   const [cityOverride, setCityOverride] = useState<string | null>(initialDraft?.settlementId ?? profileDefaults.cityId);
   const cityId = cityOverride ?? (storedLocation === "all" ? "" : storedLocation);
@@ -143,6 +155,7 @@ export function PublishForm({
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [existingImages, setExistingImages] = useState<OwnerDraftImage[]>(initialDraft?.images ?? []);
   const photosRef = useRef<PhotoPreview[]>([]);
+  const mountedRef = useRef(true);
   const priceRef = useRef<HTMLInputElement | null>(null);
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
   const [listingId, setListingId] = useState<string | null>(initialDraft?.id ?? null);
@@ -174,7 +187,10 @@ export function PublishForm({
       ? t("publish.editPageTitle", { step: steps[step] })
       : t("publish.pageTitle", { step: steps[step] });
   useEffect(() => { photosRef.current = photos; }, [photos]);
-  useEffect(() => () => photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url)), []);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -361,27 +377,50 @@ export function PublishForm({
   }
 
   function validateAndContinue() {
+    if (processingPhotosRef.current) return;
     if (!validateCurrent(step)) return;
     setStep((value) => Math.min(steps.length - 1, value + 1));
   }
 
   function previousStep() {
+    if (processingPhotosRef.current) return;
     setGlobalError("");
     setFieldErrors({});
     setStep((value) => Math.max(0, value - 1));
   }
 
-  function addPhotos(files: FileList | null) {
-    if (!files) return;
+  async function addPhotos(selectedFiles: readonly File[]) {
+    if (selectedFiles.length === 0 || processingPhotosRef.current) return;
     const available = Math.max(0, 12 - existingImages.length - photos.length);
-    const candidates = Array.from(files).slice(0, available);
+    const candidates = selectedFiles.slice(0, available);
     if (candidates.length === 0 || candidates.some((file) => !isAcceptedListingPhoto(file) || file.size > 12 * 1024 * 1024)) {
       setGlobalError(t("publish.photoFileError"));
       return;
     }
-    const next = candidates.map((file) => ({ name: file.name, url: URL.createObjectURL(file), file }));
-    clearFieldError("photos");
-    setPhotos((current) => [...current, ...next]);
+    processingPhotosRef.current = true;
+    setProcessingPhotos(true);
+    setGlobalError("");
+    const next: PhotoPreview[] = [];
+    try {
+      // Process sequentially to keep peak memory bounded on iPhones when a
+      // user selects several full-resolution photos at once.
+      for (const file of candidates) {
+        const normalized = await normalizeListingPhotoForUpload(file);
+        if (!mountedRef.current) {
+          next.forEach((photo) => URL.revokeObjectURL(photo.url));
+          return;
+        }
+        next.push({ name: normalized.name, url: URL.createObjectURL(normalized), file: normalized });
+      }
+      clearFieldError("photos");
+      setPhotos((current) => [...current, ...next]);
+    } catch {
+      next.forEach((photo) => URL.revokeObjectURL(photo.url));
+      if (mountedRef.current) setGlobalError(t("publish.photoProcessingFailed"));
+    } finally {
+      processingPhotosRef.current = false;
+      if (mountedRef.current) setProcessingPhotos(false);
+    }
   }
 
   function removePhoto(index: number) {
@@ -493,6 +532,7 @@ export function PublishForm({
   }
 
   async function submitForModeration() {
+    if (processingPhotosRef.current) return;
     if (!validateCurrent(step, true)) return;
     const input = buildDraftInput();
     savePublishRecovery(safeBrowserStorage("localStorage"), createPublishRecovery(userId, recoveryFields, listingId));
@@ -533,19 +573,41 @@ export function PublishForm({
           headers: { accept: "application/json" },
         });
         const uploadBody = await upload.json().catch(() => ({})) as {
-          images?: Array<{ id: string; storageKey: string; sortOrder: number }>;
+          error?: string;
+          images?: unknown;
         };
         if (!upload.ok) {
           setStep(2);
           setFieldErrors({ photos: ["invalid"] });
-          setGlobalError(upload.status === 400 ? t("publish.photoFileError") : t("publish.photoUploadFailed"));
+          setGlobalError(upload.status === 401 || uploadBody.error === "authentication_required"
+            ? t("publish.signInToSave")
+            : upload.status === 400
+            ? t("publish.photoFileError")
+            : upload.status === 413
+              ? t("publish.photoPayloadTooLarge")
+              : t("publish.photoUploadFailed"));
           return;
         }
-        const uploadedImages = (uploadBody.images ?? []).map((image) => ({
+        const responseImages = Array.isArray(uploadBody.images) && uploadBody.images.every(isUploadedPhoto)
+          ? uploadBody.images
+          : null;
+        if (!responseImages || responseImages.length !== photos.length) {
+          setStep(2);
+          setFieldErrors({ photos: ["invalid"] });
+          setGlobalError(t("publish.photoUploadFailed"));
+          return;
+        }
+        const uploadedImages = responseImages.map((image) => ({
           id: image.id,
           url: protectedMediaUrl(image.storageKey) ?? "",
           sortOrder: image.sortOrder,
         }));
+        if (uploadedImages.some((image) => !image.url)) {
+          setStep(2);
+          setFieldErrors({ photos: ["invalid"] });
+          setGlobalError(t("publish.photoUploadFailed"));
+          return;
+        }
         photos.forEach((photo) => URL.revokeObjectURL(photo.url));
         setPhotos([]);
         setExistingImages((current) => [...current, ...uploadedImages].sort((left, right) => left.sortOrder - right.sortOrder));
@@ -724,8 +786,12 @@ export function PublishForm({
           {step === 2 && <div className="publish-panel" ref={(node) => setFieldRef("photos", node)}>
             <div className="panel-heading"><span><Camera size={22} /></span><div><h2>{t("publish.addPhotos")}</h2><p>{t("publish.photosNote")}</p></div></div>
             {existingImages.length > 0 ? <div className="existing-photo-grid">{existingImages.map((image, index) => <article key={image.id}><img src={image.url} alt={t("publish.existingPhoto", { count: index + 1 })} />{index === 0 ? <b>{t("publish.mainPhoto")}</b> : null}</article>)}</div> : null}
-            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple onChange={(event) => addPhotos(event.target.files)} /></label>
-            {photos.length > 0 && <div className="photo-preview-grid">{photos.map((photo, index) => <article key={`${photo.name}-${index}`}><img src={photo.url} alt={t("publish.preview", { count: index + 1 })} />{existingImages.length === 0 && index === 0 && <b>{t("publish.mainPhoto")}</b>}<div><button type="button" disabled={index === 0} onClick={() => movePhoto(index, -1)} aria-label={t("publish.moveLeft")}><ChevronLeft size={16} /></button><GripVertical size={16} /><button type="button" disabled={index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={t("publish.moveRight")}><ChevronRight size={16} /></button><button type="button" className="remove-photo" onClick={() => removePhoto(index)} aria-label={t("publish.removePhoto")}><Trash2 size={16} /></button></div></article>)}</div>}
+            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{processingPhotos ? t("publish.processingPhotos") : t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple disabled={processingPhotos} onChange={(event) => {
+              const selected = Array.from(event.currentTarget.files ?? []);
+              event.currentTarget.value = "";
+              void addPhotos(selected);
+            }} /></label>
+            {photos.length > 0 && <div className="photo-preview-grid">{photos.map((photo, index) => <article key={`${photo.name}-${index}`}><img src={photo.url} alt={t("publish.preview", { count: index + 1 })} />{existingImages.length === 0 && index === 0 && <b>{t("publish.mainPhoto")}</b>}<div><button type="button" disabled={processingPhotos || index === 0} onClick={() => movePhoto(index, -1)} aria-label={t("publish.moveLeft")}><ChevronLeft size={16} /></button><GripVertical size={16} /><button type="button" disabled={processingPhotos || index === photos.length - 1} onClick={() => movePhoto(index, 1)} aria-label={t("publish.moveRight")}><ChevronRight size={16} /></button><button type="button" className="remove-photo" disabled={processingPhotos} onClick={() => removePhoto(index)} aria-label={t("publish.removePhoto")}><Trash2 size={16} /></button></div></article>)}</div>}
             {fieldError("photos")}
             <div className="photo-tips"><ShieldCheck size={19} /><div><strong>{t("publish.photoTip")}</strong><p>{t("publish.photoTipNote")}</p></div></div>
           </div>}
@@ -742,10 +808,10 @@ export function PublishForm({
 
           {globalError && <div className="form-error" role="alert">{globalError}</div>}
           <div className="publish-controls">
-            <button type="button" className="secondary-control" disabled={step === 0 || saving} onClick={previousStep}><ChevronLeft size={18} />{t("common.back")}</button>
+            <button type="button" className="secondary-control" disabled={step === 0 || saving || processingPhotos} onClick={previousStep}><ChevronLeft size={18} />{t("common.back")}</button>
             {step < steps.length - 1
-              ? <button type="button" className="primary-control" onClick={validateAndContinue}>{t("common.next")}<ChevronRight size={18} /></button>
-              : <button type="button" className="primary-control" disabled={saving} onClick={() => void submitForModeration()}>{saving ? t("publish.saving") : listingStatus === "rejected" ? t("publish.resubmitForModeration") : t("publish.submitForModeration")}<Check size={18} /></button>}
+              ? <button type="button" className="primary-control" disabled={processingPhotos} onClick={validateAndContinue}>{t("common.next")}<ChevronRight size={18} /></button>
+              : <button type="button" className="primary-control" disabled={saving || processingPhotos} onClick={() => void submitForModeration()}>{saving ? t("publish.saving") : listingStatus === "rejected" ? t("publish.resubmitForModeration") : t("publish.submitForModeration")}<Check size={18} /></button>}
           </div>
         </div>
       )}

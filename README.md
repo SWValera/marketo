@@ -23,10 +23,12 @@ and account UI is localized in Russian and Kazakh.
   cross-device manual fallback, logout, password recovery/update and profile
   editing use Supabase Auth/Profile RPCs. Supabase Auth remains the only user
   identity source.
-- Publish creates an authenticated Supabase draft, stores typed attributes and
-  private contact data, normalizes JPEG/PNG/WebP/HEIC uploads to metadata-free
-  WebP through Cloudflare Images, stores them in MARKETO_MEDIA R2, then submits
-  the listing to pending. Browser localStorage is
+- Publish creates an authenticated Supabase draft and stores typed attributes
+  and private contact data. The browser decodes JPEG/PNG/WebP/HEIC photos,
+  applies orientation, scales them to at most 2560 px and re-encodes them as
+  bounded JPEGs. The server validates the JPEG structure, strips application
+  metadata again, stores the bytes in MARKETO_MEDIA R2, then submits the listing
+  to pending. Browser localStorage is
   user-scoped, consent-based recovery-only storage with a seven-day TTL.
 - The authenticated profile reads real owner listings with bounded pagination,
   protected non-public media, localized statuses and owner archive/sold actions.
@@ -54,7 +56,6 @@ and account UI is localized in Russian and Kazakh.
 - Cloudflare Worker entry: dist/server/index.js
 - static assets: dist/client
 - R2 binding: MARKETO_MEDIA
-- Images binding: IMAGES
 
 Required public Supabase values and server-only secrets are documented in
 .env.example. Never expose SUPABASE_SECRET_KEY or a service-role key through a

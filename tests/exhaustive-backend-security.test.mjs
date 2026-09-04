@@ -167,12 +167,11 @@ test("runtime public configuration rejects service-role JWTs and matches build U
 });
 
 test("upload and media routes preserve fail-closed cleanup and error classification", async () => {
-  const [uploadRoute, mediaRoute, submitRoute, imageValidation, imageNormalization, requestRouting] = await Promise.all([
+  const [uploadRoute, mediaRoute, submitRoute, imageValidation, requestRouting] = await Promise.all([
     readFile(new URL("app/api/listings/[id]/images/route.ts", root), "utf8"),
     readFile(new URL("app/api/media/[...key]/route.ts", root), "utf8"),
     readFile(new URL("app/api/listings/[id]/submit/route.ts", root), "utf8"),
     readFile(new URL("lib/media/image-validation.ts", root), "utf8"),
-    readFile(new URL("lib/media/image-normalization.ts", root), "utf8"),
     import("../lib/http/request-routing.ts"),
   ]);
   assert.match(uploadRoute, /parseBoundedMultipartFormData\(request, listingImageLimits\.maxRequestBytes\)/);
@@ -180,9 +179,9 @@ test("upload and media routes preserve fail-closed cleanup and error classificat
   assert.match(uploadRoute, /createListingImageStorageKey/);
   assert.match(uploadRoute, /metadataCleanupError/);
   assert.match(uploadRoute, /photo_upload_cleanup_failed/);
-  assert.match(uploadRoute, /normalizeListingImage\(file, images\)/);
-  assert.match(imageNormalization, /\.output\(\{ format: OUTPUT_MIME_TYPE, quality: OUTPUT_QUALITY, anim: false \}\)/);
-  assert.match(imageNormalization, /imageFamily\(outputInfo\.format\) !== "webp"/);
+  assert.match(uploadRoute, /validateListingImage\(file\)/);
+  assert.doesNotMatch(uploadRoute, /getListingImageProcessor|normalizeListingImage|media_processing_unavailable/);
+  assert.match(uploadRoute, /file\.size > listingImageLimits\.maxBytes/);
   assert.match(mediaRoute, /publicResult\.error.*status: 503/s);
   assert.match(mediaRoute, /protectedResult\.error.*status: 503/s);
   assert.match(mediaRoute, /client\.auth\.getUser\(\)/);
@@ -190,6 +189,8 @@ test("upload and media routes preserve fail-closed cleanup and error classificat
   assert.doesNotMatch(mediaRoute, /writeHttpMetadata/);
   assert.match(submitRoute, /code === "42501" \? 409 : 500/);
   assert.match(imageValidation, /expectedBytes > MAX_DECODED_IMAGE_BYTES/);
+  assert.match(imageValidation, /stripJpegMetadata/);
+  assert.match(imageValidation, /!\[1, 3\]\.includes\(componentCount\)/);
   assert.equal(listingImageLimits.maxPixels, 20_000_000);
   assert.equal(listingImageLimits.maxDecodedBytes, 64 * 1024 * 1024);
   assert.equal(listingImageLimits.maxRequestBytes, listingImageLimits.maxTotalBytes + 512 * 1024);

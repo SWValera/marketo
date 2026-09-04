@@ -5,9 +5,3 @@ export function getListingMediaBucket(): R2Bucket {
   if (!bucket) throw new Error("MARKETO_MEDIA R2 binding is not configured.");
   return bucket;
 }
-
-export function getListingImageProcessor(): ImagesBinding {
-  const images = env.IMAGES;
-  if (!images) throw new Error("IMAGES binding is not configured.");
-  return images;
-}

@@ -279,7 +279,10 @@ function parseJpeg(bytes: Uint8Array): DetectedImage | null {
       const height = readUint16BE(bytes, payloadStart + 1);
       const width = readUint16BE(bytes, payloadStart + 3);
       const componentCount = bytes[payloadStart + 5];
-      if (precision !== 8 || height === 0 || width === 0 || ![1, 3, 4].includes(componentCount) || length !== 8 + componentCount * 3) return null;
+      // The browser upload contract emits grayscale or sRGB JPEG. Reject CMYK
+      // and YCCK because removing Adobe/ICC application segments would make
+      // their colour interpretation ambiguous after storage.
+      if (precision !== 8 || height === 0 || width === 0 || ![1, 3].includes(componentCount) || length !== 8 + componentCount * 3) return null;
       const components = new Map<number, JpegFrameComponent>();
       let maxHorizontalSampling = 0;
       let maxVerticalSampling = 0;
@@ -526,6 +529,47 @@ function detect(bytes: Uint8Array): DetectedImage | null {
   return null;
 }
 
+function stripJpegMetadata(bytes: Uint8Array) {
+  const parts: Uint8Array[] = [bytes.subarray(0, 2)];
+  let totalLength = 2;
+  let offset = 2;
+  let changed = false;
+  while (offset < bytes.length) {
+    const markerStart = offset;
+    if (bytes[offset++] !== 0xff) throw new Error("unsupported_image_content");
+    while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.length) throw new Error("unsupported_image_content");
+    const marker = bytes[offset++];
+    if (marker === 0xda) {
+      const remainder = bytes.subarray(markerStart);
+      parts.push(remainder);
+      totalLength += remainder.length;
+      break;
+    }
+    if (offset + 2 > bytes.length) throw new Error("unsupported_image_content");
+    const length = readUint16BE(bytes, offset);
+    if (length < 2 || length > bytes.length - offset) throw new Error("unsupported_image_content");
+    const segmentEnd = offset + length;
+    const isMetadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
+    if (isMetadata) {
+      changed = true;
+    } else {
+      const segment = bytes.subarray(markerStart, segmentEnd);
+      parts.push(segment);
+      totalLength += segment.length;
+    }
+    offset = segmentEnd;
+  }
+  if (!changed) return bytes;
+  const sanitized = new Uint8Array(totalLength);
+  let writeOffset = 0;
+  for (const part of parts) {
+    sanitized.set(part, writeOffset);
+    writeOffset += part.length;
+  }
+  return sanitized;
+}
+
 export async function validateListingImage(file: File): Promise<ValidatedImage> {
   if (file.size < 32 || file.size > MAX_IMAGE_BYTES) throw new Error("invalid_image_size");
   if (file.type === "image/avif") throw new Error("unsupported_image_content");
@@ -543,9 +587,13 @@ export async function validateListingImage(file: File): Promise<ValidatedImage> 
     mimeType: detected.mimeType,
     extension: detected.extension,
   };
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  // Browser uploads are already re-encoded, but the API remains a security
+  // boundary. Remove EXIF/XMP/IPTC/comment segments from direct JPEG requests
+  // as well, so GPS and device metadata can never reach R2.
+  const storageBytes = detected.mimeType === "image/jpeg" ? stripJpegMetadata(bytes) : bytes;
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", storageBytes));
   const sha256 = [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return { bytes, byteSize: file.size, ...image, sha256 };
+  return { bytes: storageBytes, byteSize: storageBytes.length, ...image, sha256 };
 }
 
 export const listingImageLimits = {

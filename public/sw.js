@@ -1,4 +1,4 @@
-const CACHE_NAME = "marketo-static-v6";
+const CACHE_NAME = "marketo-static-v7";
 const CACHE_PREFIX = "marketo-static-";
 // HTML and authenticated pages are deliberately never cached. Only the
 // self-contained offline document and immutable/static assets are stored.

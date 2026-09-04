@@ -9,8 +9,11 @@ const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
 export function PwaRuntime() {
   const { t } = useI18n();
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const [reloadAvailable, setReloadAvailable] = useState(false);
   const [updating, setUpdating] = useState(false);
   const reloadRequested = useRef(false);
+  const activationRequested = useRef(false);
+  const newControllerNeedsReload = useRef(false);
 
   const reloadOnce = useCallback((delay = 0) => {
     if (reloadRequested.current) return;
@@ -25,6 +28,7 @@ export function PwaRuntime() {
     let registration: ServiceWorkerRegistration | undefined;
     let installingWorker: ServiceWorker | null = null;
     let intervalId: number | undefined;
+    let updateCheckInFlight = false;
 
     const onControllerChange = () => {
       // clients.claim() also fires on the first successful installation. That
@@ -34,9 +38,33 @@ export function PwaRuntime() {
         controlledAtRegistration = true;
         return;
       }
-      reloadOnce();
+      if (activationRequested.current) {
+        reloadOnce();
+      } else {
+        // Another tab may have activated the release. Never discard a draft
+        // by reloading this tab until the user explicitly accepts the update.
+        newControllerNeedsReload.current = true;
+        setWaitingWorker(null);
+        setReloadAvailable(true);
+      }
     };
-    const checkForUpdate = () => registration?.update().catch(() => undefined);
+    const checkForUpdate = () => {
+      if (!registration || updateCheckInFlight) return;
+      updateCheckInFlight = true;
+      void registration.update()
+        .catch(() => undefined)
+        .finally(() => { updateCheckInFlight = false; });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      if (newControllerNeedsReload.current) {
+        setReloadAvailable(true);
+      } else if (registration?.waiting) {
+        setWaitingWorker(registration.waiting);
+      } else {
+        checkForUpdate();
+      }
+    };
     const onInstallingStateChange = () => {
       if (installingWorker?.state === "installed" && navigator.serviceWorker.controller) {
         setWaitingWorker(installingWorker);
@@ -46,6 +74,7 @@ export function PwaRuntime() {
       installingWorker?.removeEventListener("statechange", onInstallingStateChange);
       installingWorker = registration?.installing ?? null;
       installingWorker?.addEventListener("statechange", onInstallingStateChange);
+      onInstallingStateChange();
     };
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
@@ -58,6 +87,8 @@ export function PwaRuntime() {
       }, UPDATE_INTERVAL_MS);
       registration.addEventListener("updatefound", onUpdateFound);
       if (registration.installing) onUpdateFound();
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      if (!registration.waiting && controlledAtRegistration) checkForUpdate();
     }).catch(() => undefined);
 
     return () => {
@@ -65,13 +96,21 @@ export function PwaRuntime() {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
       registration?.removeEventListener("updatefound", onUpdateFound);
       installingWorker?.removeEventListener("statechange", onInstallingStateChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (intervalId !== undefined) window.clearInterval(intervalId);
     };
   }, [reloadOnce]);
 
   const activateUpdate = useCallback(() => {
-    if (!waitingWorker || updating) return;
+    if (updating) return;
+    if (reloadAvailable) {
+      setUpdating(true);
+      reloadOnce();
+      return;
+    }
+    if (!waitingWorker) return;
     setUpdating(true);
+    activationRequested.current = true;
     const channel = new MessageChannel();
     const timeout = window.setTimeout(() => reloadOnce(), 4500);
     channel.port1.onmessage = () => {
@@ -79,13 +118,13 @@ export function PwaRuntime() {
       reloadOnce(250);
     };
     waitingWorker.postMessage({ type: "SKIP_WAITING" }, [channel.port2]);
-  }, [reloadOnce, updating, waitingWorker]);
+  }, [reloadAvailable, reloadOnce, updating, waitingWorker]);
 
-  if (!waitingWorker) return null;
+  if (!waitingWorker && !reloadAvailable) return null;
   return <aside className="pwa-update-toast" role="status" aria-live="polite">
     <span className="pwa-update-icon"><RefreshCw size={20} /></span>
     <div><strong>{t("pwa.updateTitle")}</strong><small>{t("pwa.updateNote")}</small></div>
     <button type="button" className="pwa-update-action" disabled={updating} onClick={activateUpdate}>{updating ? t("pwa.updating") : t("pwa.update")}</button>
-    <button type="button" className="pwa-update-close" onClick={() => setWaitingWorker(null)} aria-label={t("pwa.later")}><X size={18} /></button>
+    <button type="button" className="pwa-update-close" onClick={() => { setWaitingWorker(null); setReloadAvailable(false); }} aria-label={t("pwa.later")}><X size={18} /></button>
   </aside>;
 }

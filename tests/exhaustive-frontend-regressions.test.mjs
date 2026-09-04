@@ -143,13 +143,24 @@ test("unsupported product actions are not exposed as working controls", async ()
 });
 
 test("upload UI accepts the normalized marketplace image formats", async () => {
-  const [form, messages] = await Promise.all([
+  const [form, normalizer, messages] = await Promise.all([
     source("components/publish-form.tsx"),
+    source("lib/media/client-image-normalization.ts"),
     source("lib/i18n/messages.ts"),
   ]);
   assert.match(form, /accept="image\/jpeg,image\/png,image\/webp,image\/heic,image\/heif,\.heic,\.heif"/);
+  assert.match(form, /for \(const file of candidates\)[\s\S]*await normalizeListingPhotoForUpload\(file\)/);
+  assert.match(form, /event\.currentTarget\.value = ""/);
+  assert.match(form, /form\.append\("photos", photo\.file, photo\.name\)/);
+  assert.match(form, /responseImages\.length !== photos\.length/);
+  assert.match(form, /mountedRef\.current/);
+  assert.match(normalizer, /context\.fillStyle = "#ffffff"/);
+  assert.match(normalizer, /colorSpace: "srgb"/);
+  assert.match(normalizer, /canvas\.toBlob\(resolve, "image\/jpeg"/);
   assert.match(messages, /JPEG, PNG, WebP или HEIC\/HEIF/);
   assert.match(messages, /JPEG, PNG, WebP немесе HEIC\/HEIF/);
+  assert.match(messages, /автоматически преобразуем в JPEG/);
+  assert.match(messages, /JPEG-ке автоматты түрде түрлендіреміз/);
 });
 
 test("every rendered main element is a valid target for the global skip link", async () => {

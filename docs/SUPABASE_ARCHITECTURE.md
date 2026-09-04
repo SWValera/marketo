@@ -64,14 +64,17 @@ not expose private phone fields publicly.
 1. An authenticated owner calls create_listing_draft.
 2. One transaction writes listing, private contact and validated typed category
    attributes.
-3. The server image route verifies owner/editable status and enforces bounded
+3. The browser decodes JPEG, PNG, WebP or HEIC/HEIF with the device image
+   decoder, applies orientation, scales down to 2560 px and emits a JPEG. In the
+   supported UI, source bytes stay on the device and photos are processed one at
+   a time to bound mobile memory use.
+4. The server image route verifies owner/editable status and enforces bounded
    multipart, per-file and total input limits.
-4. Cloudflare Images decodes JPEG, PNG, WebP or HEIC/HEIF, verifies the real
-   format and dimensions, applies EXIF orientation, scales down to 2560 px and
-   emits a metadata-free WebP. Source bytes are never persisted.
-5. The route verifies and hashes the normalized output, writes it to R2, then
-   inserts image metadata with the server-only Supabase client. Failed batches
-   compensate database and R2.
+5. The route validates the baseline JPEG (or compatible PNG from a rolling
+   older client) structure and dimensions, removes JPEG application/comment
+   metadata, hashes the stored bytes, writes them to R2, then inserts image
+   metadata with the server-only Supabase client. Failed batches compensate
+   database and R2.
 6. The owner calls submit_listing, which validates required data and moves the
    listing to pending.
 7. A moderator-only RPC may approve pending → active.
@@ -136,7 +139,6 @@ Server only:
 
 - SUPABASE_SECRET_KEY (or legacy service-role fallback)
 - MARKETO_MEDIA R2 binding
-- IMAGES binding for trusted decode, orientation, resizing and WebP normalization
 
 Migration tooling only:
 

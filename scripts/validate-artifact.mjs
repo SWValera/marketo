@@ -72,8 +72,8 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   if (workerConfig.main !== "index.js" || workerConfig.assets?.binding !== "ASSETS" || workerConfig.assets?.directory !== "../client") {
     throw artifactError("Generated Worker configuration has an invalid entry or assets binding.");
   }
-  if (workerConfig.images?.binding !== "IMAGES") {
-    throw artifactError("Generated Worker configuration must contain the IMAGES binding.");
+  if (workerConfig.images !== undefined) {
+    throw artifactError("Generated Worker configuration must not depend on a Cloudflare Images binding.");
   }
   if (sourceHosting?.r2) {
     const bindings = (workerConfig.r2_buckets ?? []).filter((item) => item?.binding === sourceHosting.r2);

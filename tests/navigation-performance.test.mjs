@@ -236,11 +236,17 @@ test("request-driven mutations do not schedule a duplicate replace plus refresh 
   assert.deepEqual(offenders, []);
 });
 
-test("PWA runtime ignores initial controller acquisition and avoids an eager update request", async () => {
+test("PWA runtime detects releases promptly without discarding an in-progress draft", async () => {
   const runtime = await source("components/pwa-runtime.tsx");
   assert.match(runtime, /controlledAtRegistration\s*=\s*Boolean\(navigator\.serviceWorker\.controller\)/);
   assert.match(runtime, /if\s*\(\s*!controlledAtRegistration\s*\)\s*\{[\s\S]*?controlledAtRegistration\s*=\s*true;[\s\S]*?return;/);
   assert.match(runtime, /reloadRequested\.current/);
-  assert.equal(runtime.match(/\bcheckForUpdate\(\)/g)?.length ?? 0, 1, "only the visibility-gated interval may check for updates");
   assert.match(runtime, /setInterval\([\s\S]*?visibilityState\s*===\s*["']visible["'][\s\S]*?checkForUpdate\(\)/);
+  assert.match(runtime, /addEventListener\("visibilitychange", onVisibilityChange\)/);
+  assert.match(runtime, /removeEventListener\("visibilitychange", onVisibilityChange\)/);
+  assert.match(runtime, /updateCheckInFlight/);
+  assert.match(runtime, /if \(activationRequested\.current\)[\s\S]*reloadOnce\(\)[\s\S]*setReloadAvailable\(true\)/);
+  assert.match(runtime, /activationRequested\.current = true/);
+  assert.match(runtime, /addEventListener\("statechange", onInstallingStateChange\);[\s\S]*onInstallingStateChange\(\)/);
+  assert.match(runtime, /if \(!registration\.waiting && controlledAtRegistration\) checkForUpdate\(\)/);
 });

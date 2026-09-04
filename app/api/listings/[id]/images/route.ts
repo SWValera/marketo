@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getListingImageProcessor, getListingMediaBucket } from "@/lib/media/bucket";
-import { listingImageLimits } from "@/lib/media/image-validation";
-import { normalizeListingImage } from "@/lib/media/image-normalization";
+import { getListingMediaBucket } from "@/lib/media/bucket";
+import { listingImageLimits, validateListingImage } from "@/lib/media/image-validation";
 import { isSameOriginMutationRequest } from "@/lib/http/same-origin";
 import { MultipartRequestError, parseBoundedMultipartFormData } from "@/lib/http/bounded-multipart";
 import { createListingImageStorageKey } from "@/lib/media/storage-key";
@@ -21,7 +20,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError || !authData.user) return NextResponse.json({ error: "authentication_required" }, { status: 401 });
   const { data: listing, error: listingError } = await client.from("listings").select("id, owner_id, status").eq("id", listingId).maybeSingle();
-  if (listingError) return NextResponse.json({ error: "listing_lookup_failed" }, { status: 503 });
+  if (listingError) {
+    console.error("listing_photo_upload_unavailable", { code: "listing_lookup_failed" });
+    return NextResponse.json({ error: "listing_lookup_failed" }, { status: 503 });
+  }
   if (!listing || listing.owner_id !== authData.user.id) return NextResponse.json({ error: "listing_not_owned" }, { status: 403 });
   if (listing.status !== "draft" && listing.status !== "rejected") return NextResponse.json({ error: "listing_not_editable" }, { status: 409 });
 
@@ -38,10 +40,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const files = entries.map(([, entry]) => entry as File);
   if (files.length === 0 || files.length > listingImageLimits.maxFiles) return NextResponse.json({ error: "invalid_photo_count" }, { status: 400 });
+  if (files.some((file) => file.size > listingImageLimits.maxBytes)) return NextResponse.json({ error: "photo_payload_too_large" }, { status: 413 });
+  if (files.some((file) => file.size < 32)) return NextResponse.json({ error: "invalid_image_size" }, { status: 400 });
   if (files.reduce((total, file) => total + file.size, 0) > listingImageLimits.maxTotalBytes) return NextResponse.json({ error: "photo_payload_too_large" }, { status: 413 });
 
   const { data: existing, error: existingError } = await client.from("listing_images").select("id, sort_order, byte_size").eq("listing_id", listingId).order("sort_order");
-  if (existingError) return NextResponse.json({ error: "image_lookup_failed" }, { status: 503 });
+  if (existingError) {
+    console.error("listing_photo_upload_unavailable", { code: "image_lookup_failed" });
+    return NextResponse.json({ error: "image_lookup_failed" }, { status: 503 });
+  }
   if (existing.length + files.length > listingImageLimits.maxFiles) return NextResponse.json({ error: "photo_limit_exceeded" }, { status: 400 });
   const existingBytes = existing.reduce((total, image) => total + (image.byte_size ?? 0), 0);
   if (existingBytes + files.reduce((total, file) => total + file.size, 0) > listingImageLimits.maxTotalBytes) {
@@ -52,18 +59,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     bucket = getListingMediaBucket();
   } catch {
+    console.error("listing_photo_upload_unavailable", { code: "media_storage_unavailable" });
     return NextResponse.json({ error: "media_storage_unavailable" }, { status: 503 });
-  }
-  let images: ImagesBinding;
-  try {
-    images = getListingImageProcessor();
-  } catch {
-    return NextResponse.json({ error: "media_processing_unavailable" }, { status: 503 });
   }
   let admin: ReturnType<typeof createSupabaseAdminClient>;
   try {
     admin = createSupabaseAdminClient();
   } catch {
+    console.error("listing_photo_upload_unavailable", { code: "media_metadata_unavailable" });
     return NextResponse.json({ error: "media_metadata_unavailable" }, { status: 503 });
   }
   const created: Array<{ id: string; storageKey: string; sortOrder: number; byteSize: number }> = [];
@@ -72,10 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     for (const [index, file] of files.entries()) {
-      const image = await normalizeListingImage(file, images);
-      if (existingBytes + created.reduce((total, item) => total + item.byteSize, 0) + image.byteSize > listingImageLimits.maxTotalBytes) {
-        throw new Error("normalized_photo_payload_too_large");
-      }
+      const image = await validateListingImage(file);
       const sortOrder = firstSortOrder + index;
       // The object identity must not depend on the racy sort-order snapshot.
       // A losing concurrent metadata insert can therefore delete only its own
@@ -133,13 +133,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         cleanupFailed = true;
       }
     }
-    if (cleanupFailed) return NextResponse.json({ error: "photo_upload_cleanup_failed" }, { status: 503 });
+    if (cleanupFailed) {
+      console.error("listing_photo_upload_failed", { code: "photo_upload_cleanup_failed" });
+      return NextResponse.json({ error: "photo_upload_cleanup_failed" }, { status: 503 });
+    }
     const message = error instanceof Error ? error.message : "photo_upload_failed";
     const clientError = /^(?:invalid_image_size|unsupported_image_content|image_mime_mismatch|image_dimensions_too_small|image_dimensions_too_large)$/.test(message);
-    const tooLarge = /^(?:normalized_image_too_large|normalized_photo_payload_too_large)$/.test(message);
+    if (!clientError) console.error("listing_photo_upload_failed", { code: "internal_upload_failure" });
     return NextResponse.json(
-      { error: clientError ? message : tooLarge ? "photo_payload_too_large" : "photo_upload_failed" },
-      { status: clientError ? 400 : tooLarge ? 413 : 503 },
+      { error: clientError ? message : "photo_upload_failed" },
+      { status: clientError ? 400 : 503 },
     );
   }
 

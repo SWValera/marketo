@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { deflateSync, inflateSync } from "node:zlib";
+import { clientListingImageSize, normalizeListingPhotoForUpload } from "../lib/media/client-image-normalization.ts";
 import { validateListingImage } from "../lib/media/image-validation.ts";
-import { normalizeListingImage } from "../lib/media/image-normalization.ts";
 
 const root = new URL("../", import.meta.url);
 
@@ -83,45 +83,24 @@ function imageFile(bytes, name, type) {
   return new File([bytes], name, { type });
 }
 
-function fakeImagesBinding({
-  sourceInfo = { format: "image/heic", fileSize: 64, width: 8064, height: 6048 },
-  outputInfo = { format: "image/webp", fileSize: REAL_WEBP.length, width: 2560, height: 1920 },
-  outputBytes = REAL_WEBP,
-  outputContentType = "image/webp",
-  outputStatus = 200,
-  failTransform = false,
-} = {}) {
-  let infoCalls = 0;
-  const calls = { transform: null, output: null };
+function fakeClientImageRuntime({ width = 8064, height = 6048, outputs = [new Blob([REAL_JPEG], { type: "image/jpeg" })], failDecode = false } = {}) {
+  const calls = { encodes: [], releases: 0 };
+  let outputIndex = 0;
   return {
     calls,
-    binding: {
-      async info(stream) {
-        await new Response(stream).arrayBuffer();
-        infoCalls += 1;
-        return infoCalls === 1 ? sourceInfo : outputInfo;
-      },
-      input(stream) {
+    runtime: {
+      async decode() {
+        if (failDecode) throw new Error("decode failed");
         return {
-          transform(options) {
-            calls.transform = options;
-            return {
-              async output(outputOptions) {
-                calls.output = outputOptions;
-                if (failTransform) throw new Error("transform unavailable");
-                await new Response(stream).arrayBuffer();
-                return {
-                  response() {
-                    return new Response(outputBytes, {
-                      status: outputStatus,
-                      headers: { "content-type": outputContentType },
-                    });
-                  },
-                };
-              },
-            };
-          },
+          source: {},
+          width,
+          height,
+          release() { calls.releases += 1; },
         };
+      },
+      async encodeJpeg(_source, outputWidth, outputHeight, quality) {
+        calls.encodes.push({ width: outputWidth, height: outputHeight, quality });
+        return outputs[Math.min(outputIndex++, outputs.length - 1)];
       },
     },
   };
@@ -254,41 +233,68 @@ test("listing image validator accepts real baseline JPEG and fully checked PNG p
   await assert.rejects(validateListingImage(new File(["<svg xmlns='http://www.w3.org/2000/svg'/>"] , "image.svg", { type: "image/svg+xml" })), /unsupported_image_content/);
 });
 
-test("listing image normalization accepts a 48 MP iPhone HEIC and stores a bounded metadata-free WebP", async () => {
-  const fake = fakeImagesBinding();
-  const file = imageFile(new Uint8Array(64), "IMG_0001.HEIC", "image/heic");
-  const image = await normalizeListingImage(file, fake.binding);
+test("client normalization turns a 48 MP iPhone HEIC into a bounded JPEG accepted by the server", async () => {
+  assert.deepEqual(clientListingImageSize(8064, 6048), { width: 2560, height: 1920 });
+  const fake = fakeClientImageRuntime();
+  const source = new File([new Uint8Array(64)], "IMG_0001.HEIC", { type: "image/heic", lastModified: 123456 });
+  const image = await normalizeListingPhotoForUpload(source, fake.runtime);
 
-  assert.deepEqual({ width: image.width, height: image.height, mime: image.mimeType, extension: image.extension }, {
-    width: 2560,
-    height: 1920,
-    mime: "image/webp",
-    extension: "webp",
-  });
-  assert.equal(image.byteSize, REAL_WEBP.length);
-  assert.match(image.sha256, /^[a-f0-9]{64}$/);
-  assert.deepEqual(fake.calls.transform, { width: 2560, height: 2560, fit: "scale-down" });
-  assert.deepEqual(fake.calls.output, { format: "image/webp", quality: 84, anim: false });
+  assert.equal(image.name, "IMG_0001.jpg");
+  assert.equal(image.type, "image/jpeg");
+  assert.equal(image.lastModified, 123456);
+  assert.deepEqual(fake.calls.encodes, [{ width: 2560, height: 1920, quality: 0.86 }]);
+  assert.equal(fake.calls.releases, 1);
+  const validated = await validateListingImage(image);
+  assert.equal(validated.mimeType, "image/jpeg");
+  assert.match(validated.sha256, /^[a-f0-9]{64}$/);
 });
 
-test("listing image normalization rejects MIME mismatches and unavailable transformations", async () => {
-  const mismatch = fakeImagesBinding();
-  await assert.rejects(
-    normalizeListingImage(imageFile(new Uint8Array(64), "spoofed.png", "image/png"), mismatch.binding),
-    /image_mime_mismatch/,
-  );
+test("client normalization retries compression and always releases decoded images", async () => {
+  const oversized = new Blob([new Uint8Array(12 * 1024 * 1024 + 1)], { type: "image/jpeg" });
+  const retry = fakeClientImageRuntime({ outputs: [oversized, new Blob([REAL_JPEG], { type: "image/jpeg" })] });
+  const source = imageFile(new Uint8Array(64), "IMG_0002.HEIF", "image/heif");
+  const image = await normalizeListingPhotoForUpload(source, retry.runtime);
+  assert.equal(image.type, "image/jpeg");
+  assert.deepEqual(retry.calls.encodes.map((call) => call.quality), [0.86, 0.76]);
+  assert.equal(retry.calls.releases, 1);
 
-  const unavailable = fakeImagesBinding({ failTransform: true });
+  const wrongMime = fakeClientImageRuntime({ outputs: [new Blob([REAL_WEBP], { type: "image/webp" })] });
   await assert.rejects(
-    normalizeListingImage(imageFile(new Uint8Array(64), "IMG_0002.HEIF", "image/heif"), unavailable.binding),
-    /image_processing_failed/,
+    normalizeListingPhotoForUpload(source, wrongMime.runtime),
+    /image_encode_failed/,
   );
+  assert.equal(wrongMime.calls.releases, 1);
 
-  const svg = fakeImagesBinding({ sourceInfo: { format: "image/svg+xml" } });
+  const unavailable = fakeClientImageRuntime({ failDecode: true });
   await assert.rejects(
-    normalizeListingImage(imageFile(new Uint8Array(64), "vector.svg", "image/svg+xml"), svg.binding),
-    /unsupported_image_content/,
+    normalizeListingPhotoForUpload(source, unavailable.runtime),
+    /decode failed/,
   );
+  assert.equal(unavailable.calls.releases, 0);
+  assert.throws(() => clientListingImageSize(20_000, 300), /invalid_image_dimensions/);
+});
+
+test("server strips JPEG application and comment metadata before R2 storage", async () => {
+  const exif = Buffer.from("Exif\0\0GPSLatitude=51.1", "utf8");
+  const comment = Buffer.from("private camera comment", "utf8");
+  const segment = (marker, payload) => {
+    const header = Buffer.alloc(4);
+    header[0] = 0xff;
+    header[1] = marker;
+    header.writeUInt16BE(payload.length + 2, 2);
+    return Buffer.concat([header, payload]);
+  };
+  const withMetadata = Buffer.concat([
+    REAL_JPEG.subarray(0, 2),
+    segment(0xe1, exif),
+    segment(0xfe, comment),
+    REAL_JPEG.subarray(2),
+  ]);
+  const sanitized = await validateListingImage(imageFile(withMetadata, "iphone.jpg", "image/jpeg"));
+  assert.equal(Buffer.from(sanitized.bytes).includes(exif), false);
+  assert.equal(Buffer.from(sanitized.bytes).includes(comment), false);
+  assert.ok(sanitized.byteSize < withMetadata.length);
+  await assert.doesNotReject(validateListingImage(imageFile(sanitized.bytes, "stored.jpg", "image/jpeg")));
 });
 
 test("listing image validator rejects synthetic, truncated, malformed, and ambiguous JPEG structures", async () => {
@@ -481,8 +487,8 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.doesNotMatch(publishPage, /getCategoryReferences|getMyListingDraftBundle/);
   assert.match(draftRoute, /create_listing_draft/);
   for (const status of [401, 404, 409, 503]) assert.match(draftReadRoute, new RegExp(`status: ${status}`));
-  assert.match(imageRoute, /normalizeListingImage/);
-  assert.match(imageRoute, /getListingImageProcessor/);
+  assert.match(imageRoute, /validateListingImage\(file\)/);
+  assert.doesNotMatch(imageRoute, /normalizeListingImage|getListingImageProcessor|media_processing_unavailable/);
   assert.match(imageRoute, /listing\.owner_id !== authData\.user\.id/);
   assert.match(imageRoute, /bucket\.put/);
   assert.match(imageRoute, /stored\.size !== image\.byteSize/);
