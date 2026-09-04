@@ -116,7 +116,11 @@ test("catalog filters navigate only on explicit apply and route state remounts p
     assert.equal(catalogTags.length, 1, `${page} must render one catalog client`);
     assert.doesNotMatch(catalogTags[0], /\bcatalog\s*=/, `${page} must not serialize the catalog into RSC props`);
     assert.match(catalogTags[0], /\bkey\s*=/, `${page} must remount from stable server route state`);
-    assert.match(text, /JSON\.stringify\(parsed\)/, `${page} key must include parsed route state`);
+    assert.match(
+      text,
+      /JSON\.stringify\(\{\s*\.\.\.parsed,\s*dynamicFilters:\s*initialDynamicFilters\s*\}\)/,
+      `${page} key must include parsed route state with sanitized dynamic filters`,
+    );
   }
 });
 

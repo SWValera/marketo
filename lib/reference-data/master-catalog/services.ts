@@ -1,7 +1,7 @@
 import { branch, fallbackLeaf, leaves, overlay, type CatalogEntry, type MasterCatalogNode } from "./types.ts";
 
 const serviceLeaves = (entries: readonly CatalogEntry[], profiles: readonly string[] = ["serviceBase"]) =>
-  leaves(entries, profiles);
+  leaves(entries, profiles.includes("serviceProfessional") ? profiles : [...profiles, "serviceProfessional"]);
 
 export const servicesCatalogOverlays: MasterCatalogNode[] = [
   overlay("services", [

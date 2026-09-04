@@ -88,8 +88,8 @@ test("every root vertical has a representative leaf with domain-specific seller 
 test("generated coverage report contains one auditable row per category", async () => {
   const report = await readFile(new URL("../docs/CATEGORY_COVERAGE_REPORT.md", import.meta.url), "utf8");
   assert.match(report, /Категорий: \*\*1356\*\*/);
-  assert.match(report, /Эффективных category-attribute связей: \*\*9373\*\*/);
-  assert.match(report, /Активных option rows в clean seed: \*\*87150\*\*/);
+  assert.match(report, /Эффективных category-attribute связей: \*\*14310\*\*/);
+  assert.match(report, /Активных option rows в clean seed: \*\*84490\*\*/);
   const matrix = report.split("## Полная матрица 1356 категорий\n")[1]?.split("## Принятые правила качества\n")[0] ?? "";
   const dataRows = matrix.split("\n").filter((line) => /^\| [a-z0-9-]+ \|/.test(line));
   assert.equal(dataRows.length, 1356);

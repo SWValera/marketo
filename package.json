@@ -19,6 +19,7 @@
     "verify:reference": "node scripts/run-with-sites-env.mjs --node scripts/verify-supabase-reference.mjs",
     "seed:reference": "node scripts/run-with-sites-env.mjs --node scripts/generate-reference-seeds.mjs",
     "category:migration": "node scripts/run-with-sites-env.mjs --node scripts/generate-category-normalization.mjs",
+    "catalog:completeness": "node scripts/run-with-sites-env.mjs --node scripts/generate-catalog-completeness-migration.mjs",
     "category:coverage": "node scripts/run-with-sites-env.mjs --node scripts/generate-category-coverage.mjs",
     "db:checksums": "node scripts/run-with-sites-env.mjs --node scripts/generate-supabase-checksums.mjs",
     "db:export": "node scripts/run-with-sites-env.mjs --bin drizzle-kit export",

@@ -39,7 +39,30 @@ async function createDatabase() {
 
 async function applyMigrations(db) {
   const names = (await readdir(new URL("supabase/migrations/", root))).filter((name) => name.endsWith(".sql")).sort();
-  for (const name of names) await db.exec(await readFile(new URL(`supabase/migrations/${name}`, root), "utf8"));
+  for (const name of names) {
+    if (name === "0024_catalog_completeness.sql") {
+      await db.exec(`
+        create temporary table released_catalog_attributes as
+        select category.slug as category_slug, attribute.key, attribute.data_type, attribute.depends_on_key
+        from public.category_attributes as attribute
+        join public.categories as category on category.id = attribute.category_id
+        where attribute.is_active;
+
+        create temporary table released_catalog_options as
+        select
+          category.slug as category_slug,
+          attribute.key as attribute_key,
+          option.value,
+          parent_option.value as parent_value
+        from public.category_attribute_options as option
+        join public.category_attributes as attribute on attribute.id = option.attribute_id
+        join public.categories as category on category.id = attribute.category_id
+        left join public.category_attribute_options as parent_option on parent_option.id = option.parent_option_id
+        where attribute.is_active and option.is_active;
+      `);
+    }
+    await db.exec(await readFile(new URL(`supabase/migrations/${name}`, root), "utf8"));
+  }
   return names;
 }
 
@@ -47,7 +70,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 23);
+    assert.equal(names.length, 24);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -134,6 +157,237 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       order by tablename
     `);
     assert.deepEqual(realtimeTables.rows, [{ tablename: "messages" }, { tablename: "notifications" }]);
+
+    const migrationCatalogContract = await db.query(`
+      with expected(slug, key, data_type, filter_mode) as (
+        values
+          ('smartphones', 'screen_size', 'number', 'range'),
+          ('smartphones', 'network_generation', 'select', 'exact'),
+          ('tablets', 'connectivity', 'select', 'exact'),
+          ('tablets', 'network_generation', 'select', 'exact'),
+          ('smart-watches', 'watch_model', 'text', 'search'),
+          ('cars-sedan', 'generation', 'text', 'search'),
+          ('cars-sedan', 'engine_power', 'number', 'range'),
+          ('cars-sedan', 'vin_available', 'boolean', 'exact'),
+          ('washing-machines', 'load_capacity', 'number', 'range'),
+          ('refrigerators', 'total_volume', 'number', 'range'),
+          ('air-conditioners', 'room_area', 'number', 'range'),
+          ('pet-aquarium-equipment', 'supply_type', 'text', 'search'),
+          ('books-fiction', 'author', 'text', 'search'),
+          ('food-farm-products', 'expiry_date', 'date', 'range'),
+          ('pet-food', 'animal_type', 'select', 'exact'),
+          ('rental-passenger-cars', 'brand', 'select', 'exact'),
+          ('rental-costumes-decor', 'rental_item_type', 'select', 'exact'),
+          ('rental-strollers-seats', 'child_item_type', 'select', 'exact'),
+          ('rental-computers-projectors', 'rental_equipment_type', 'select', 'exact'),
+          ('rental-sound-light', 'event_equipment_type', 'select', 'exact'),
+          ('rental-sports-tourism', 'rental_activity_type', 'select', 'exact'),
+          ('free-home-appliances', 'appliance_type', 'select', 'exact'),
+          ('exchange-cars', 'engine_power', 'number', 'range'),
+          ('exchange-phones', 'mobile_device_type', 'select', 'exact'),
+          ('exchange-land-commercial', 'exchange_property_type', 'select', 'exact'),
+          ('jobs-driver', 'skills', 'text', 'search'),
+          ('renovation-turnkey', 'provider_type', 'select', 'exact'),
+          ('flats-sale', 'property_documents', 'select', 'exact'),
+          ('commercial-rent', 'utilities_connected', 'boolean', 'exact'),
+          ('beauty-face-care', 'certification', 'select', 'exact')
+      )
+      select
+        count(*) filter (where attribute.id is null)::int as missing_expected,
+        count(*) filter (
+          where attribute.id is not null
+            and (not category.is_active or not attribute.is_active or not attribute.is_visible)
+        )::int as inactive_expected,
+        count(*) filter (
+          where attribute.id is not null
+            and (
+              attribute.data_type <> expected.data_type
+              or attribute.filter_mode <> expected.filter_mode
+              or not attribute.is_filterable
+            )
+        )::int as metadata_mismatches
+      from expected
+      left join public.categories as category on category.slug = expected.slug
+      left join public.category_attributes as attribute
+        on attribute.category_id = category.id and attribute.key = expected.key
+    `);
+    assert.deepEqual(migrationCatalogContract.rows[0], {
+      missing_expected: 0,
+      inactive_expected: 0,
+      metadata_mismatches: 0,
+    });
+
+    const migrationCatalogState = await db.query(`
+      with expected_condition(slug, key, controller_key, controller_values) as (
+        values
+          ('rental-costumes-decor', 'size', 'rental_item_type', array['costume']::text[]),
+          ('rental-costumes-decor', 'decor_style', 'rental_item_type', array['decor']::text[]),
+          ('rental-strollers-seats', 'stroller_type', 'child_item_type', array['stroller']::text[]),
+          ('rental-strollers-seats', 'isofix', 'child_item_type', array['car-seat']::text[]),
+          ('rental-computers-projectors', 'cpu', 'rental_equipment_type', array['computer']::text[]),
+          ('rental-computers-projectors', 'resolution', 'rental_equipment_type', array['projector']::text[]),
+          ('rental-computers-projectors', 'projector_technology', 'rental_equipment_type', array['projector']::text[]),
+          ('rental-bikes-scooters', 'bicycle_type', 'rental_vehicle_type', array['bicycle']::text[]),
+          ('rental-bikes-scooters', 'scooter_drive_type', 'rental_vehicle_type', array['scooter']::text[]),
+          ('rental-event-furniture', 'furniture_type', 'event_furnishing_type', array['furniture']::text[]),
+          ('rental-event-furniture', 'textile_type', 'event_furnishing_type', array['textile']::text[]),
+          ('rental-photo-video', 'camera_type', 'photo_video_type', array['photo']::text[]),
+          ('rental-photo-video', 'video_camera_type', 'photo_video_type', array['video']::text[]),
+          ('rental-photo-video', 'action_camera_type', 'photo_video_type', array['action']::text[]),
+          ('rental-photo-video', 'video_resolution', 'photo_video_type', array['video', 'action']::text[]),
+          ('rental-photo-video', 'waterproof', 'photo_video_type', array['action']::text[]),
+          ('rental-generators-compressors', 'fuel', 'power_equipment_type', array['generator']::text[]),
+          ('rental-generators-compressors', 'compressor_pressure', 'power_equipment_type', array['compressor']::text[]),
+          ('rental-game-consoles', 'console_form', 'gaming_rental_type', array['console']::text[]),
+          ('rental-game-consoles', 'vr_type', 'gaming_rental_type', array['vr']::text[]),
+          ('free-kids-gear', 'stroller_type', 'kids_gear_type', array['stroller']::text[]),
+          ('free-kids-gear', 'furniture_type', 'kids_gear_type', array['furniture']::text[]),
+          ('free-kids-gear', 'care_item_type', 'kids_gear_type', array['care']::text[]),
+          ('free-phones-computers', 'screen_size', 'free_device_type', array['phone', 'tablet', 'laptop']::text[]),
+          ('free-phones-computers', 'cpu', 'free_device_type', array['laptop', 'desktop']::text[]),
+          ('exchange-gaming', 'console_form', 'gaming_item_type', array['console']::text[]),
+          ('exchange-gaming', 'game_title', 'gaming_item_type', array['game']::text[]),
+          ('exchange-gaming', 'vr_type', 'gaming_item_type', array['vr']::text[]),
+          ('feeding-breast-pumps', 'year', 'breast_pump_item_type', array['pump']::text[]),
+          ('baby-monitors-scales', 'connection', 'baby_device_type', array['audio-monitor', 'video-monitor']::text[]),
+          ('baby-monitors-scales', 'night_vision', 'baby_device_type', array['video-monitor']::text[]),
+          ('exchange-phones', 'sim', 'mobile_device_type', array['phone']::text[]),
+          ('exchange-phones', 'stylus_included', 'mobile_device_type', array['tablet']::text[]),
+          ('exchange-land-commercial', 'land_area', 'exchange_property_type', array['land']::text[]),
+          ('exchange-land-commercial', 'commercial_type', 'exchange_property_type', array['commercial']::text[])
+      )
+      select
+        (select count(*)::int from public.category_attributes where is_active) as attributes,
+        (select count(*)::int from public.category_attribute_options where is_active) as options,
+        (select count(*)::int
+          from public.category_attribute_options as option
+          join public.category_attributes as attribute on attribute.id = option.attribute_id
+          where option.is_active and not attribute.is_active
+        ) as active_options_on_inactive_attributes,
+        (select count(*)::int
+          from expected_condition as expected
+          left join public.categories as category on category.slug = expected.slug
+          left join public.category_attributes as attribute
+            on attribute.category_id = category.id and attribute.key = expected.key
+          where attribute.id is null
+             or attribute.validation -> 'visibleWhen' ->> 'key' is distinct from expected.controller_key
+             or attribute.validation -> 'visibleWhen' -> 'values' is distinct from to_jsonb(expected.controller_values)
+        ) as visible_when_mismatches
+    `);
+    assert.deepEqual(migrationCatalogState.rows[0], {
+      attributes: 14310,
+      options: 84490,
+      active_options_on_inactive_attributes: 0,
+      visible_when_mismatches: 0,
+    });
+
+    const releasedCatalogCompatibility = await db.query(`
+      select
+        count(*) filter (
+          where current_attribute.is_active
+            and current_attribute.data_type is distinct from released.data_type
+        )::int as data_type_changes,
+        count(*) filter (
+          where current_attribute.is_active
+            and current_attribute.depends_on_key is distinct from released.depends_on_key
+        )::int as dependency_changes,
+        (
+          select count(*)::int
+          from released_catalog_options as released_option
+          join public.categories as category on category.slug = released_option.category_slug
+          join public.category_attributes as current_owner
+            on current_owner.category_id = category.id
+           and current_owner.key = released_option.attribute_key
+           and current_owner.is_active
+          left join public.category_attribute_options as current_option
+            on current_option.attribute_id = current_owner.id
+           and current_option.value = released_option.value
+          where current_option.id is null or not current_option.is_active
+        ) as removed_option_values,
+        (
+          select count(*)::int
+          from released_catalog_options as released_option
+          join public.categories as category on category.slug = released_option.category_slug
+          join public.category_attributes as current_owner
+            on current_owner.category_id = category.id
+           and current_owner.key = released_option.attribute_key
+           and current_owner.is_active
+          join public.category_attribute_options as current_option
+            on current_option.attribute_id = current_owner.id
+           and current_option.value = released_option.value
+           and current_option.is_active
+          left join public.category_attribute_options as current_parent on current_parent.id = current_option.parent_option_id
+          where current_parent.value is distinct from released_option.parent_value
+        ) as parent_value_changes
+      from released_catalog_attributes as released
+      join public.categories as category on category.slug = released.category_slug
+      join public.category_attributes as current_attribute
+        on current_attribute.category_id = category.id and current_attribute.key = released.key
+    `);
+    assert.deepEqual(releasedCatalogCompatibility.rows[0], {
+      data_type_changes: 0,
+      dependency_changes: 0,
+      removed_option_values: 0,
+      parent_value_changes: 0,
+    });
+
+    const migrationCatalogForbidden = await db.query(`
+      with forbidden(slug, key) as (
+        values
+          ('smart-watches', 'model'),
+          ('pet-aquarium-equipment', 'species'),
+          ('pet-bird-cages', 'age_months'),
+          ('food-farm-products', 'model'),
+          ('food-farm-products', 'warranty'),
+          ('exchange-cars', 'model_other')
+      )
+      select
+        count(*) filter (where attribute.is_active)::int as active_forbidden,
+        (
+          select count(*)::int
+          from public.category_attribute_options as option
+          join public.category_attributes as owner_attribute on owner_attribute.id = option.attribute_id
+          where option.is_active and not owner_attribute.is_active
+        ) as active_options_on_inactive_attributes
+      from forbidden
+      join public.categories as category on category.slug = forbidden.slug
+      left join public.category_attributes as attribute
+        on attribute.category_id = category.id and attribute.key = forbidden.key
+    `);
+    assert.deepEqual(migrationCatalogForbidden.rows[0], {
+      active_forbidden: 0,
+      active_options_on_inactive_attributes: 0,
+    });
+
+    const leafGuard = await db.query(`
+      select
+        procedure.prosecdef,
+        has_function_privilege('anon', procedure.oid, 'EXECUTE') as anon_execute,
+        has_function_privilege('authenticated', procedure.oid, 'EXECUTE') as authenticated_execute,
+        has_function_privilege('service_role', procedure.oid, 'EXECUTE') as service_execute,
+        exists (
+          select 1
+          from pg_trigger as trigger
+          join pg_class as relation on relation.oid = trigger.tgrelid
+          join pg_namespace as relation_namespace on relation_namespace.oid = relation.relnamespace
+          where trigger.tgname = 'listings_validate_leaf_category'
+            and relation_namespace.nspname = 'public'
+            and relation.relname = 'listings'
+            and not trigger.tgisinternal
+        ) as trigger_exists
+      from pg_proc as procedure
+      join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+      where namespace.nspname = 'private'
+        and procedure.proname = 'validate_listing_leaf_category'
+    `);
+    assert.deepEqual(leafGuard.rows, [{
+      prosecdef: false,
+      anon_execute: false,
+      authenticated_execute: false,
+      service_execute: false,
+      trigger_exists: true,
+    }]);
+
     await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
     const result = await db.query(`
       select
@@ -141,8 +395,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         (select count(*) from public.regions)::int as regions,
         (select count(*) from public.settlements)::int as settlements,
         (select count(*) from public.categories)::int as categories,
-        (select count(*) from public.category_attributes)::int as attributes,
-        (select count(*) from public.category_attribute_options)::int as options,
+        (select count(*) from public.category_attributes where is_active)::int as attributes,
+        (select count(*) from public.category_attribute_options where is_active)::int as options,
         (select count(*) from public.city_premium_settings)::int as premium_settings,
         (select count(*) from public.city_premium_settings where capacity = 15)::int as default_capacity_settings,
         (select count(*) from public.city_premium_accounts)::int as premium_accounts,
@@ -156,8 +410,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       regions: 20,
       settlements: 90,
       categories: 1356,
-      attributes: 9373,
-      options: 87150,
+      attributes: 14310,
+      options: 84490,
       premium_settings: 90,
       default_capacity_settings: 90,
       premium_accounts: 0,
@@ -235,7 +489,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       broken_dependencies: 0,
     });
 
-    for (const migrationName of ["0017_master_catalog.sql"]) {
+    for (const migrationName of ["0024_catalog_completeness.sql"]) {
       const migration = await readFile(new URL(`supabase/migrations/${migrationName}`, root), "utf8");
       await db.exec(migration);
       await db.exec(migration);
@@ -243,10 +497,10 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
     await db.query("select private.apply_contextual_catalog_metadata()");
     const repeatedReferenceCounts = await db.query(`
       select
-        (select count(*) from public.category_attributes)::int as attributes,
-        (select count(*) from public.category_attribute_options)::int as options
+        (select count(*) from public.category_attributes where is_active)::int as attributes,
+        (select count(*) from public.category_attribute_options where is_active)::int as options
     `);
-    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 9373, options: 87150 });
+    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 14310, options: 84490 });
 
     const passengerCars = await db.query(`
       select

@@ -1,8 +1,8 @@
 # Marketo Supabase migration manifest
 
-Status: local source contains 23 ordered migrations. 0001–0022 are the
-immutable baseline; 0023 is the forward-only owner listing/draft lifecycle
-migration. This workspace did not apply SQL to production.
+Status: local source contains 24 ordered migrations. 0001–0022 are the
+immutable baseline; 0023–0024 are forward-only owner-lifecycle and catalog
+completeness migrations. This workspace did not apply SQL to production.
 
 | Order | File | Depends on | Purpose |
 |---:|---|---|---|
@@ -29,7 +29,8 @@ migration. This workspace did not apply SQL to production.
 | 21 | migrations/0021_auth_role_rpc_hardening.sql | 0003, 0005, 0007, 0009–0010, 0016–0019 | explicit anonymous/account/staff RPC execution allowlist |
 | 22 | migrations/0022_active_staff_moderation_hardening.sql | 0003, 0005, 0009–0010, 0021 | active-profile staff roles, moderation-only pending RLS and bounded decision input |
 | 23 | migrations/0023_owner_listing_draft_lifecycle.sql | 0003–0005, 0010, 0016, 0022 | atomic owner draft/rejected replacement and safe rejection feedback |
-| Seed | seeds/001_marketo_reference.sql | 0001–0023 | RU/KK geography/catalog bootstrap; no user/product records |
+| 24 | migrations/0024_catalog_completeness.sql | 0004–0005, 0014–0017, 0023 | forward-only category field synchronization, integrity pre/postflight and active-leaf listing guard |
+| Seed | seeds/001_marketo_reference.sql | 0001–0024 | RU/KK geography/catalog bootstrap; no user/product records |
 
 ## Integrity boundary
 

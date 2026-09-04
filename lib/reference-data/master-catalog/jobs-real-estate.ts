@@ -1,6 +1,7 @@
 import { branch, leaf, leaves, overlay, type CatalogEntry, type MasterCatalogNode } from "./types.ts";
 
-const jobLeaves = (entries: readonly CatalogEntry[]) => leaves(entries, ["job"]);
+const jobLeaves = (entries: readonly CatalogEntry[]) => leaves(entries, ["job", "professionalRequirements"]);
+const propertyProfiles = (...profiles: string[]) => [...profiles, "propertyDocsUtilities"];
 
 export const jobsCatalogOverlays: MasterCatalogNode[] = [
   overlay("jobs", [
@@ -160,34 +161,34 @@ export const jobsCatalogOverlays: MasterCatalogNode[] = [
 export const realEstateCatalogOverlays: MasterCatalogNode[] = [
   overlay("real-estate", [
     overlay("property-sale", [
-      leaf("flats-sale", "Квартиры", "Пәтерлер", ["flatSale"]),
-      leaf("houses-sale", "Дома и коттеджи", "Үйлер мен коттедждер", ["house"]),
-      leaf("rooms-sale", "Комнаты и доли", "Бөлмелер мен үлестер", ["room"]),
-      leaf("land-sale", "Земельные участки", "Жер телімдері", ["land"]),
-      leaf("commercial-sale", "Коммерческая недвижимость", "Коммерциялық жылжымайтын мүлік", ["commercialProperty"]),
-      leaf("garages-sale", "Гаражи и парковочные места", "Гараждар мен автотұрақ орындары", ["garage"]),
-      leaf("dachas-sale", "Дачи", "Саяжайлар", ["house"]),
-      leaf("townhouses-sale", "Таунхаусы", "Таунхаустар", ["house"]),
-      leaf("unfinished-property-sale", "Недостроенные объекты", "Аяқталмаған нысандар", ["house"]),
+      leaf("flats-sale", "Квартиры", "Пәтерлер", propertyProfiles("flatSale")),
+      leaf("houses-sale", "Дома и коттеджи", "Үйлер мен коттедждер", propertyProfiles("house")),
+      leaf("rooms-sale", "Комнаты и доли", "Бөлмелер мен үлестер", propertyProfiles("room")),
+      leaf("land-sale", "Земельные участки", "Жер телімдері", propertyProfiles("land")),
+      leaf("commercial-sale", "Коммерческая недвижимость", "Коммерциялық жылжымайтын мүлік", propertyProfiles("commercialProperty")),
+      leaf("garages-sale", "Гаражи и парковочные места", "Гараждар мен автотұрақ орындары", propertyProfiles("garage")),
+      leaf("dachas-sale", "Дачи", "Саяжайлар", propertyProfiles("house")),
+      leaf("townhouses-sale", "Таунхаусы", "Таунхаустар", propertyProfiles("house")),
+      leaf("unfinished-property-sale", "Недостроенные объекты", "Аяқталмаған нысандар", propertyProfiles("house")),
     ]),
     overlay("property-rent", [
-      leaf("flats-rent", "Квартиры", "Пәтерлер", ["flatSale", "rentTerms"]),
-      leaf("houses-rent", "Дома и коттеджи", "Үйлер мен коттедждер", ["house", "rentTerms"]),
-      leaf("rooms-rent", "Комнаты", "Бөлмелер", ["room", "rentTerms"]),
-      leaf("commercial-rent", "Коммерческие помещения", "Коммерциялық орындар", ["commercialProperty", "rentTerms"]),
-      leaf("garages-rent", "Гаражи и парковки", "Гараждар мен тұрақтар", ["garage", "rentTerms"]),
-      leaf("land-rent", "Земельные участки", "Жер телімдері", ["land", "rentTerms"]),
+      leaf("flats-rent", "Квартиры", "Пәтерлер", propertyProfiles("flatSale", "rentTerms")),
+      leaf("houses-rent", "Дома и коттеджи", "Үйлер мен коттедждер", propertyProfiles("house", "rentTerms")),
+      leaf("rooms-rent", "Комнаты", "Бөлмелер", propertyProfiles("room", "rentTerms")),
+      leaf("commercial-rent", "Коммерческие помещения", "Коммерциялық орындар", propertyProfiles("commercialRentalProperty", "rentTerms")),
+      leaf("garages-rent", "Гаражи и парковки", "Гараждар мен тұрақтар", propertyProfiles("garage", "rentTerms")),
+      leaf("land-rent", "Земельные участки", "Жер телімдері", propertyProfiles("land", "rentTerms")),
     ]),
     overlay("property-daily", [
-      leaf("flats-daily", "Квартиры", "Пәтерлер", ["flatSale", "dailyTerms"]),
-      leaf("houses-daily", "Дома и коттеджи", "Үйлер мен коттедждер", ["house", "dailyTerms"]),
-      leaf("rooms-daily", "Комнаты", "Бөлмелер", ["room", "dailyTerms"]),
-      leaf("guest-houses-daily", "Гостевые дома", "Қонақ үйлер", ["house", "dailyTerms"]),
-      leaf("hostels-daily", "Хостелы и койко-места", "Хостелдер мен төсек-орындар", ["room", "dailyTerms"]),
+      leaf("flats-daily", "Квартиры", "Пәтерлер", propertyProfiles("flatSale", "dailyTerms")),
+      leaf("houses-daily", "Дома и коттеджи", "Үйлер мен коттедждер", propertyProfiles("house", "dailyTerms")),
+      leaf("rooms-daily", "Комнаты", "Бөлмелер", propertyProfiles("room", "dailyTerms")),
+      leaf("guest-houses-daily", "Гостевые дома", "Қонақ үйлер", propertyProfiles("house", "dailyTerms")),
+      leaf("hostels-daily", "Хостелы и койко-места", "Хостелдер мен төсек-орындар", propertyProfiles("room", "dailyTerms")),
     ]),
     branch("property-new-buildings", "Новостройки от застройщиков", "Құрылыс салушылардан жаңа үйлер", [
-      leaf("new-build-flats", "Квартиры в новостройках", "Жаңа үйлердегі пәтерлер", ["flatSale"]),
-      leaf("new-build-commercial", "Коммерческие помещения", "Коммерциялық орындар", ["commercialProperty"]),
+      leaf("new-build-flats", "Квартиры в новостройках", "Жаңа үйлердегі пәтерлер", propertyProfiles("flatSale")),
+      leaf("new-build-commercial", "Коммерческие помещения", "Коммерциялық орындар", propertyProfiles("commercialProperty")),
     ]),
   ]),
 ];

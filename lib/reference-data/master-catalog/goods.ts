@@ -85,22 +85,38 @@ const rentalsRoot: MasterCatalogNode = {
   schemaProfiles: ["rentalGoods"],
   children: [
     branch("rental-tools-equipment", "Инструменты и оборудование", "Құралдар мен жабдық", goods([
-      ["rental-power-tools", "Электроинструмент", "Электр құралы"], ["rental-construction-equipment", "Строительное оборудование", "Құрылыс жабдығы"], ["rental-generators-compressors", "Генераторы и компрессоры", "Генераторлар мен компрессорлар"], ["rental-garden-tools", "Садовая техника", "Бақша техникасы"],
+      ["rental-power-tools", "Электроинструмент", "Электр құралы", ["rentalGoods", "tool"]],
+      ["rental-construction-equipment", "Строительное оборудование", "Құрылыс жабдығы", ["rentalGoods", "equipment"]],
+      ["rental-generators-compressors", "Генераторы и компрессоры", "Генераторлар мен компрессорлар", ["rentalGoods", "equipment", "rentalGeneratorCompressor"]],
+      ["rental-garden-tools", "Садовая техника", "Бақша техникасы", ["rentalGoods", "tool"]],
     ], ["rentalGoods"]), ["rentalGoods"]),
     branch("rental-special-machinery", "Спецтехника", "Арнайы техника", goods([
       ["rental-excavators-loaders", "Экскаваторы и погрузчики", "Экскаваторлар мен тиегіштер"], ["rental-cranes-lifts", "Краны и автовышки", "Крандар мен автомұнаралар"], ["rental-aerial-platforms", "Подъёмники и вышки", "Көтергіштер мен мұнаралар"], ["rental-road-machinery", "Дорожная техника", "Жол техникасы"],
     ], ["rentalGoods", "machinery"]), ["rentalGoods", "machinery"]),
     branch("rental-vehicles", "Транспорт", "Көлік", goods([
-      ["rental-passenger-cars", "Легковые автомобили", "Жеңіл автомобильдер"], ["rental-minibuses-buses", "Микроавтобусы и автобусы", "Шағын автобустар мен автобустар"], ["rental-trucks", "Грузовой транспорт", "Жүк көлігі"], ["rental-bikes-scooters", "Велосипеды и самокаты", "Велосипедтер мен самокаттар"],
+      ["rental-passenger-cars", "Легковые автомобили", "Жеңіл автомобильдер", ["rentalGoods", "passengerCar", "vehicleCompliance"]],
+      ["rental-minibuses-buses", "Микроавтобусы и автобусы", "Шағын автобустар мен автобустар", ["rentalGoods", "commercialVehicle", "passengerCommercial"]],
+      ["rental-trucks", "Грузовой транспорт", "Жүк көлігі", ["rentalGoods", "commercialVehicle"]],
+      ["rental-bikes-scooters", "Велосипеды и самокаты", "Велосипедтер мен самокаттар", ["rentalGoods", "bicycle", "rentalBicycleScooter"]],
     ], ["rentalGoods"]), ["rentalGoods"]),
     branch("rental-events-leisure", "Мероприятия и отдых", "Іс-шаралар мен демалыс", goods([
-      ["rental-event-furniture", "Мебель и текстиль для мероприятий", "Іс-шараға арналған жиһаз бен тоқыма"], ["rental-sound-light", "Звуковое и световое оборудование", "Дыбыс және жарық жабдығы"], ["rental-tents-pavilions", "Шатры и павильоны", "Шатырлар мен павильондар"], ["rental-costumes-decor", "Костюмы и декор", "Костюмдер мен безендіру"], ["rental-sports-tourism", "Спортивный и туристический инвентарь", "Спорт және туризм құралдары"],
+      ["rental-event-furniture", "Мебель и текстиль для мероприятий", "Іс-шараға арналған жиһаз бен тоқыма", ["rentalGoods", "furniture", "rentalEventFurniture"]],
+      ["rental-sound-light", "Звуковое и световое оборудование", "Дыбыс және жарық жабдығы", ["rentalGoods", "audio", "lighting", "rentalSoundLight"]],
+      ["rental-tents-pavilions", "Шатры и павильоны", "Шатырлар мен павильондар", ["rentalGoods", "outdoorGear"]],
+      ["rental-costumes-decor", "Костюмы и декор", "Костюмдер мен безендіру", ["rentalGoods", "clothing", "rentalCostumeDecor"]],
+      ["rental-sports-tourism", "Спортивный и туристический инвентарь", "Спорт және туризм құралдары", ["rentalGoods", "sportsGoods", "outdoorGear", "rentalSportsTourism"]],
     ], ["rentalGoods"]), ["rentalGoods"]),
     branch("rental-electronics", "Электроника", "Электроника", goods([
-      ["rental-photo-video", "Фото- и видеотехника", "Фото және бейне техникасы"], ["rental-computers-projectors", "Компьютеры и проекторы", "Компьютерлер мен проекторлар"], ["rental-game-consoles", "Игровые приставки и VR", "Ойын консольдары және VR"], ["rental-home-appliances", "Бытовая техника", "Тұрмыстық техника"],
+      ["rental-photo-video", "Фото- и видеотехника", "Фото және бейне техникасы", ["rentalGoods", "camera", "rentalPhotoVideo"]],
+      ["rental-computers-projectors", "Компьютеры и проекторы", "Компьютерлер мен проекторлар", ["rentalGoods", "computer", "rentalComputerProjector"]],
+      ["rental-game-consoles", "Игровые приставки и VR", "Ойын консольдары және VR", ["rentalGoods", "gaming", "rentalGamingDevice"]],
+      ["rental-home-appliances", "Бытовая техника", "Тұрмыстық техника", ["rentalGoods", "appliance", "genericAppliance"]],
     ], ["rentalGoods"]), ["rentalGoods"]),
     branch("rental-kids-goods", "Детские товары", "Балалар тауарлары", goods([
-      ["rental-strollers-seats", "Коляски и автокресла", "Арбалар мен автоорындықтар"], ["rental-kids-furniture", "Детская мебель", "Балалар жиһазы"], ["rental-kids-party", "Товары для детских праздников", "Балалар мерекесіне арналған тауарлар"], ["rental-kids-transport", "Детский транспорт", "Балалар көлігі"],
+      ["rental-strollers-seats", "Коляски и автокресла", "Арбалар мен автоорындықтар", ["rentalGoods", "stroller", "regulatedSafety", "rentalStrollerSeat"]],
+      ["rental-kids-furniture", "Детская мебель", "Балалар жиһазы", ["rentalGoods", "furniture"]],
+      ["rental-kids-party", "Товары для детских праздников", "Балалар мерекесіне арналған тауарлар", ["rentalGoods", "productCore"]],
+      ["rental-kids-transport", "Детский транспорт", "Балалар көлігі", ["rentalGoods", "bicycle"]],
     ], ["rentalGoods"]), ["rentalGoods"]),
     fallbackLeaf("other-rental-goods", "Другие товары напрокат", "Жалға берілетін басқа тауарлар", ["rentalGoods"]),
   ],
@@ -108,21 +124,41 @@ const rentalsRoot: MasterCatalogNode = {
 
 const electronicsOverlay = overlay("electronics", [
   branch("tablets-ereaders", "Планшеты и электронные книги", "Планшеттер мен электронды кітаптар", [
-    ...goods([["tablets", "Планшеты", "Планшеттер"]], ["tablet"]),
+    ...goods([["tablets", "Планшеты", "Планшеттер"]], ["tablet", "tabletDeviceSpecs"]),
     ...goods([["ereaders", "Электронные книги", "Электронды кітаптар"]], ["ereader"]),
     ...goods([["tablet-accessories", "Аксессуары для планшетов", "Планшет аксессуарлары"]], ["goodsBrand"]),
   ], ["goodsBrand"]),
   branch("home-appliances", "Техника для дома", "Үйге арналған техника", goods([
-    ["washing-machines", "Стиральные машины", "Кір жуғыш машиналар"], ["drying-machines", "Сушильные машины", "Кептіргіш машиналар"], ["vacuum-cleaners", "Пылесосы", "Шаңсорғыштар"], ["robot-vacuums", "Роботы-пылесосы", "Робот шаңсорғыштар"], ["irons-steamers", "Утюги и отпариватели", "Үтіктер мен булағыштар"], ["sewing-machines", "Швейные и вязальные машины", "Тігін және тоқу машиналары"],
+    ["washing-machines", "Стиральные машины", "Кір жуғыш машиналар", ["appliance", "energyRatedAppliance", "laundryAppliance"]],
+    ["drying-machines", "Сушильные машины", "Кептіргіш машиналар", ["appliance", "energyRatedAppliance", "dryingAppliance"]],
+    ["vacuum-cleaners", "Пылесосы", "Шаңсорғыштар", ["appliance", "vacuumAppliance"]],
+    ["robot-vacuums", "Роботы-пылесосы", "Робот шаңсорғыштар", ["appliance", "vacuumAppliance"]],
+    ["irons-steamers", "Утюги и отпариватели", "Үтіктер мен булағыштар", ["appliance", "ironSteamerAppliance"]],
+    ["sewing-machines", "Швейные и вязальные машины", "Тігін және тоқу машиналары", ["appliance", "sewingAppliance"]],
   ], ["appliance"]), ["appliance"]),
   branch("kitchen-appliances", "Техника для кухни", "Асүй техникасы", goods([
-    ["refrigerators", "Холодильники", "Тоңазытқыштар"], ["freezers", "Морозильники", "Мұздатқыштар"], ["cookers-hobs", "Плиты и варочные панели", "Плиталар мен пісіру панельдері"], ["ovens", "Духовые шкафы", "Пештер"], ["dishwashers", "Посудомоечные машины", "Ыдыс жуғыш машиналар"], ["microwave-ovens", "Микроволновые печи", "Микротолқынды пештер"], ["kitchen-hoods", "Вытяжки", "Сорғыштар"], ["small-kitchen-appliances", "Мелкая техника", "Шағын асүй техникасы"],
+    ["refrigerators", "Холодильники", "Тоңазытқыштар", ["appliance", "energyRatedAppliance", "refrigeratorAppliance"]],
+    ["freezers", "Морозильники", "Мұздатқыштар", ["appliance", "energyRatedAppliance", "freezerAppliance"]],
+    ["cookers-hobs", "Плиты и варочные панели", "Плиталар мен пісіру панельдері", ["appliance", "energyRatedAppliance", "cookerHobAppliance"]],
+    ["ovens", "Духовые шкафы", "Пештер", ["appliance", "energyRatedAppliance", "ovenAppliance"]],
+    ["dishwashers", "Посудомоечные машины", "Ыдыс жуғыш машиналар", ["appliance", "energyRatedAppliance", "dishwasherAppliance"]],
+    ["microwave-ovens", "Микроволновые печи", "Микротолқынды пештер", ["appliance", "microwaveAppliance"]],
+    ["kitchen-hoods", "Вытяжки", "Сорғыштар", ["appliance", "hoodAppliance"]],
+    ["small-kitchen-appliances", "Мелкая техника", "Шағын асүй техникасы", ["appliance", "smallKitchenAppliance"]],
   ], ["appliance"]), ["appliance"]),
   branch("climate-equipment", "Климатическая техника", "Климаттық техника", goods([
-    ["air-conditioners", "Кондиционеры", "Кондиционерлер"], ["heaters", "Обогреватели", "Жылытқыштар"], ["humidifiers-purifiers", "Увлажнители и очистители", "Ылғалдандырғыштар мен тазартқыштар"], ["household-fans", "Вентиляторы", "Желдеткіштер"], ["water-heaters", "Водонагреватели", "Су жылытқыштар"],
+    ["air-conditioners", "Кондиционеры", "Кондиционерлер", ["appliance", "energyRatedAppliance", "climateAppliance"]],
+    ["heaters", "Обогреватели", "Жылытқыштар", ["appliance", "heatingAppliance"]],
+    ["humidifiers-purifiers", "Увлажнители и очистители", "Ылғалдандырғыштар мен тазартқыштар", ["appliance", "airTreatmentAppliance"]],
+    ["household-fans", "Вентиляторы", "Желдеткіштер", ["appliance", "fanAppliance"]],
+    ["water-heaters", "Водонагреватели", "Су жылытқыштар", ["appliance", "energyRatedAppliance", "waterHeaterAppliance"]],
   ], ["appliance"]), ["appliance"]),
   branch("personal-care-electronics", "Техника для ухода", "Күтім техникасы", goods([
-    ["hair-styling-devices", "Фены и укладка волос", "Фендер мен шаш сәндеу"], ["shavers-trimmers", "Электробритвы и триммеры", "Электр ұстаралар мен триммерлер"], ["epilators-care", "Эпиляторы и уход за кожей", "Эпиляторлар мен тері күтімі"], ["electric-toothbrushes", "Электрические зубные щётки", "Электр тіс щеткалары"], ["health-electronics", "Весы и товары для здоровья", "Таразылар мен денсаулық тауарлары"],
+    ["hair-styling-devices", "Фены и укладка волос", "Фендер мен шаш сәндеу", ["appliance", "hairStylingAppliance"]],
+    ["shavers-trimmers", "Электробритвы и триммеры", "Электр ұстаралар мен триммерлер", ["appliance", "groomingAppliance"]],
+    ["epilators-care", "Эпиляторы и уход за кожей", "Эпиляторлар мен тері күтімі", ["appliance", "skinCareAppliance"]],
+    ["electric-toothbrushes", "Электрические зубные щётки", "Электр тіс щеткалары", ["appliance", "toothbrushAppliance"]],
+    ["health-electronics", "Весы и товары для здоровья", "Таразылар мен денсаулық тауарлары", ["appliance", "healthAppliance", "regulatedSafety"]],
   ], ["appliance"]), ["appliance"]),
 ]);
 

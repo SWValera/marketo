@@ -19,6 +19,7 @@ import {
   getCategoryRoot,
   isCategoryWithin,
 } from "@/lib/reference-data/catalog";
+import { sanitizeAttributeFilters } from "@/lib/reference-data/attributes";
 import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
 
 type CategoryPageProps = {
@@ -66,22 +67,24 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   const rootCategory = getCategoryRoot(view, filteredCategory);
   let listings;
   let initialAttributes;
+  let initialDynamicFilters: Record<string, string> = {};
   try {
-    [listings, initialAttributes] = await Promise.all([
-      listingRepository.list({
-        locale,
-        categoryIds: getCategoryDescendantIds(view, filteredCategory),
-        settlementId: parsed.cityId && parsed.cityId !== "all" ? parsed.cityId : undefined,
-        query: parsed.query,
-        minPriceMinor: parsed.minPrice ? Number(parsed.minPrice) : undefined,
-        maxPriceMinor: parsed.maxPrice ? Number(parsed.maxPrice) : undefined,
-        attributeFilters: parsed.dynamicFilters,
-        sort: parsed.sort,
-        page: parsed.page,
-        limit: 60,
-      }),
-      getCategoryAttributeReferences(filteredCategory.id),
-    ]);
+    initialAttributes = await getCategoryAttributeReferences(filteredCategory.id);
+    initialDynamicFilters = initialAttributes.status === "ready"
+      ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
+      : {};
+    listings = await listingRepository.list({
+      locale,
+      categoryIds: getCategoryDescendantIds(view, filteredCategory),
+      settlementId: parsed.cityId && parsed.cityId !== "all" ? parsed.cityId : undefined,
+      query: parsed.query,
+      minPriceMinor: parsed.minPrice ? Number(parsed.minPrice) : undefined,
+      maxPriceMinor: parsed.maxPrice ? Number(parsed.maxPrice) : undefined,
+      attributeFilters: initialDynamicFilters,
+      sort: parsed.sort,
+      page: parsed.page,
+      limit: 60,
+    });
   } catch {
     return <><Header categorySlug={category.slug} /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState
       title={t("state.error")}
@@ -97,6 +100,6 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   return <><Header categorySlug={filteredCategory.slug} searchPlaceholder={searchPlaceholder} /><main id="main-content" tabIndex={-1} className="page-shell subpage-main">
     <nav className="breadcrumbs" aria-label={t("categories.eyebrow")}><Link href="/">{t("common.home")}</Link>{path.map((item) => <span key={item.slug}>/ <Link href={`/category/${item.slug}`}>{localize(item.name, locale)}</Link></span>)}</nav>
     {children.length > 0 ? <section className="subcategory-strip" aria-label={`${t("categories.refine")}: ${localize(category.name, locale)}`}><strong>{t("categories.refine")}</strong><div>{children.map((child) => <Link href={`/category/${child.slug}`} key={child.id}>{localize(child.name, locale)}</Link>)}</div></section> : null}
-    <CatalogClient key={`${slug}:${JSON.stringify(parsed)}`} basePath={`/category/${category.slug}`} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={parsed.dynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
+    <CatalogClient key={`${slug}:${JSON.stringify({ ...parsed, dynamicFilters: initialDynamicFilters })}`} basePath={`/category/${category.slug}`} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={initialDynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
   </main><MobileNav /></>;
 }

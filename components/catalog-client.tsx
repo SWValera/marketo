@@ -38,7 +38,7 @@ import {
   isAttributeVisible,
 } from "@/lib/reference-data/attributes";
 
-type FilterValue = string | boolean;
+type FilterValue = string;
 type CatalogRouteState = {
   query: string;
   categorySlug: string;
@@ -170,7 +170,7 @@ export function CatalogClient({
       .filter((item) => !minPrice || (item.priceAmount ?? 0) >= Number(minPrice))
       .filter((item) => !maxPrice || (item.priceAmount ?? 0) <= Number(maxPrice))
       .filter((item) => Object.entries(dynamicFilters).every(([key, value]) => {
-        if (value === "" || value === false) return true;
+        if (value === "") return true;
         const rangeMatch = key.match(/^(.*)_(min|max)$/);
         const attributeKey = rangeMatch?.[1] ?? key;
         const preview = readListingAttributePreview(item.attributes, attributeKey);
@@ -186,8 +186,8 @@ export function CatalogClient({
           const boundary = Number(value);
           return Number.isFinite(candidate) && (rangeMatch[2] === "min" ? candidate >= boundary : candidate <= boundary);
         }
-        if (typeof value === "boolean") return listingValue === value;
         const definition = filterDefinitions.get(attributeKey);
+        if (definition?.dataType === "boolean") return listingValue === (value === "true");
         if (definition?.filterMode === "search" || definition?.dataType === "text") return String(listingValue ?? "").toLocaleLowerCase("ru").includes(String(value).toLocaleLowerCase("ru"));
         if (definition?.dataType === "number") return Number(listingValue) === Number(value);
         return String(listingValue ?? "") === String(value);
@@ -222,7 +222,7 @@ export function CatalogClient({
     if (routeState.maxPrice) params.set("price_max", routeState.maxPrice);
     if (routeState.sort !== "new") params.set("sort", routeState.sort);
     if (routeState.page > 1) params.set("page", String(routeState.page));
-    for (const [key, value] of Object.entries(routeState.dynamicFilters)) if (value !== "" && value !== false) params.set(`f_${key}`, String(value));
+    for (const [key, value] of Object.entries(routeState.dynamicFilters)) if (value !== "") params.set(`f_${key}`, value);
     return `${basePath}${params.size ? `?${params}` : ""}`;
   }
 
@@ -297,7 +297,10 @@ export function CatalogClient({
       const filter = activeAttributes.find((item) => item.key === (rangeMatch?.[1] ?? key));
       const option = filter?.options?.find((item) => item.value === value);
       const rangeLabel = rangeMatch?.[2] === "min" ? t("catalog.from") : rangeMatch?.[2] === "max" ? t("catalog.to") : "";
-      return option ? localize(option.label, locale) : filter ? `${localize(filter.label, locale)}${rangeLabel ? ` ${rangeLabel}` : ""}: ${value === true ? t("common.yes") : String(value)}` : null;
+      const displayValue = filter?.dataType === "boolean"
+        ? value === "true" ? t("common.yes") : t("common.no")
+        : value;
+      return option ? localize(option.label, locale) : filter ? `${localize(filter.label, locale)}${rangeLabel ? ` ${rangeLabel}` : ""}: ${displayValue}` : null;
     }),
   ].filter(Boolean) as string[];
 
@@ -323,7 +326,7 @@ export function CatalogClient({
             return <label key={attribute.id}>{localize(attribute.label, locale)}<ReferenceSelect attribute={attribute} emptyMode="filter" value={String(dynamicFilters[attribute.key] ?? "")} parentOptionId={getDependentParentOptionId(attribute, attributeState.data.attributes, dynamicFilters)} onChange={(value) => setDynamicFilters((current) => clearDependentValues(attribute.key, value, attributeState.data.attributes, current))} /></label>;
           }
           if (attribute.dataType === "boolean") {
-            return <label className="check-row" key={attribute.id}><input type="checkbox" checked={Boolean(dynamicFilters[attribute.key])} onChange={(event) => setDynamicFilters((current) => clearDependentValues(attribute.key, event.target.checked, attributeState.data.attributes, current))} /> {localize(attribute.label, locale)}</label>;
+            return <label key={attribute.id}>{localize(attribute.label, locale)}<select value={dynamicFilters[attribute.key] ?? ""} onChange={(event) => setDynamicFilters((current) => clearDependentValues(attribute.key, event.target.value, attributeState.data.attributes, current))}><option value="">{t("common.notImportant")}</option><option value="true">{t("common.yes")}</option><option value="false">{t("common.no")}</option></select></label>;
           }
           if (attribute.filterMode === "range") {
             return <fieldset className="attribute-range-filter" key={attribute.id}><legend>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}</legend><div><label>{t("catalog.from")}<input type={attribute.dataType === "date" ? "date" : "number"} inputMode={attribute.dataType === "date" ? undefined : "decimal"} value={String(dynamicFilters[`${attribute.key}_min`] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [`${attribute.key}_min`]: event.target.value }))} /></label><label>{t("catalog.to")}<input type={attribute.dataType === "date" ? "date" : "number"} inputMode={attribute.dataType === "date" ? undefined : "decimal"} value={String(dynamicFilters[`${attribute.key}_max`] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [`${attribute.key}_max`]: event.target.value }))} /></label></div></fieldset>;

@@ -12,11 +12,13 @@ const execFileAsync = promisify(execFile);
 const root = new URL("../", import.meta.url);
 const generatorEnvironment = prepareNodeRuntimeEnvironment(process.env);
 
-test("reference seed is byte-reproducible and catalog generator protects released migrations", async () => {
+test("reference seed and catalog completeness migration are byte-reproducible", async () => {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "marketo-generators-"));
   const generatedSeedPath = join(temporaryDirectory, "001_marketo_reference.sql");
+  const generatedCompletenessPath = join(temporaryDirectory, "0024_catalog_completeness.sql");
   const catalogCandidatePath = join(temporaryDirectory, "next-master-catalog.candidate.sql");
   const releasedMigrationUrl = new URL("supabase/migrations/0017_master_catalog.sql", root);
+  const releasedCompletenessUrl = new URL("supabase/migrations/0024_catalog_completeness.sql", root);
 
   try {
     const releasedMigrationBefore = await readFile(releasedMigrationUrl);
@@ -29,6 +31,17 @@ test("reference seed is byte-reproducible and catalog generator protects release
       await readFile(generatedSeedPath),
       await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root)),
       "reference seed generator output must be byte-identical",
+    );
+
+    await execFileAsync(process.execPath, [
+      fileURLToPath(new URL("scripts/generate-catalog-completeness-migration.mjs", root)),
+      "--output",
+      generatedCompletenessPath,
+    ], { cwd: fileURLToPath(new URL(".", root)), env: generatorEnvironment });
+    assert.deepEqual(
+      await readFile(generatedCompletenessPath),
+      await readFile(releasedCompletenessUrl),
+      "catalog completeness generator output must be byte-identical",
     );
 
     await execFileAsync(process.execPath, [

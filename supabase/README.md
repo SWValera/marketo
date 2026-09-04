@@ -17,12 +17,15 @@ in the build or test chain connects to or mutates production Supabase.
   from pending-listing RLS, and bounds moderation reasons and notes.
 - 0023 adds an owner-only atomic draft/rejected update and a deliberately
   narrow rejection-feedback RPC without moderator identity or internal notes.
+- 0024 synchronizes the expanded category-specific seller fields and buyer
+  filters without replacing stable row UUIDs, and rejects non-leaf listing
+  categories at the database boundary.
 - seeds/001_marketo_reference.sql contains only RU/KK reference data.
 - Remote application status is not inferred from local files. No migration was
   applied remotely during recovery.
 
 The exact ordered list, dependencies and purpose are in
-MIGRATION_MANIFEST.md. CHECKSUMS.sha256 covers all 23 migrations and the
+MIGRATION_MANIFEST.md. CHECKSUMS.sha256 covers all 24 migrations and the
 reference seed.
 
 ## Clean local verification
@@ -45,8 +48,8 @@ branch, Database Linter or Security Advisor.
 - Kazakhstan administrative bootstrap: 20 top-level units and 90 selectable
   settlements;
 - Master Catalog: 1,356 categories, 1,137 leaves, 16 roots;
-- 9,373 category-attribute assignments;
-- 87,150 localized option assignments;
+- 14,310 category-attribute assignments;
+- 84,490 localized option assignments;
 - no users, listings, favorites, chats, messages, notifications or credentials.
 
 Regenerate reference SQL only when the reviewed typed source changes:
@@ -60,7 +63,7 @@ migration/seed release.
 
 ## Safe rollout rule
 
-First rehearse 0017–0023 in order on a disposable Supabase branch cloned from
+First rehearse 0017–0024 in order on a disposable Supabase branch cloned from
 the actual target schema. Compare it with a clean migrations-plus-seed
 database, run Database Linter/Security Advisor and exercise real Auth/R2 with
 non-production credentials. Production requires a separate explicit approval.

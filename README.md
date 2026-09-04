@@ -13,12 +13,12 @@ and account UI is localized in Russian and Kazakh.
   safe rejection feedback are added by the forward-only migration
   0023_owner_listing_draft_lifecycle.sql.
 - Master Catalog contains **1,356 categories**, **1,137 meaningful leaves** and
-  **16 root verticals**. The clean seed contains 9,373 seller-attribute
-  assignments and 87,150 option assignments.
+  **16 root verticals**. The clean seed contains 14,310 seller-attribute
+  assignments and 84,490 option assignments.
 - The semantic gate checks taxonomy structure, RU/KK, seller/filter parity,
   dependencies, vehicle body scope, device dictionary isolation and reference
   freshness. It also verifies contextual RU/KK helper text for every category.
-  See docs/MASTER_CATALOG_VALIDATION.md.
+  See docs/MASTER_CATALOG_VALIDATION.md and docs/CATALOG_BENCHMARK.md.
 - Email/password registration, login, same-device callback notification,
   cross-device manual fallback, logout, password recovery/update and profile
   editing use Supabase Auth/Profile RPCs. Supabase Auth remains the only user

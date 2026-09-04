@@ -45,6 +45,87 @@ async function asAnon(db, operation) {
   }
 }
 
+async function buildRequiredAttributePayload(db, categoryId, overrides = {}) {
+  const required = await db.query(`
+    select id, key, data_type, validation, depends_on_key
+    from public.category_attributes
+    where category_id = $1
+      and is_active
+      and is_visible
+      and (is_required or key = any($2::text[]))
+    order by sort_order, id
+  `, [categoryId, Object.keys(overrides)]);
+  const selectedOptionValues = new Map();
+  const payload = [];
+
+  for (const attribute of required.rows) {
+    const override = overrides[attribute.key];
+    if (override) {
+      const { selectedValue, ...fields } = override;
+      payload.push({ attribute_id: attribute.id, data_type: attribute.data_type, ...fields });
+      if (selectedValue !== undefined) selectedOptionValues.set(attribute.key, selectedValue);
+      continue;
+    }
+
+    if (attribute.data_type === "select" || attribute.data_type === "multiselect") {
+      const parentValue = attribute.depends_on_key
+        ? selectedOptionValues.get(attribute.depends_on_key) ?? null
+        : null;
+      const selected = await db.query(`
+        select option.id, option.value
+        from public.category_attribute_options as option
+        left join public.category_attribute_options as parent on parent.id = option.parent_option_id
+        where option.attribute_id = $1
+          and option.is_active
+          and (
+            $2::text is null
+            or parent.value = $2
+            or option.parent_option_id is null
+          )
+        order by
+          case
+            when $2::text is not null and parent.value = $2 then 0
+            when option.parent_option_id is null then 1
+            else 2
+          end,
+          option.sort_order,
+          option.id
+        limit 1
+      `, [attribute.id, parentValue]);
+      assert.equal(selected.rows.length, 1, `required option is missing for ${attribute.key}`);
+      selectedOptionValues.set(attribute.key, selected.rows[0].value);
+      payload.push({
+        attribute_id: attribute.id,
+        data_type: attribute.data_type,
+        option_ids: [selected.rows[0].id],
+      });
+      continue;
+    }
+
+    const validation = attribute.validation ?? {};
+    const minimum = Number.isFinite(Number(validation.min)) ? Number(validation.min) : 1;
+    if (attribute.data_type === "range") {
+      payload.push({
+        attribute_id: attribute.id,
+        data_type: attribute.data_type,
+        min: minimum,
+        max: minimum,
+      });
+    } else {
+      const value = attribute.data_type === "number"
+        ? minimum
+        : attribute.data_type === "boolean"
+          ? true
+          : attribute.data_type === "date"
+            ? "2026-01-01"
+            : "fixture";
+      payload.push({ attribute_id: attribute.id, data_type: attribute.data_type, value });
+    }
+  }
+
+  return payload;
+}
+
 async function createFixtureDatabase() {
   const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
   try {
@@ -91,6 +172,7 @@ async function createFixtureDatabase() {
     select
       (select id from public.settlements where slug = 'astana') as settlement_id,
       (select id from public.categories where slug = 'free-other') as free_category_id,
+      (select id from public.categories where slug = 'cars') as cars_group_category_id,
       (select id from public.categories where slug = 'cars-suv') as car_category_id,
       (
         select attribute.id
@@ -298,8 +380,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
     await t.test("category attributes and options have valid ownership, labels, types and ordering", async () => {
       const result = await db.query(`
         select
-          (select count(*) from public.category_attributes)::int as attributes,
-          (select count(*) from public.category_attribute_options)::int as options,
+          (select count(*) from public.category_attributes where is_active)::int as attributes,
+          (select count(*) from public.category_attribute_options where is_active)::int as options,
           (
             select count(*)
             from public.category_attributes as attribute
@@ -324,8 +406,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as invalid_options
       `);
       assert.deepEqual(result.rows[0], {
-        attributes: 9373,
-        options: 87150,
+        attributes: 14310,
+        options: 84490,
         orphan_attributes: 0,
         orphan_options: 0,
         invalid_attributes: 0,
@@ -350,6 +432,39 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           /attribute option is inactive|foreign key|violates/i,
         );
       });
+    });
+
+    await t.test("listing writes reject parent and inactive categories on insert and update", async () => {
+      const inactiveLeaf = await db.query("select id from public.categories where slug = 'other-transport-unlisted'");
+      await db.query("update public.categories set is_active = false where id = $1", [inactiveLeaf.rows[0].id]);
+      // Use the privileged test connection so table grants/RLS do not mask the
+      // trigger under test. Product roles still reach listing creation via RPC.
+      await assert.rejects(
+        db.query(
+          `insert into public.listings (
+            owner_id, category_id, settlement_id, slug, title, description,
+            price_minor, currency_code, status
+          ) values ($1, $2, $3, 'security-parent-category', 'Parent category', 'Parent category must be rejected', 1000, 'KZT', 'draft')`,
+          [users.owner, refs.cars_group_category_id, refs.settlement_id],
+        ),
+        /active leaf category/i,
+      );
+      await assert.rejects(
+        db.query(
+          `insert into public.listings (
+            owner_id, category_id, settlement_id, slug, title, description,
+            price_minor, currency_code, status
+          ) values ($1, $2, $3, 'security-inactive-category', 'Inactive category', 'Inactive leaf category must be rejected', 1000, 'KZT', 'draft')`,
+          [users.owner, inactiveLeaf.rows[0].id, refs.settlement_id],
+        ),
+        /active leaf category/i,
+      );
+      await assert.rejects(
+        db.query("update public.listings set category_id = $1 where id = $2", [refs.cars_group_category_id, listings.draftFree]),
+        /active leaf category/i,
+      );
+      const unchanged = await db.query("select category_id from public.listings where id = $1", [listings.draftFree]);
+      assert.equal(unchanged.rows[0].category_id, refs.free_category_id);
     });
 
     await t.test("pending queue and staff helpers require an active moderator or admin", async () => {
@@ -909,12 +1024,12 @@ test("Supabase v2 security and reference-data audit", async (t) => {
     });
 
     await t.test("User A listing roundtrip is discoverable by User B after moderation", async () => {
-      const attributes = JSON.stringify([
-        { attribute_id: refs.car_brand_attribute_id, data_type: "select", option_ids: [refs.car_brand_option_id] },
-        { attribute_id: refs.car_model_attribute_id, data_type: "select", option_ids: [refs.car_model_option_id] },
-        { attribute_id: refs.car_condition_attribute_id, data_type: "select", option_ids: [refs.car_condition_option_id] },
-        { attribute_id: refs.car_year_attribute_id, data_type: "number", value: 2025 },
-      ]);
+      const attributes = JSON.stringify(await buildRequiredAttributePayload(db, refs.car_category_id, {
+        brand: { option_ids: [refs.car_brand_option_id], selectedValue: "toyota" },
+        model: { option_ids: [refs.car_model_option_id], selectedValue: "toyota:rav4" },
+        condition: { option_ids: [refs.car_condition_option_id], selectedValue: "used" },
+        year: { value: 2025 },
+      }));
       let listingId;
       let listingSlug;
       await asAuthenticated(db, users.owner, async () => {

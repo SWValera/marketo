@@ -199,6 +199,14 @@ export function validateMasterCatalog() {
     check(resolved.attributes.length > 0, `no seller attributes: ${category.slug}`);
     check(new Set(resolved.profileNames).size === resolved.profileNames.length, `duplicate profile assignment: ${category.slug}`);
     check(resolved.profileNames.every((profile) => profile in categorySchemaProfiles), `unknown profile assignment: ${category.slug}`);
+    const profileAttributeTypes = new Map();
+    for (const profileName of resolved.profileNames) {
+      for (const attribute of categorySchemaProfiles[profileName] ?? []) {
+        const previousType = profileAttributeTypes.get(attribute.key);
+        check(!previousType || previousType === attribute.dataType, `cross-profile attribute type collision: ${category.slug}.${attribute.key} (${previousType} -> ${attribute.dataType})`);
+        profileAttributeTypes.set(attribute.key, attribute.dataType);
+      }
+    }
     const keys = new Set(resolved.attributes.map((attribute) => attribute.key));
     check(keys.size === resolved.attributes.length, `duplicate effective attribute key: ${category.slug}`);
     if (!category.hasChildren) {
@@ -206,6 +214,7 @@ export function validateMasterCatalog() {
       check(resolved.attributes.some((attribute) => attribute.required) || category.rootSlug === "free", `leaf has no meaningful required seller field: ${category.slug}`);
     }
     attributeAssignments += resolved.attributes.length;
+    const visibleWhenParents = new Map();
 
     for (const attribute of resolved.attributes) {
       check(/^[a-z][A-Za-z0-9_]*$/.test(attribute.key), `invalid attribute key: ${category.slug}.${attribute.key}`);
@@ -246,13 +255,49 @@ export function validateMasterCatalog() {
         const visibleWhen = manual?.validation?.visibleWhen;
         check(visibleWhen?.key === attribute.key && visibleWhen?.values?.includes("other-model"), `manual fallback visibility is invalid: ${category.slug}.${attribute.key}`);
       }
-      const visibleWhen = attribute.validation?.visibleWhen;
-      if (visibleWhen && typeof visibleWhen === "object" && "key" in visibleWhen) {
+      const validation = attribute.validation;
+      const hasVisibleWhen = Boolean(
+        validation
+        && typeof validation === "object"
+        && !Array.isArray(validation)
+        && Object.prototype.hasOwnProperty.call(validation, "visibleWhen"),
+      );
+      if (hasVisibleWhen) {
+        const rawVisibleWhen = validation.visibleWhen;
+        const conditionIsObject = Boolean(rawVisibleWhen && typeof rawVisibleWhen === "object" && !Array.isArray(rawVisibleWhen));
+        check(conditionIsObject, `visibleWhen must be an object: ${category.slug}.${attribute.key}`);
+        if (!conditionIsObject) continue;
+
+        const keyIsValid = typeof rawVisibleWhen.key === "string" && rawVisibleWhen.key.trim().length > 0 && rawVisibleWhen.key === rawVisibleWhen.key.trim();
+        const valuesAreValid = Array.isArray(rawVisibleWhen.values)
+          && rawVisibleWhen.values.length > 0
+          && rawVisibleWhen.values.every((value) => typeof value === "string" && value.trim().length > 0 && value === value.trim());
+        check(keyIsValid, `visibleWhen has an invalid controller key: ${category.slug}.${attribute.key}`);
+        check(valuesAreValid, `visibleWhen must contain non-empty string values: ${category.slug}.${attribute.key}`);
+        if (!keyIsValid || !valuesAreValid) continue;
+
+        check(new Set(rawVisibleWhen.values).size === rawVisibleWhen.values.length, `visibleWhen contains duplicate values: ${category.slug}.${attribute.key}`);
         check(!attribute.required, `required conditional attribute is incompatible with DB submit semantics: ${category.slug}.${attribute.key}`);
-        const controlling = resolved.attributes.find((candidate) => candidate.key === visibleWhen.key);
+        check(rawVisibleWhen.key !== attribute.key, `visibleWhen cannot reference itself: ${category.slug}.${attribute.key}`);
+        const controlling = resolved.attributes.find((candidate) => candidate.key === rawVisibleWhen.key);
         check(Boolean(controlling), `visibleWhen references missing attribute: ${category.slug}.${attribute.key}`);
+        check(["select", "multiselect"].includes(controlling?.dataType ?? ""), `visibleWhen controller is not option-backed: ${category.slug}.${attribute.key}`);
         const controllingValues = new Set(controlling?.options?.map((option) => option.value) ?? []);
-        for (const value of visibleWhen.values ?? []) check(controllingValues.has(value), `visibleWhen references missing option: ${category.slug}.${attribute.key}.${value}`);
+        for (const value of rawVisibleWhen.values) check(controllingValues.has(value), `visibleWhen references missing option: ${category.slug}.${attribute.key}.${value}`);
+        visibleWhenParents.set(attribute.key, rawVisibleWhen.key);
+      }
+    }
+
+    for (const start of visibleWhenParents.keys()) {
+      const visited = new Set();
+      let current = start;
+      while (visibleWhenParents.has(current)) {
+        if (visited.has(current)) {
+          check(false, `visibleWhen dependency cycle: ${category.slug}.${start}`);
+          break;
+        }
+        visited.add(current);
+        current = visibleWhenParents.get(current);
       }
     }
   }
@@ -273,6 +318,195 @@ export function validateMasterCatalog() {
     const keys = new Set(resolveCategoryAttributeSchema(slug, "electronics").attributes.map((attribute) => attribute.key));
     check(!keys.has("appliance_type"), `device leaf asks seller for device type again: ${slug}`);
   }
+
+  const categoryContract = (slug, requiredProfiles, requiredKeys, forbiddenKeys = [], forbiddenProfiles = []) => {
+    const category = categoryOptions.find((candidate) => candidate.slug === slug);
+    check(Boolean(category) && !category?.hasChildren, `catalog contract target is not a leaf: ${slug}`);
+    if (!category) return;
+    const resolved = resolveCategoryAttributeSchema(slug, category.rootSlug);
+    const keys = new Set(resolved.attributes.map((attribute) => attribute.key));
+    for (const profile of requiredProfiles) check(resolved.profileNames.includes(profile), `missing profile ${slug}.${profile}`);
+    for (const profile of forbiddenProfiles) check(!resolved.profileNames.includes(profile), `irrelevant profile ${slug}.${profile}`);
+    for (const key of requiredKeys) check(keys.has(key), `missing catalog field ${slug}.${key}`);
+    for (const key of forbiddenKeys) check(!keys.has(key), `irrelevant catalog field ${slug}.${key}`);
+  };
+
+  const conditionalFieldContract = (slug, key, controllerKey, controllerValues) => {
+    const category = categoryOptions.find((candidate) => candidate.slug === slug);
+    check(Boolean(category) && !category?.hasChildren, `conditional contract target is not a leaf: ${slug}`);
+    if (!category) return;
+    const resolved = resolveCategoryAttributeSchema(slug, category.rootSlug);
+    const controller = resolved.attributes.find((attribute) => attribute.key === controllerKey);
+    const attribute = resolved.attributes.find((candidate) => candidate.key === key);
+    check(Boolean(controller?.required && controller.filterable), `conditional controller is not required/filterable: ${slug}.${controllerKey}`);
+    const condition = attribute?.validation?.visibleWhen;
+    check(condition?.key === controllerKey, `conditional field has wrong controller: ${slug}.${key}`);
+    check(JSON.stringify(condition?.values ?? []) === JSON.stringify(controllerValues), `conditional field has wrong values: ${slug}.${key}`);
+  };
+
+  const optionValuesContract = (slug, key, expectedValues) => {
+    const category = categoryOptions.find((candidate) => candidate.slug === slug);
+    check(Boolean(category), `option contract target is missing: ${slug}`);
+    if (!category) return;
+    const attribute = resolveCategoryAttributeSchema(slug, category.rootSlug).attributes.find((candidate) => candidate.key === key);
+    check(Boolean(attribute && ["select", "multiselect"].includes(attribute.dataType)), `option contract target is not option-backed: ${slug}.${key}`);
+    check(JSON.stringify(attribute?.options?.map((option) => option.value) ?? []) === JSON.stringify(expectedValues), `stable option values changed: ${slug}.${key}`);
+  };
+
+  categoryContract("smartphones", ["smartphone", "deviceSpecs"], ["storage", "ram", "screen_size", "display_type", "operating_system", "network_generation", "nfc", "battery_capacity", "battery_health", "repair_history"], ["connectivity"]);
+  categoryContract("tablets", ["tablet", "tabletDeviceSpecs"], ["storage", "screen_size", "connectivity", "network_generation", "stylus_included"]);
+  categoryContract("smart-watches", ["smartWatch"], ["wearable_type", "brand", "watch_model", "case_size", "compatible_os", "gps", "nfc", "battery_life", "color", "condition", "package"], ["model", "storage", "ram", "sim"], ["smartphone"]);
+  optionValuesContract("smart-watches", "wearable_type", ["smart-watch", "fitness-band"]);
+  categoryContract("video-cameras", ["videoCamera"], ["brand", "model", "video_camera_type", "video_resolution", "frame_rate", "storage_media", "stabilization", "optical_zoom", "condition"], ["camera_type", "mount"], ["camera"]);
+  optionValuesContract("video-cameras", "video_camera_type", ["camcorder", "cinema", "action", "360"]);
+  categoryContract("action-cameras", ["videoCamera", "actionCamera"], ["brand", "model", "video_camera_type", "video_resolution", "frame_rate", "storage_media", "stabilization", "optical_zoom", "waterproof", "mounting_type", "condition"], ["camera_type", "mount"], ["camera"]);
+  optionValuesContract("action-cameras", "video_camera_type", ["action", "360"]);
+  categoryContract("projectors", ["projector"], ["brand", "model", "screen_size", "resolution", "projector_technology", "refresh_rate", "brightness_lumens", "contrast_ratio", "lamp_hours", "light_source", "throw_type", "smart_projector", "condition"], ["panel"], ["display"]);
+  optionValuesContract("projectors", "projector_technology", ["lcd", "dlp", "lcos", "led", "laser"]);
+  for (const slug of bodyLeafSlugs) categoryContract(slug, ["vehicleCompliance"], ["engine_power", "owners_count", "customs_cleared", "registration_status", "registration_country", "documents_status", "accident_history", "vin_available"], ["body", "body_type"]);
+  categoryContract("washing-machines", ["appliance", "energyRatedAppliance", "laundryAppliance"], ["load_capacity", "installation_type", "energy_class", "max_spin_rpm"]);
+  categoryContract("drying-machines", ["appliance", "energyRatedAppliance", "dryingAppliance"], ["load_capacity", "drying_type", "installation_type", "energy_class"]);
+  for (const slug of ["vacuum-cleaners", "robot-vacuums"]) categoryContract(slug, ["appliance", "vacuumAppliance"], ["cleaning_type", "dust_collector", "dust_capacity", "cordless", "self_emptying"]);
+  categoryContract("refrigerators", ["appliance", "energyRatedAppliance", "refrigeratorAppliance"], ["total_volume", "freezer_location", "no_frost", "energy_class"]);
+  categoryContract("freezers", ["appliance", "energyRatedAppliance", "freezerAppliance"], ["freezer_type", "total_volume", "freezing_capacity", "minimum_temperature", "energy_class"], ["freezer_location"]);
+  categoryContract("cookers-hobs", ["appliance", "energyRatedAppliance", "cookerHobAppliance"], ["cooking_device_type", "energy_source", "burners", "oven_volume", "energy_class"]);
+  conditionalFieldContract("cookers-hobs", "oven_volume", "cooking_device_type", ["cooker"]);
+  categoryContract("ovens", ["appliance", "energyRatedAppliance", "ovenAppliance"], ["oven_volume", "grill", "convection", "cleaning_type", "energy_class"], ["burners", "cooking_device_type"]);
+  categoryContract("dishwashers", ["appliance", "energyRatedAppliance", "dishwasherAppliance"], ["place_settings", "installation_type", "width", "half_load", "energy_class"]);
+  categoryContract("microwave-ovens", ["appliance", "microwaveAppliance"], ["oven_volume", "grill", "convection"], ["burners"]);
+  categoryContract("kitchen-hoods", ["appliance", "hoodAppliance"], ["installation_type", "width", "extraction_rate", "noise_level", "recirculation"], ["energy_class"]);
+  categoryContract("air-conditioners", ["appliance", "energyRatedAppliance", "climateAppliance"], ["room_area", "inverter", "cooling_capacity", "energy_class"]);
+  categoryContract("heaters", ["appliance", "heatingAppliance"], ["room_area", "heater_kind", "thermostat"], ["cooling_capacity", "inverter"]);
+  categoryContract("humidifiers-purifiers", ["appliance", "airTreatmentAppliance"], ["treatment_type", "room_area", "tank_volume", "filter_type"], ["cooling_capacity", "inverter"]);
+  categoryContract("household-fans", ["appliance", "fanAppliance"], ["fan_type", "speed_levels", "oscillation", "remote_control"], ["cooling_capacity", "inverter", "heating_mode"]);
+  categoryContract("water-heaters", ["appliance", "energyRatedAppliance", "waterHeaterAppliance"], ["tank_volume", "heater_type", "energy_source", "energy_class"]);
+  categoryContract("irons-steamers", ["appliance", "ironSteamerAppliance"], ["iron_device_type", "steam_output", "tank_volume", "auto_shutoff"], ["energy_class"]);
+  categoryContract("sewing-machines", ["appliance", "sewingAppliance"], ["sewing_device_type", "control_type", "operations_count"], ["energy_class"]);
+  categoryContract("small-kitchen-appliances", ["appliance", "smallKitchenAppliance"], ["kitchen_device_type", "capacity", "attachments"], ["energy_class"]);
+  categoryContract("hair-styling-devices", ["appliance", "hairStylingAppliance"], ["hair_device_type", "temperature_levels", "ionization", "cold_air", "attachments"], ["energy_class"]);
+  categoryContract("shavers-trimmers", ["appliance", "groomingAppliance"], ["grooming_device_type", "power_source", "wet_use", "attachments_count"], ["energy_class"]);
+  categoryContract("epilators-care", ["appliance", "skinCareAppliance"], ["skincare_device_type", "power_source", "wet_use", "attachments_count"], ["energy_class"]);
+  categoryContract("electric-toothbrushes", ["appliance", "toothbrushAppliance"], ["toothbrush_type", "modes_count", "pressure_sensor", "timer", "heads_count"], ["energy_class"]);
+  categoryContract("health-electronics", ["appliance", "healthAppliance", "regulatedSafety"], ["health_device_type", "measurement_scope", "smart_sync", "certification"], ["energy_class"]);
+  categoryContract("feeding-breast-pumps", ["appliance", "breastPumpAppliance", "regulatedSafety"], ["breast_pump_item_type", "year", "power", "warranty", "pump_type", "double_pumping", "modes_count", "certification"], ["energy_class"]);
+  optionValuesContract("feeding-breast-pumps", "breast_pump_item_type", ["pump", "accessory"]);
+  for (const key of ["year", "power", "warranty", "pump_type", "double_pumping", "modes_count"]) conditionalFieldContract("feeding-breast-pumps", key, "breast_pump_item_type", ["pump"]);
+  categoryContract("feeding-sterilizers-heaters", ["appliance", "sterilizerWarmerAppliance", "regulatedSafety"], ["baby_heating_device_type", "bottle_capacity", "auto_shutoff"], ["energy_class"]);
+  categoryContract("baby-monitors-scales", ["appliance", "babyMonitoringAppliance", "regulatedSafety"], ["baby_device_type", "connection", "range_meters", "night_vision", "smart_sync"], ["energy_class"]);
+  optionValuesContract("baby-monitors-scales", "baby_device_type", ["audio-monitor", "video-monitor", "scale", "thermometer"]);
+  for (const key of ["connection", "range_meters"]) conditionalFieldContract("baby-monitors-scales", key, "baby_device_type", ["audio-monitor", "video-monitor"]);
+  conditionalFieldContract("baby-monitors-scales", "night_vision", "baby_device_type", ["video-monitor"]);
+  for (const slug of ["pet-aquariums", "pet-aquarium-equipment", "pet-bird-cages", "pet-rodent-cages", "pet-terrariums"]) {
+    categoryContract(slug, ["animalSupply"], ["animal_type", "supply_type", "dimensions", "material", "condition"], ["species", "age_months", "gender", "documents"], ["smallAnimal"]);
+  }
+  categoryContract("books-fiction", ["bookMedia"], ["author", "language", "book_format", "publication_year", "isbn", "condition"], ["model", "warranty"]);
+  categoryContract("books-magazines", ["bookMedia"], ["language", "publication_year", "issue_number", "condition"], ["model", "warranty"]);
+  for (const slug of ["food-farm-products", "beauty-face-care"]) categoryContract(slug, ["consumableLot", "regulatedSafety"], ["net_quantity", "quantity_unit", "manufacture_date", "expiry_date", "storage_conditions", "certification"], ["model", "warranty"]);
+  categoryContract("pet-food", ["consumableLot", "petConsumable", "regulatedSafety"], ["animal_type", "net_quantity", "quantity_unit", "expiry_date", "certification"], ["model", "warranty"]);
+  categoryContract("business-medical-consumables", ["consumableLot", "regulatedSafety"], ["expiry_date", "certification", "sterile"], ["model", "warranty"]);
+  categoryContract("rental-passenger-cars", ["rentalGoods", "passengerCar", "vehicleCompliance"], ["billing_period", "minimum_term", "deposit", "brand", "model", "year", "engine_power", "condition"]);
+  categoryContract("rental-home-appliances", ["rentalGoods", "appliance", "genericAppliance"], ["billing_period", "brand", "model", "appliance_type", "condition"], ["energy_class"]);
+  categoryContract("free-home-appliances", ["free", "appliance", "genericAppliance"], ["condition", "brand", "model", "appliance_type"], ["energy_class"]);
+  categoryContract("exchange-cars", ["exchange", "passengerCarExchange", "vehicleCompliance"], ["wanted", "brand", "model", "year", "engine_power", "condition"], ["model_other"]);
+  categoryContract("exchange-appliances", ["exchange", "appliance", "genericAppliance"], ["wanted", "brand", "model", "appliance_type", "condition"], ["energy_class"]);
+  categoryContract("jobs-driver", ["job", "professionalRequirements"], ["employment", "schedule", "experience", "contract_type", "skills", "languages", "license_categories"]);
+  categoryContract("renovation-turnkey", ["serviceBase", "serviceProfessional"], ["provider_type", "contract_available", "documents_available", "payment_method", "service_area"]);
+  categoryContract("flats-sale", ["flatSale", "propertyDocsUtilities"], ["seller_role", "ownership_type", "property_documents", "property_encumbrance", "address_visibility", "electricity", "water", "internet"]);
+  categoryContract("commercial-rent", ["commercialRentalProperty", "rentTerms", "propertyDocsUtilities"], ["commercial_type", "total_area", "utilities_connected", "utilities"]);
+  const commercialRentAttributes = resolveCategoryAttributeSchema("commercial-rent", "real-estate").attributes;
+  check(commercialRentAttributes.find((attribute) => attribute.key === "utilities")?.dataType === "select", "commercial rent utilities payment field changed type");
+  check(commercialRentAttributes.find((attribute) => attribute.key === "utilities_connected")?.dataType === "boolean", "commercial rent connection field changed type");
+
+  categoryContract("rental-bikes-scooters", ["rentalBicycleScooter"], ["rental_vehicle_type", "bicycle_type", "wheel_size", "frame_size", "frame_material", "scooter_drive_type", "max_load", "max_speed", "range_km"]);
+  optionValuesContract("rental-bikes-scooters", "rental_vehicle_type", ["bicycle", "scooter"]);
+  for (const key of ["bicycle_type", "frame_size", "frame_material"]) conditionalFieldContract("rental-bikes-scooters", key, "rental_vehicle_type", ["bicycle"]);
+  for (const key of ["scooter_drive_type", "max_speed", "range_km"]) conditionalFieldContract("rental-bikes-scooters", key, "rental_vehicle_type", ["scooter"]);
+
+  categoryContract("rental-event-furniture", ["rentalEventFurniture"], ["event_furnishing_type", "furniture_type", "material", "dimensions", "textile_type", "textile_material"]);
+  optionValuesContract("rental-event-furniture", "event_furnishing_type", ["furniture", "textile"]);
+  for (const key of ["furniture_type", "material"]) conditionalFieldContract("rental-event-furniture", key, "event_furnishing_type", ["furniture"]);
+  for (const key of ["textile_type", "textile_material"]) conditionalFieldContract("rental-event-furniture", key, "event_furnishing_type", ["textile"]);
+
+  categoryContract("rental-photo-video", ["rentalPhotoVideo"], ["photo_video_type", "camera_type", "mount", "video_camera_type", "action_camera_type", "video_resolution", "waterproof"]);
+  optionValuesContract("rental-photo-video", "photo_video_type", ["photo", "video", "action"]);
+  for (const key of ["camera_type", "mount"]) conditionalFieldContract("rental-photo-video", key, "photo_video_type", ["photo"]);
+  conditionalFieldContract("rental-photo-video", "video_camera_type", "photo_video_type", ["video"]);
+  conditionalFieldContract("rental-photo-video", "action_camera_type", "photo_video_type", ["action"]);
+  conditionalFieldContract("rental-photo-video", "video_resolution", "photo_video_type", ["video", "action"]);
+  conditionalFieldContract("rental-photo-video", "waterproof", "photo_video_type", ["action"]);
+
+  categoryContract("rental-generators-compressors", ["rentalGeneratorCompressor"], ["power_equipment_type", "power", "capacity", "fuel", "phase_count", "compressor_pressure", "air_delivery", "receiver_volume"]);
+  optionValuesContract("rental-generators-compressors", "power_equipment_type", ["generator", "compressor"]);
+  for (const key of ["fuel", "phase_count"]) conditionalFieldContract("rental-generators-compressors", key, "power_equipment_type", ["generator"]);
+  for (const key of ["compressor_pressure", "air_delivery", "receiver_volume"]) conditionalFieldContract("rental-generators-compressors", key, "power_equipment_type", ["compressor"]);
+
+  categoryContract("rental-game-consoles", ["rentalGamingDevice"], ["gaming_rental_type", "platform", "brand", "model", "console_form", "vr_type", "controllers_included"]);
+  optionValuesContract("rental-game-consoles", "gaming_rental_type", ["console", "vr"]);
+  conditionalFieldContract("rental-game-consoles", "console_form", "gaming_rental_type", ["console"]);
+  conditionalFieldContract("rental-game-consoles", "vr_type", "gaming_rental_type", ["vr"]);
+
+  categoryContract("free-kids-gear", ["freeKidsGear"], ["kids_gear_type", "stroller_type", "furniture_type", "care_item_type", "condition"]);
+  optionValuesContract("free-kids-gear", "kids_gear_type", ["stroller", "furniture", "care"]);
+  conditionalFieldContract("free-kids-gear", "stroller_type", "kids_gear_type", ["stroller"]);
+  conditionalFieldContract("free-kids-gear", "furniture_type", "kids_gear_type", ["furniture"]);
+  conditionalFieldContract("free-kids-gear", "care_item_type", "kids_gear_type", ["care"]);
+
+  categoryContract("free-phones-computers", ["freePhoneComputer"], ["free_device_type", "brand", "model", "condition", "storage", "ram", "sim", "screen_size", "cpu", "gpu"]);
+  optionValuesContract("free-phones-computers", "free_device_type", ["phone", "tablet", "laptop", "desktop", "accessory"]);
+  for (const key of ["storage", "ram"]) conditionalFieldContract("free-phones-computers", key, "free_device_type", ["phone", "tablet", "laptop", "desktop"]);
+  conditionalFieldContract("free-phones-computers", "sim", "free_device_type", ["phone", "tablet"]);
+  conditionalFieldContract("free-phones-computers", "screen_size", "free_device_type", ["phone", "tablet", "laptop"]);
+  for (const key of ["cpu", "gpu"]) conditionalFieldContract("free-phones-computers", key, "free_device_type", ["laptop", "desktop"]);
+
+  categoryContract("exchange-gaming", ["exchangeGaming"], ["wanted", "gaming_item_type", "platform", "brand", "model", "condition", "console_form", "game_title", "edition", "vr_type"]);
+  optionValuesContract("exchange-gaming", "gaming_item_type", ["console", "game", "vr", "accessory"]);
+  conditionalFieldContract("exchange-gaming", "console_form", "gaming_item_type", ["console"]);
+  for (const key of ["game_title", "edition"]) conditionalFieldContract("exchange-gaming", key, "gaming_item_type", ["game"]);
+  conditionalFieldContract("exchange-gaming", "vr_type", "gaming_item_type", ["vr"]);
+
+  categoryContract("rental-costumes-decor", ["rentalCostumeDecor"], ["rental_item_type", "size", "season", "decor_style", "dimensions"]);
+  for (const key of ["size", "season"]) conditionalFieldContract("rental-costumes-decor", key, "rental_item_type", ["costume"]);
+  for (const key of ["decor_style", "dimensions"]) conditionalFieldContract("rental-costumes-decor", key, "rental_item_type", ["decor"]);
+  categoryContract("rental-strollers-seats", ["rentalStrollerSeat"], ["child_item_type", "stroller_type", "age_group", "weight_group", "isofix"]);
+  for (const key of ["stroller_type", "age_group"]) conditionalFieldContract("rental-strollers-seats", key, "child_item_type", ["stroller"]);
+  for (const key of ["weight_group", "isofix"]) conditionalFieldContract("rental-strollers-seats", key, "child_item_type", ["car-seat"]);
+  categoryContract("rental-computers-projectors", ["rentalComputerProjector"], ["rental_equipment_type", "cpu", "ram", "gpu", "storage_capacity", "screen_size", "resolution", "projector_technology", "refresh_rate"], ["panel"], ["display"]);
+  optionValuesContract("rental-computers-projectors", "projector_technology", ["lcd", "dlp", "lcos", "led", "laser"]);
+  for (const key of ["cpu", "ram", "gpu", "storage_capacity"]) conditionalFieldContract("rental-computers-projectors", key, "rental_equipment_type", ["computer"]);
+  for (const key of ["screen_size", "resolution", "projector_technology", "refresh_rate"]) conditionalFieldContract("rental-computers-projectors", key, "rental_equipment_type", ["projector"]);
+  categoryContract("rental-sound-light", ["rentalSoundLight"], ["event_equipment_type", "audio_type", "connection", "lighting_type", "light_source", "power"]);
+  for (const key of ["audio_type", "connection"]) conditionalFieldContract("rental-sound-light", key, "event_equipment_type", ["sound"]);
+  for (const key of ["lighting_type", "light_source", "power"]) conditionalFieldContract("rental-sound-light", key, "event_equipment_type", ["light"]);
+  categoryContract("rental-sports-tourism", ["rentalSportsTourism"], ["rental_activity_type", "sport", "product_type", "gear_type", "season", "capacity", "dimensions", "material", "waterproof"]);
+  for (const key of ["sport", "product_type"]) conditionalFieldContract("rental-sports-tourism", key, "rental_activity_type", ["sport"]);
+  for (const key of ["gear_type", "season", "capacity", "dimensions", "material", "waterproof"]) conditionalFieldContract("rental-sports-tourism", key, "rental_activity_type", ["tourism"]);
+  categoryContract("exchange-phones", ["exchangeMobileDevice"], ["mobile_device_type", "storage", "ram", "sim", "stylus_included", "network_generation"]);
+  conditionalFieldContract("exchange-phones", "sim", "mobile_device_type", ["phone"]);
+  conditionalFieldContract("exchange-phones", "stylus_included", "mobile_device_type", ["tablet"]);
+  categoryContract("exchange-land-commercial", ["exchangePropertyMixed"], ["exchange_property_type", "land_area", "land_purpose", "access_road", "commercial_type", "total_area", "floor", "separate_entrance", "renovation", "parking", "utilities"]);
+  for (const key of ["land_area", "land_purpose", "access_road"]) conditionalFieldContract("exchange-land-commercial", key, "exchange_property_type", ["land"]);
+  for (const key of ["commercial_type", "total_area", "floor", "separate_entrance", "renovation", "parking", "utilities"]) conditionalFieldContract("exchange-land-commercial", key, "exchange_property_type", ["commercial"]);
+
+  for (const [slug, keys] of [
+    ["smartphones", ["screen_size", "battery_capacity", "battery_health"]],
+    ["cars-sedan", ["engine_power"]],
+    ["washing-machines", ["load_capacity", "max_spin_rpm"]],
+    ["refrigerators", ["total_volume"]],
+  ]) {
+    const category = categoryOptions.find((candidate) => candidate.slug === slug);
+    const attributes = resolveCategoryAttributeSchema(slug, category.rootSlug).attributes;
+    for (const key of keys) {
+      const attribute = attributes.find((candidate) => candidate.key === key);
+      check(attribute?.dataType === "number" && attribute.filterable && attribute.filterMode === "range", `range filter metadata mismatch: ${slug}.${key}`);
+    }
+  }
+  for (const [slug, key] of [["smart-watches", "gps"], ["smart-watches", "nfc"], ["cars-sedan", "vin_available"], ["cars-sedan", "customs_cleared"], ["refrigerators", "no_frost"], ["air-conditioners", "inverter"]]) {
+    const category = categoryOptions.find((candidate) => candidate.slug === slug);
+    const attribute = resolveCategoryAttributeSchema(slug, category.rootSlug).attributes.find((candidate) => candidate.key === key);
+    check(attribute?.dataType === "boolean" && attribute.filterable && attribute.filterMode === "exact", `boolean filter metadata mismatch: ${slug}.${key}`);
+  }
+  const foodExpiry = resolveCategoryAttributeSchema("food-farm-products", "home-garden").attributes.find((attribute) => attribute.key === "expiry_date");
+  check(foodExpiry?.dataType === "date" && foodExpiry.filterable && foodExpiry.filterMode === "range", "expiry date filter metadata mismatch");
 
   const allBodies = Object.keys(passengerVehicleModelsByBody);
   check(vehicleBodyReference.strategy === "reviewed-explicit-multi-body", "vehicle body source is not explicit and reviewed");
@@ -345,8 +579,8 @@ export function validateMasterCatalog() {
   check(migrationSource.includes("attribute.is_filterable"), "catalog filter RPC ignores buyer-filter metadata");
   check(migrationSource.includes("listing_attribute_option_values") && migrationSource.includes("listing_attribute_values"), "catalog filter RPC does not cover scalar and option seller values");
   check(listingSource.includes('rpc("search_catalog_listing_cards"'), "listing repository does not use full-dataset catalog filter RPC");
-  check(searchPageSource.includes("attributeFilters: parsed.dynamicFilters"), "search page does not pass dynamic buyer filters to repository");
-  check(categoryPageSource.includes("attributeFilters: parsed.dynamicFilters"), "category page does not pass dynamic buyer filters to repository");
+  check(searchPageSource.includes("sanitizeAttributeFilters") && searchPageSource.includes("attributeFilters: initialDynamicFilters"), "search page does not sanitize and pass dynamic buyer filters to repository");
+  check(categoryPageSource.includes("sanitizeAttributeFilters") && categoryPageSource.includes("attributeFilters: initialDynamicFilters"), "category page does not sanitize and pass dynamic buyer filters to repository");
 
   const contextualMetadata = validateContextualCategoryMetadata();
   assertions += contextualMetadata.assertions;

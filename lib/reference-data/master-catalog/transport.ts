@@ -5,17 +5,17 @@ const vehicle = (entries: Parameters<typeof leaves>[0], profiles: readonly strin
 export const transportCatalogOverlays: MasterCatalogNode[] = [
   overlay("transport", [
     overlay("cars", [
-      leaf("cars-sedan", "Седаны", "Седандар", ["passengerCarSedan"]),
-      leaf("cars-suv", "Кроссоверы и внедорожники", "Кроссоверлер мен жол талғамайтын көліктер", ["passengerCarSuv"]),
-      leaf("cars-hatchback", "Хэтчбеки", "Хэтчбектер", ["passengerCarHatchback"]),
-      leaf("cars-liftback", "Лифтбеки", "Лифтбектер", ["passengerCarLiftback"]),
-      leaf("cars-wagon", "Универсалы", "Универсалдар", ["passengerCarWagon"]),
-      leaf("cars-minivan", "Минивэны", "Минивэндер", ["passengerCarMinivan"]),
-      leaf("cars-coupe", "Купе", "Купелер", ["passengerCarCoupe"]),
-      leaf("cars-cabriolet", "Кабриолеты и родстеры", "Кабриолеттер мен родстерлер", ["passengerCarCabriolet"]),
-      leaf("cars-pickup", "Пикапы", "Пикаптар", ["passengerCarPickup"]),
-      fallbackLeaf("cars-other-body", "Другой кузов", "Басқа шанақ", ["passengerCarOther"]),
-    ], ["passengerCar"]),
+      leaf("cars-sedan", "Седаны", "Седандар", ["passengerCarSedan", "vehicleCompliance"]),
+      leaf("cars-suv", "Кроссоверы и внедорожники", "Кроссоверлер мен жол талғамайтын көліктер", ["passengerCarSuv", "vehicleCompliance"]),
+      leaf("cars-hatchback", "Хэтчбеки", "Хэтчбектер", ["passengerCarHatchback", "vehicleCompliance"]),
+      leaf("cars-liftback", "Лифтбеки", "Лифтбектер", ["passengerCarLiftback", "vehicleCompliance"]),
+      leaf("cars-wagon", "Универсалы", "Универсалдар", ["passengerCarWagon", "vehicleCompliance"]),
+      leaf("cars-minivan", "Минивэны", "Минивэндер", ["passengerCarMinivan", "vehicleCompliance"]),
+      leaf("cars-coupe", "Купе", "Купелер", ["passengerCarCoupe", "vehicleCompliance"]),
+      leaf("cars-cabriolet", "Кабриолеты и родстеры", "Кабриолеттер мен родстерлер", ["passengerCarCabriolet", "vehicleCompliance"]),
+      leaf("cars-pickup", "Пикапы", "Пикаптар", ["passengerCarPickup", "vehicleCompliance"]),
+      fallbackLeaf("cars-other-body", "Другой кузов", "Басқа шанақ", ["passengerCarOther", "vehicleCompliance"]),
+    ], ["passengerCar", "vehicleCompliance"]),
     overlay("motorcycles", [
       overlay("road-motorcycles", vehicle([
         ["motorcycles-sport", "Спортивные мотоциклы", "Спорттық мотоциклдер"],
@@ -249,14 +249,14 @@ export const partsCatalogOverlays: MasterCatalogNode[] = [
       ["moto-brakes-wheels", "Тормоза и колёса", "Тежегіштер мен дөңгелектер"],
       ["moto-electrics", "Мотоэлектрика", "Мотоэлектрика"],
       ["moto-accessories", "Мотоаксессуары и экипировка", "Мотоаксессуарлар мен жабдық"],
-    ], ["autoPart"]), ["autoPart"]),
+    ], ["motoPart"]), ["motoPart"]),
     overlay("special-parts", leaves([
       ["truck-parts", "Запчасти для грузовиков", "Жүк көліктерінің бөлшектері"],
       ["bus-parts", "Запчасти для автобусов", "Автобус бөлшектері"],
       ["construction-machinery-parts", "Запчасти для спецтехники", "Арнайы техника бөлшектері"],
       ["agricultural-machinery-parts", "Запчасти для сельхозтехники", "Ауыл шаруашылық техника бөлшектері"],
       ["trailer-parts", "Запчасти для прицепов", "Тіркеме бөлшектері"],
-    ], ["autoPart"]), ["autoPart"]),
-    leaf("auto-dismantling", "Авторазборы", "Автобөлшектеу", ["autoPart"]),
+    ], ["commercialPart"]), ["commercialPart"]),
+    leaf("auto-dismantling", "Авторазборы", "Автобөлшектеу", ["dismantling"]),
   ], ["autoPart"]),
 ];

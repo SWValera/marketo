@@ -30,6 +30,7 @@ const expectedMigrations = [
   "0021_auth_role_rpc_hardening.sql",
   "0022_active_staff_moderation_hardening.sql",
   "0023_owner_listing_draft_lifecycle.sql",
+  "0024_catalog_completeness.sql",
 ];
 
 const immutableMigrationHashes = {
@@ -198,6 +199,27 @@ check(/get_my_listing_moderation_feedback[\s\S]{0,900}security definer[\s\S]{0,2
 check(!/returns table\([^)]*(?:moderator_id|note|metadata)/i.test(ownerLifecycleSql), "Owner feedback RPC exposes staff-only moderation data.");
 check(/revoke all on function public\.get_my_listing_moderation_feedback\(uuid\)[\s\S]{0,120}from public, anon, service_role/i.test(ownerLifecycleSql), "Owner feedback RPC privileges are not explicitly revoked.");
 check(/grant execute on function public\.get_my_listing_moderation_feedback\(uuid\)\s*to authenticated/i.test(ownerLifecycleSql), "Owner feedback RPC is not authenticated-only.");
+
+const catalogCompletenessSql = migrations.get("0024_catalog_completeness.sql") ?? "";
+check(/source category count mismatch: expected 1356/i.test(catalogCompletenessSql), "Catalog completeness migration has no exact 1356-category source preflight.");
+check(/source attribute count mismatch: expected 14310/i.test(catalogCompletenessSql), "Catalog completeness migration has no exact active-attribute source preflight.");
+check(/source option count mismatch: expected 84490/i.test(catalogCompletenessSql), "Catalog completeness migration has no exact active-option source preflight.");
+check(/active attribute count mismatch: expected 14310/i.test(catalogCompletenessSql), "Catalog completeness migration has no exact active-attribute postflight.");
+check(/active option count mismatch: expected 84490/i.test(catalogCompletenessSql), "Catalog completeness migration has no exact active-option postflight.");
+check(/existing\.data_type <> target\.data_type[\s\S]{0,240}refuses to change the data type/i.test(catalogCompletenessSql), "Catalog completeness migration can silently change a stable attribute type.");
+check(/listing_attribute_values[\s\S]{0,400}listing_attribute_option_values[\s\S]{0,400}refuses to deactivate an attribute referenced by a listing/i.test(catalogCompletenessSql), "Catalog completeness migration has no referenced-attribute deactivation guard.");
+check(/listing_attribute_option_values[\s\S]{0,500}refuses to deactivate an option referenced by a listing/i.test(catalogCompletenessSql), "Catalog completeness migration has no referenced-option deactivation guard.");
+check(/set is_required = target\.is_required\s+and coalesce\([\s\S]{0,800}select existing\.is_required[\s\S]{0,600}\), false\)/i.test(catalogCompletenessSql), "Catalog completeness rollout does not preserve optionality for new or newly-required fields.");
+check((catalogCompletenessSql.match(/greatest\s*\(/gi) ?? []).length >= 4, "Catalog completeness sort staging is not dynamically bounded.");
+check((catalogCompletenessSql.match(/row_number\s*\(\)\s*over/gi) ?? []).length >= 4, "Catalog completeness sort staging is not deterministic.");
+check((catalogCompletenessSql.match(/2147483647/g) ?? []).length >= 2, "Catalog completeness sort staging has no integer-overflow preflight.");
+check(!/set\s+sort_order\s*=\s*1000000\b/i.test(catalogCompletenessSql), "Catalog completeness sort staging uses the legacy fixed offset.");
+check(/option\.is_active and not attribute\.is_active[\s\S]{0,180}active option owned by an inactive attribute/i.test(catalogCompletenessSql), "Catalog completeness postflight permits active options on inactive attributes.");
+check(/actual\.validation is distinct from target\.validation/i.test(catalogCompletenessSql), "Catalog completeness postflight does not verify persisted conditional metadata.");
+check(/create or replace function private\.validate_listing_leaf_category\(\)[\s\S]{0,500}security invoker/i.test(catalogCompletenessSql), "Leaf-category guard must remain SECURITY INVOKER.");
+check(/where category\.id = new\.category_id[\s\S]{0,400}category\.is_active[\s\S]{0,400}child\.parent_id = category\.id and child\.is_active/i.test(catalogCompletenessSql), "Leaf-category guard does not require an active category without active children.");
+check(/revoke all on function private\.validate_listing_leaf_category\(\)[\s\S]{0,120}from public, anon, authenticated, service_role/i.test(catalogCompletenessSql), "Leaf-category guard function privileges are not explicitly revoked.");
+check(/create trigger listings_validate_leaf_category\s+before insert or update of category_id on public\.listings/i.test(catalogCompletenessSql), "Leaf-category guard is not attached to direct listing writes.");
 
 const drizzleConfig = await readFile(resolve(root, "drizzle.config.ts"), "utf8");
 const databaseTypes = await readFile(resolve(root, "lib/supabase/database.types.ts"), "utf8");

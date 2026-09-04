@@ -8,7 +8,7 @@ export type ListingQuery = {
   query?: string;
   minPriceMinor?: number;
   maxPriceMinor?: number;
-  attributeFilters?: Record<string, string | boolean>;
+  attributeFilters?: Record<string, string>;
   sort?: "new" | "cheap" | "expensive";
   page?: number;
   limit?: number;

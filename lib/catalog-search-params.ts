@@ -22,13 +22,13 @@ export function parseCatalogSearchParams(params: CatalogSearchParams) {
   const city = first(params.city);
   const sort = first(params.sort);
   const normalizedSort: "new" | "cheap" | "expensive" = sort === "cheap" || sort === "expensive" ? sort : "new";
-  const dynamicFilters: Record<string, string | boolean> = {};
+  const dynamicFilters: Record<string, string> = {};
   for (const [key, rawValue] of Object.entries(params)) {
     const attributeKey = key.slice(2);
     if (!key.startsWith("f_") || !rawValue || !/^[a-z][A-Za-z0-9_]{0,79}$/.test(attributeKey)) continue;
     if (Object.keys(dynamicFilters).length >= 40) break;
     const value = first(rawValue).slice(0, 200);
-    if (value) dynamicFilters[attributeKey] = value === "true" ? true : value;
+    if (value) dynamicFilters[attributeKey] = value;
   }
   return {
     query: first(params.q).slice(0, 200),

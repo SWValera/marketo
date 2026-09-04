@@ -60,13 +60,13 @@ npm run validate:catalog
 
 ## Зафиксированный результат
 
-На 2026-08-29:
+На 2026-09-04:
 
 ```text
 Master Catalog semantic validation passed:
-1356 categories, 1137 leaves, 497714 assertions,
+1356 categories, 1137 leaves, 516426 assertions,
 8136 contextual RU/KK metadata assignments,
-9373 seller-attribute assignments, 87150 option assignments.
+14310 seller-attribute assignments, 84490 option assignments.
 ```
 
 Это подтверждает semantic source-of-truth в памяти приложения. SQL migration,

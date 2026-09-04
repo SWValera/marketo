@@ -197,9 +197,20 @@ test("catalog URL parser preserves search, geo, sorting and category attributes"
     maxPrice: "",
     sort: "cheap",
     page: 1,
-    dynamicFilters: { drive: "all", remote: true },
+    dynamicFilters: { drive: "all", remote: "true" },
   });
   assert.equal(parseCatalogSearchParams({ city: "petropavl" }).cityId, undefined);
+});
+
+test("catalog pages sanitize conditional URL filters before server search and client hydration", async () => {
+  for (const file of ["app/search/page.tsx", "app/category/[slug]/page.tsx"]) {
+    const source = await readFile(new URL(file, root), "utf8");
+    assert.match(source, /sanitizeAttributeFilters/);
+    assert.match(source, /attributeFilters: initialDynamicFilters/);
+    assert.match(source, /initialDynamicFilters=\{initialDynamicFilters\}/);
+    assert.doesNotMatch(source, /attributeFilters: parsed\.dynamicFilters/);
+    assert.doesNotMatch(source, /initialDynamicFilters=\{parsed\.dynamicFilters\}/);
+  }
 });
 
 test("Russian and Kazakh dictionaries stay type-aligned and locale preference is wired", async () => {
