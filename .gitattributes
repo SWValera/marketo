@@ -1,1 +1,4 @@
 *.sh text eol=lf
+supabase/migrations/*.sql text eol=lf
+supabase/seeds/*.sql text eol=lf
+supabase/CHECKSUMS.sha256 text eol=lf

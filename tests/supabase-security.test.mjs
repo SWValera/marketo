@@ -1370,6 +1370,39 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       assert.doesNotMatch(restoredDefinition.rows[0].definition, /select\s+true\s*;/i);
     });
 
+    await t.test("0025 treats LF and CRLF function bodies as the same reviewed contract", async () => {
+      const migration = await readFile(
+        new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
+        "utf8",
+      );
+      const baseline = await readFile(
+        new URL("supabase/migrations/0010_rls_and_grants.sql", root),
+        "utf8",
+      );
+      const canonicalFunction = baseline.match(
+        /create or replace function private\.current_profile_is_active\(\)[\s\S]*?\$\$;/i,
+      )?.[0];
+      assert.ok(canonicalFunction);
+
+      const crlfFunction = canonicalFunction.replace(/\r?\n/g, "\r\n");
+      await db.exec(crlfFunction);
+      const storedBody = await db.query(`
+        select strpos(prosrc, E'\\r\\n') > 0 as has_crlf
+        from pg_proc
+        where oid = 'private.current_profile_is_active()'::regprocedure
+      `);
+      assert.equal(storedBody.rows[0].has_crlf, true);
+
+      await db.exec(migration);
+      const restoredDefinition = await db.query(`
+        select pg_get_functiondef(
+          'private.current_profile_is_active()'::regprocedure
+        ) as definition
+      `);
+      assert.match(restoredDefinition.rows[0].definition, /public\.profiles/i);
+      assert.match(restoredDefinition.rows[0].definition, /status\s*=\s*'active'/i);
+    });
+
     await t.test("0025 refuses a same-signature callable function with a drifted default", async () => {
       const migration = await readFile(
         new URL("supabase/migrations/0025_security_boundary_repair.sql", root),

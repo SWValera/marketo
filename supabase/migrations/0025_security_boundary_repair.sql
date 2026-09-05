@@ -118,7 +118,10 @@ select
     coalesce(to_jsonb(procedure.proargmodes)::text, 'null') || ' | ' ||
     procedure.pronargdefaults::text || ' | ' ||
     coalesce(pg_get_expr(procedure.proargdefaults, 0, false), 'null') || ' | ' ||
-    procedure.prosrc
+    -- PostgreSQL stores a function body byte-for-byte. A function installed
+    -- from Windows tooling can therefore contain CRLF while the reviewed SQL
+    -- contains LF, despite an otherwise identical contract.
+    replace(replace(procedure.prosrc, E'\r\n', E'\n'), E'\r', E'\n')
   )
 from marketo_security_0025_functions as function_inventory
 join pg_proc as procedure
@@ -919,7 +922,7 @@ select
     coalesce(to_jsonb(procedure.proargmodes)::text, 'null') || ' | ' ||
     procedure.pronargdefaults::text || ' | ' ||
     coalesce(pg_get_expr(procedure.proargdefaults, 0, false), 'null') || ' | ' ||
-    procedure.prosrc
+    replace(replace(procedure.prosrc, E'\r\n', E'\n'), E'\r', E'\n')
   )
 from marketo_security_0025_functions as function_inventory
 join pg_proc as procedure
