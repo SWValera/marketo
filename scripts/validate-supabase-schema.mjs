@@ -31,6 +31,7 @@ const expectedMigrations = [
   "0022_active_staff_moderation_hardening.sql",
   "0023_owner_listing_draft_lifecycle.sql",
   "0024_catalog_completeness.sql",
+  "0025_security_boundary_repair.sql",
 ];
 
 const immutableMigrationHashes = {
@@ -220,6 +221,134 @@ check(/create or replace function private\.validate_listing_leaf_category\(\)[\s
 check(/where category\.id = new\.category_id[\s\S]{0,400}category\.is_active[\s\S]{0,400}child\.parent_id = category\.id and child\.is_active/i.test(catalogCompletenessSql), "Leaf-category guard does not require an active category without active children.");
 check(/revoke all on function private\.validate_listing_leaf_category\(\)[\s\S]{0,120}from public, anon, authenticated, service_role/i.test(catalogCompletenessSql), "Leaf-category guard function privileges are not explicitly revoked.");
 check(/create trigger listings_validate_leaf_category\s+before insert or update of category_id on public\.listings/i.test(catalogCompletenessSql), "Leaf-category guard is not attached to direct listing writes.");
+
+const securityBoundaryRepairSql = migrations.get("0025_security_boundary_repair.sql") ?? "";
+check(
+  /set local search_path = pg_catalog, pg_temp, public/i.test(securityBoundaryRepairSql),
+  "Security repair does not stabilize catalog rendering with a fixed local search_path.",
+);
+check(
+  /alter default privileges revoke execute on functions\s+from public, anon, authenticated, service_role/i.test(securityBoundaryRepairSql),
+  "Security repair does not revoke global default function EXECUTE from every API role.",
+);
+check(
+  /alter default privileges in schema public, private\s+revoke execute on functions\s+from public, anon, authenticated, service_role/i.test(securityBoundaryRepairSql),
+  "Security repair does not remove explicit public/private schema default EXECUTE grants.",
+);
+check(
+  /marketo_security_0025_functions[\s\S]{0,9000}to_regprocedure\(function_inventory\.signature\)[\s\S]{0,3000}refuses unreviewed public\/private function/i.test(securityBoundaryRepairSql),
+  "Security repair has no fail-closed function inventory preflight.",
+);
+check(
+  /marketo_security_0025_function_contracts[\s\S]{0,16000}canonical_fingerprint[\s\S]{0,16000}refuses drifted reviewed callable function contract/i.test(securityBoundaryRepairSql)
+    && /postflight callable function contract mismatch/i.test(securityBoundaryRepairSql),
+  "Security repair does not verify callable function bodies and metadata before and after repair.",
+);
+check(
+  (securityBoundaryRepairSql.match(/'[0-9a-f]{32}'/g) ?? []).length === 21,
+  "Security repair must pin exactly 21 callable function fingerprints.",
+);
+check(
+  (securityBoundaryRepairSql.match(/pg_get_expr\(procedure\.proargdefaults, 0, false\)/g) ?? []).length === 2,
+  "Security repair fingerprints must include function default expressions before and after repair.",
+);
+check(
+  /marketo_security_0025_policies[\s\S]{0,9000}refuses unreviewed RLS policy/i.test(securityBoundaryRepairSql),
+  "Security repair has no fail-closed RLS policy inventory preflight.",
+);
+check(
+  /requires the migration role to own every managed function/i.test(securityBoundaryRepairSql),
+  "Security repair does not verify the function owner boundary.",
+);
+check(
+  /lock table[\s\S]{0,500}public\.profiles[\s\S]{0,100}in access exclusive mode/i.test(securityBoundaryRepairSql),
+  "Security repair does not acquire its policy-table locks deterministically.",
+);
+for (const table of [
+  "profiles",
+  "listings",
+  "listing_attribute_values",
+  "listing_attribute_option_values",
+  "listing_images",
+]) {
+  check(
+    new RegExp(`alter table public\\.${table} enable row level security`, "i").test(securityBoundaryRepairSql),
+    `Security repair does not restore RLS on public.${table}.`,
+  );
+}
+check(
+  /revoke execute on all functions in schema public[\s\S]{0,120}from public, anon, authenticated, service_role/i.test(securityBoundaryRepairSql)
+    && /revoke execute on all functions in schema private[\s\S]{0,120}from public, anon, authenticated, service_role/i.test(securityBoundaryRepairSql),
+  "Security repair does not reset all API-role function grants.",
+);
+check(
+  /create or replace function private\.has_any_role[\s\S]{0,900}profile\.status = 'active'/i.test(securityBoundaryRepairSql),
+  "Security repair does not restore the active-staff role guard.",
+);
+check(
+  /create or replace function public\.moderate_listing[\s\S]{0,5000}invalid moderation reason_code[\s\S]{0,1000}moderation note is too long/i.test(securityBoundaryRepairSql),
+  "Security repair does not restore bounded moderation input.",
+);
+for (const policy of [
+  "profiles_anon_public_read",
+  "profiles_authenticated_read",
+  "profiles_owner_update",
+  "listings_anon_active_read",
+  "listings_authenticated_read",
+  "listings_owner_insert_draft",
+  "listings_owner_update_editable",
+  "listing_attribute_values_anon_active_read",
+  "listing_attribute_values_authenticated_read",
+  "listing_attribute_values_owner_insert",
+  "listing_attribute_values_owner_update",
+  "listing_attribute_values_owner_delete",
+  "listing_attribute_options_anon_active_read",
+  "listing_attribute_options_authenticated_read",
+  "listing_attribute_options_owner_insert",
+  "listing_attribute_options_owner_delete",
+  "listing_images_anon_active_read",
+  "listing_images_authenticated_read",
+  "profiles_moderation_staff_read",
+]) {
+  check(
+    new RegExp(`drop policy if exists ${policy}[\\s\\S]{0,120}create policy ${policy}`, "i").test(securityBoundaryRepairSql),
+    `Security repair does not deterministically replace ${policy}.`,
+  );
+}
+check(
+  /create or replace function public\.update_listing_draft\([\s\S]{0,9000}security invoker[\s\S]{0,300}set search_path = ''/i.test(securityBoundaryRepairSql),
+  "Security repair does not restore the complete owner draft RPC contract.",
+);
+check(
+  /create or replace function public\.get_my_listing_moderation_feedback\([\s\S]{0,1200}stable[\s\S]{0,200}security definer[\s\S]{0,200}set search_path = ''/i.test(securityBoundaryRepairSql),
+  "Security repair does not restore the safe owner feedback RPC contract.",
+);
+check(
+  /aclexplode\([\s\S]{0,200}coalesce\(procedure\.proacl, acldefault\('f', procedure\.proowner\)\)[\s\S]{0,500}privilege\.grantee = 0[\s\S]{0,300}direct PUBLIC (?:function )?EXECUTE/i.test(securityBoundaryRepairSql),
+  "Security repair does not reject direct PUBLIC function EXECUTE.",
+);
+check(
+  /grant usage on schema private[\s\S]{0,80}service_role/i.test(securityBoundaryRepairSql)
+    && /has_schema_privilege\('service_role', 'private', 'USAGE'\)/i.test(securityBoundaryRepairSql),
+  "Security repair does not make its reviewed private service helpers callable.",
+);
+for (const signature of [
+  "public.update_listing_draft(uuid,uuid,uuid,text,text,bigint,character,text,text,boolean,jsonb)",
+  "public.get_my_listing_moderation_feedback(uuid)",
+]) {
+  check(
+    securityBoundaryRepairSql.includes(`('${signature}', false, true, false)`),
+    `Security repair ACL inventory is missing authenticated-only RPC ${signature}.`,
+  );
+}
+check(
+  /marketo_security_0025_postflight[\s\S]{0,9000}function grant mismatch[\s\S]{0,9000}canonical RLS policy metadata mismatch/i.test(securityBoundaryRepairSql),
+  "Security repair has no complete RPC/RLS postflight.",
+);
+check(
+  !/\b(?:insert into|update|delete from)\s+public\.(?:categories|category_attributes|category_attribute_options)\b/i.test(securityBoundaryRepairSql),
+  "Security repair must not mutate catalog reference data.",
+);
 
 const drizzleConfig = await readFile(resolve(root, "drizzle.config.ts"), "utf8");
 const databaseTypes = await readFile(resolve(root, "lib/supabase/database.types.ts"), "utf8");

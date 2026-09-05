@@ -20,12 +20,16 @@ in the build or test chain connects to or mutates production Supabase.
 - 0024 synchronizes the expanded category-specific seller fields and buyer
   filters without replacing stable row UUIDs, and rejects non-leaf listing
   categories at the database boundary.
+- 0025 is the forward repair for the detected production RPC/RLS drift. When
+  applied, it removes global and schema-specific default API-role function
+  execution, restores the complete reviewed 19-policy boundary, reenables RLS
+  on the affected tables and restores the active-staff/owner RPC contracts.
 - seeds/001_marketo_reference.sql contains only RU/KK reference data.
 - Remote application status is not inferred from local files. No migration was
   applied remotely during recovery.
 
 The exact ordered list, dependencies and purpose are in
-MIGRATION_MANIFEST.md. CHECKSUMS.sha256 covers all 24 migrations and the
+MIGRATION_MANIFEST.md. CHECKSUMS.sha256 covers all 25 migrations and the
 reference seed.
 
 ## Clean local verification
@@ -63,7 +67,11 @@ migration/seed release.
 
 ## Safe rollout rule
 
-First rehearse 0017–0024 in order on a disposable Supabase branch cloned from
-the actual target schema. Compare it with a clean migrations-plus-seed
-database, run Database Linter/Security Advisor and exercise real Auth/R2 with
-non-production credentials. Production requires a separate explicit approval.
+First determine the target's last verified migration from schema evidence.
+On a disposable Supabase branch cloned from that exact target, apply only the
+consecutive missing forward migrations in order (for example, a target verified
+through 0023 receives 0024 and then 0025). Never replay migrations already
+represented by the target schema. Compare the result with a clean
+migrations-plus-seed database, run Database Linter/Security Advisor and exercise
+real Auth/R2 with non-production credentials. Production requires a separate
+explicit approval.

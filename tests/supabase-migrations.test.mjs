@@ -70,7 +70,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 24);
+    assert.equal(names.length, 25);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -150,6 +150,122 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         and has_function_privilege('anon', procedure.oid, 'EXECUTE')
     `);
     assert.equal(anonymousPrivateRpcCount.rows[0].count, 0);
+
+    const directPublicRpcCount = await db.query(`
+      select count(*)::int as count
+      from pg_proc as procedure
+      join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+      cross join lateral aclexplode(
+        coalesce(procedure.proacl, acldefault('f', procedure.proowner))
+      ) as privilege
+      where namespace.nspname in ('public', 'private')
+        and privilege.grantee = 0
+        and privilege.privilege_type = 'EXECUTE'
+    `);
+    assert.equal(directPublicRpcCount.rows[0].count, 0);
+
+    const servicePrivateUsage = await db.query(`
+      select has_schema_privilege('service_role', 'private', 'USAGE') as allowed
+    `);
+    assert.equal(servicePrivateUsage.rows[0].allowed, true);
+    await db.exec("set role service_role;");
+    try {
+      const servicePrivateHelpers = await db.query(`
+        select
+          private.category_is_ancestor(null::uuid, null::uuid) as ancestor,
+          private.attribute_applies_to_listing(null::uuid, null::uuid) as applies
+      `);
+      assert.deepEqual(servicePrivateHelpers.rows[0], { ancestor: false, applies: false });
+    } finally {
+      await db.exec("reset role;");
+    }
+
+    await db.exec(`
+      create function public.marketo_0025_default_acl_probe()
+      returns integer
+      language sql
+      as 'select 1';
+
+      create function private.marketo_0025_default_acl_probe()
+      returns integer
+      language sql
+      as 'select 1';
+    `);
+    const defaultAclProbe = await db.query(`
+      select
+        namespace.nspname,
+        has_function_privilege('anon', procedure.oid, 'EXECUTE') as anon_execute,
+        has_function_privilege('authenticated', procedure.oid, 'EXECUTE') as authenticated_execute,
+        has_function_privilege('service_role', procedure.oid, 'EXECUTE') as service_execute
+      from pg_proc as procedure
+      join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+      where namespace.nspname in ('public', 'private')
+        and procedure.proname = 'marketo_0025_default_acl_probe'
+      order by namespace.nspname
+    `);
+    assert.deepEqual(defaultAclProbe.rows, [
+      {
+        nspname: "private",
+        anon_execute: false,
+        authenticated_execute: false,
+        service_execute: false,
+      },
+      {
+        nspname: "public",
+        anon_execute: false,
+        authenticated_execute: false,
+        service_execute: false,
+      },
+    ]);
+    await db.exec(`
+      drop function private.marketo_0025_default_acl_probe();
+      drop function public.marketo_0025_default_acl_probe();
+    `);
+
+    const defaultAclViolations = await db.query(`
+      select count(*)::int as count
+      from pg_default_acl as defaults
+      left join pg_namespace as namespace on namespace.oid = defaults.defaclnamespace
+      cross join lateral aclexplode(defaults.defaclacl) as privilege
+      where defaults.defaclobjtype = 'f'
+        and (defaults.defaclnamespace = 0 or namespace.nspname in ('public', 'private'))
+        and privilege.grantee in (
+          0,
+          (select oid from pg_roles where rolname = 'anon'),
+          (select oid from pg_roles where rolname = 'authenticated'),
+          (select oid from pg_roles where rolname = 'service_role')
+        )
+        and privilege.privilege_type = 'EXECUTE'
+    `);
+    assert.equal(defaultAclViolations.rows[0].count, 0);
+
+    const affectedReadPolicies = await db.query(`
+      select policyname
+      from pg_policies
+      where schemaname = 'public'
+        and tablename in (
+          'profiles',
+          'listings',
+          'listing_attribute_values',
+          'listing_attribute_option_values',
+          'listing_images'
+        )
+        and cmd in ('SELECT', 'ALL')
+      order by policyname
+    `);
+    assert.deepEqual(affectedReadPolicies.rows.map((row) => row.policyname), [
+      "listing_attribute_options_anon_active_read",
+      "listing_attribute_options_authenticated_read",
+      "listing_attribute_values_anon_active_read",
+      "listing_attribute_values_authenticated_read",
+      "listing_images_anon_active_read",
+      "listing_images_authenticated_read",
+      "listings_anon_active_read",
+      "listings_authenticated_read",
+      "profiles_anon_public_read",
+      "profiles_authenticated_read",
+      "profiles_moderation_staff_read",
+    ]);
     const realtimeTables = await db.query(`
       select tablename
       from pg_publication_tables
@@ -489,10 +605,14 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       broken_dependencies: 0,
     });
 
-    for (const migrationName of ["0024_catalog_completeness.sql"]) {
-      const migration = await readFile(new URL(`supabase/migrations/${migrationName}`, root), "utf8");
-      await db.exec(migration);
-      await db.exec(migration);
+    for (let replay = 0; replay < 2; replay += 1) {
+      for (const migrationName of [
+        "0024_catalog_completeness.sql",
+        "0025_security_boundary_repair.sql",
+      ]) {
+        const migration = await readFile(new URL(`supabase/migrations/${migrationName}`, root), "utf8");
+        await db.exec(migration);
+      }
     }
     await db.query("select private.apply_contextual_catalog_metadata()");
     const repeatedReferenceCounts = await db.query(`
@@ -501,6 +621,80 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         (select count(*) from public.category_attribute_options where is_active)::int as options
     `);
     assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 14310, options: 84490 });
+
+    const repeatedSecurityBoundary = await db.query(`
+      select
+        (
+          select count(*)::int
+          from pg_proc as procedure
+          join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+          cross join lateral aclexplode(
+            coalesce(procedure.proacl, acldefault('f', procedure.proowner))
+          ) as privilege
+          where namespace.nspname in ('public', 'private')
+            and privilege.grantee = 0
+            and privilege.privilege_type = 'EXECUTE'
+        ) as direct_public_execute,
+        (
+          select count(*)::int
+          from pg_proc as procedure
+          join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+          where namespace.nspname = 'public'
+            and has_function_privilege('anon', procedure.oid, 'EXECUTE')
+            and procedure.proname not in ('search_catalog_listing_cards', 'get_city_premium_placements')
+        ) as unexpected_anon_public_execute,
+        (
+          select count(*)::int
+          from pg_proc as procedure
+          join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+          where namespace.nspname = 'private'
+            and has_function_privilege('anon', procedure.oid, 'EXECUTE')
+        ) as anon_private_execute,
+        (
+          select count(*)::int
+          from pg_default_acl as defaults
+          left join pg_namespace as namespace on namespace.oid = defaults.defaclnamespace
+          cross join lateral aclexplode(defaults.defaclacl) as privilege
+          where defaults.defaclobjtype = 'f'
+            and (defaults.defaclnamespace = 0 or namespace.nspname in ('public', 'private'))
+            and privilege.grantee in (
+              0,
+              (select oid from pg_roles where rolname = 'anon'),
+              (select oid from pg_roles where rolname = 'authenticated'),
+              (select oid from pg_roles where rolname = 'service_role')
+            )
+            and privilege.privilege_type = 'EXECUTE'
+        ) as default_acl_violations,
+        (
+          select count(*)::int
+          from pg_class as relation
+          join pg_namespace as namespace on namespace.oid = relation.relnamespace
+          where namespace.nspname = 'public'
+            and relation.relname in (
+              'profiles', 'listings', 'listing_attribute_values',
+              'listing_attribute_option_values', 'listing_images'
+            )
+            and not relation.relrowsecurity
+        ) as rls_disabled,
+        (
+          select count(*)::int
+          from pg_policies
+          where schemaname = 'public'
+            and tablename in (
+              'profiles', 'listings', 'listing_attribute_values',
+              'listing_attribute_option_values', 'listing_images'
+            )
+            and cmd in ('SELECT', 'ALL')
+        ) as affected_read_policies
+    `);
+    assert.deepEqual(repeatedSecurityBoundary.rows[0], {
+      direct_public_execute: 0,
+      unexpected_anon_public_execute: 0,
+      anon_private_execute: 0,
+      default_acl_violations: 0,
+      rls_disabled: 0,
+      affected_read_policies: 11,
+    });
 
     const passengerCars = await db.query(`
       select

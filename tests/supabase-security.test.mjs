@@ -22,6 +22,91 @@ async function applyMigrations(db) {
     .filter((name) => name.endsWith(".sql"))
     .sort();
   for (const name of names) {
+    if (name === "0025_security_boundary_repair.sql") {
+      await db.exec(`
+        alter default privileges grant execute on functions
+        to public, anon, authenticated, service_role;
+        alter default privileges in schema public, private grant execute on functions
+        to public, anon, authenticated, service_role;
+        grant execute on all functions in schema public, private
+        to public, anon, authenticated, service_role;
+        alter table public.profiles disable row level security;
+        alter table public.listings disable row level security;
+        alter table public.listing_attribute_values disable row level security;
+        alter table public.listing_attribute_option_values disable row level security;
+        alter table public.listing_images disable row level security;
+        alter function public.update_listing_draft(
+          uuid, uuid, uuid, text, text, bigint, char(3), text, text, boolean, jsonb
+        ) security definer;
+        alter function public.get_my_listing_moderation_feedback(uuid)
+          security invoker;
+        alter function public.get_my_listing_moderation_feedback(uuid)
+          volatile;
+
+        create or replace function private.has_any_role(required_roles text[])
+        returns boolean
+        language sql
+        stable
+        security definer
+        set search_path = ''
+        as $$
+          select coalesce(
+            exists (
+              select 1
+              from public.user_roles as role_row
+              where role_row.user_id = (select auth.uid())
+                and role_row.role = any(required_roles)
+            ),
+            false
+          )
+        $$;
+
+        create or replace function public.moderate_listing(
+          target_listing_id uuid,
+          decision text,
+          reason_code text default null,
+          note text default null
+        )
+        returns void
+        language plpgsql
+        security definer
+        set search_path = ''
+        as $$
+        begin
+          return;
+        end
+        $$;
+
+        drop policy if exists listings_authenticated_read on public.listings;
+        create policy listings_authenticated_read
+        on public.listings for select to authenticated
+        using (
+          (status = 'active' and published_at is not null and deleted_at is null)
+          or owner_id = (select auth.uid())
+          or (select private.has_any_role(array['support', 'moderator', 'admin']))
+        );
+
+        drop policy if exists profiles_moderation_staff_read on public.profiles;
+
+        drop policy if exists listing_attribute_values_authenticated_read
+          on public.listing_attribute_values;
+        create policy listing_attribute_values_authenticated_read
+          on public.listing_attribute_values for select to authenticated
+          using (true);
+
+        drop policy if exists listing_attribute_options_authenticated_read
+          on public.listing_attribute_option_values;
+        create policy listing_attribute_options_authenticated_read
+          on public.listing_attribute_option_values for select to authenticated
+          using (true);
+
+        drop policy if exists listing_images_authenticated_read
+          on public.listing_images;
+        create policy listing_images_authenticated_read
+          on public.listing_images for select to authenticated
+          using (true);
+      `);
+    }
     await db.exec(await readFile(new URL(`supabase/migrations/${name}`, root), "utf8"));
   }
   await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
@@ -263,8 +348,8 @@ async function createFixtureDatabase() {
   const listings = {
     draftFree: await createListing("draft-free", "draft"),
     draftCar: await createListing("draft-car", "draft", users.owner, refs.car_category_id),
-    pendingApprove: await createListing("pending-approve", "pending"),
-    pendingReject: await createListing("pending-reject", "pending"),
+    pendingApprove: await createListing("pending-approve", "pending", users.owner, refs.car_category_id),
+    pendingReject: await createListing("pending-reject", "pending", users.owner, refs.car_category_id),
     activeOwner: await createListing("active-owner", "active"),
     archivedOwner: await createListing("archived-owner", "archived"),
     soldOwner: await createListing("sold-owner", "sold"),
@@ -275,12 +360,21 @@ async function createFixtureDatabase() {
   };
 
   await db.query(
-    "insert into public.listing_attribute_values (listing_id, attribute_id, number_value) values ($1, $2, 2024)",
-    [listings.draftCar, refs.car_year_attribute_id],
+    `insert into public.listing_attribute_values (listing_id, attribute_id, number_value)
+     values ($1, $2, 2024), ($3, $2, 2023)`,
+    [listings.draftCar, refs.car_year_attribute_id, listings.pendingApprove],
   );
   await db.query(
-    "insert into public.listing_attribute_option_values (listing_id, attribute_id, option_id) values ($1, $2, $3)",
-    [listings.activeOwner, refs.free_condition_attribute_id, refs.free_condition_option_id],
+    `insert into public.listing_attribute_option_values (listing_id, attribute_id, option_id)
+     values ($1, $2, $3), ($4, $5, $6)`,
+    [
+      listings.activeOwner,
+      refs.free_condition_attribute_id,
+      refs.free_condition_option_id,
+      listings.pendingApprove,
+      refs.car_brand_attribute_id,
+      refs.car_brand_option_id,
+    ],
   );
   await db.query(
     "insert into public.listing_images (listing_id, storage_key) values ($1, 'security/draft-owner.webp'), ($2, 'security/active-owner.webp'), ($3, 'security/pending-owner.webp')",
@@ -503,23 +597,27 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       });
     });
 
-    await t.test("pending media follows listing RLS for anon, owner, staff and inactive roles", async () => {
-      const pendingImage = async () => db.query(
-        "select storage_key from public.listing_images where listing_id = $1",
-        [listings.pendingApprove],
-      );
+    await t.test("pending child data follows listing RLS for anon, owner, staff and inactive roles", async () => {
+      const pendingChildren = async () => db.query(`
+        select
+          (select count(*)::int from public.listing_images where listing_id = $1) as images,
+          (select count(*)::int from public.listing_attribute_values where listing_id = $1) as scalar_values,
+          (select count(*)::int from public.listing_attribute_option_values where listing_id = $1) as option_values
+      `, [listings.pendingApprove]);
+      const expectedVisible = { images: 1, scalar_values: 1, option_values: 1 };
+      const expectedHidden = { images: 0, scalar_values: 0, option_values: 0 };
       await asAnon(db, async () => {
-        assert.equal((await pendingImage()).rows.length, 0);
+        assert.deepEqual((await pendingChildren()).rows[0], expectedHidden);
         const active = await db.query("select storage_key from public.listing_images where listing_id = $1", [listings.activeOwner]);
         assert.equal(active.rows.length, 1);
       });
-      await asAuthenticated(db, users.owner, async () => assert.equal((await pendingImage()).rows.length, 1));
-      await asAuthenticated(db, users.buyer, async () => assert.equal((await pendingImage()).rows.length, 0));
-      await asAuthenticated(db, users.moderator, async () => assert.equal((await pendingImage()).rows.length, 1));
-      await asAuthenticated(db, users.admin, async () => assert.equal((await pendingImage()).rows.length, 1));
-      await asAuthenticated(db, users.support, async () => assert.equal((await pendingImage()).rows.length, 0));
-      await asAuthenticated(db, users.suspendedModerator, async () => assert.equal((await pendingImage()).rows.length, 0));
-      await asAuthenticated(db, users.bannedAdmin, async () => assert.equal((await pendingImage()).rows.length, 0));
+      await asAuthenticated(db, users.owner, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedVisible));
+      await asAuthenticated(db, users.buyer, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedHidden));
+      await asAuthenticated(db, users.moderator, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedVisible));
+      await asAuthenticated(db, users.admin, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedVisible));
+      await asAuthenticated(db, users.support, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedHidden));
+      await asAuthenticated(db, users.suspendedModerator, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedHidden));
+      await asAuthenticated(db, users.bannedAdmin, async () => assert.deepEqual((await pendingChildren()).rows[0], expectedHidden));
     });
 
     await t.test("moderation input rejects missing or invalid reasons and oversized notes", async () => {
@@ -1186,6 +1284,178 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           /permission denied/i,
         );
       });
+    });
+
+    await t.test("0025 refuses unknown policies before changing RPC grants", async () => {
+      const migration = await readFile(
+        new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
+        "utf8",
+      );
+      await db.exec(`
+        grant execute on function public.moderate_listing(uuid, text, text, text) to anon;
+        create policy marketo_0025_unreviewed_profile_read
+        on public.profiles for select to anon
+        using (id = (select auth.uid()));
+      `);
+
+      await assert.rejects(
+        db.exec(migration),
+        /0025 refuses unreviewed RLS policy/i,
+      );
+      await db.exec("rollback;");
+      const unchangedGrant = await db.query(`
+        select has_function_privilege(
+          'anon',
+          'public.moderate_listing(uuid,text,text,text)',
+          'EXECUTE'
+        ) as anon_execute
+      `);
+      assert.equal(unchangedGrant.rows[0].anon_execute, true);
+
+      await db.exec(`
+        drop policy marketo_0025_unreviewed_profile_read on public.profiles;
+        revoke execute on function public.moderate_listing(uuid, text, text, text) from anon;
+      `);
+      await db.exec(migration);
+      const repairedGrant = await db.query(`
+        select has_function_privilege(
+          'anon',
+          'public.moderate_listing(uuid,text,text,text)',
+          'EXECUTE'
+        ) as anon_execute
+      `);
+      assert.equal(repairedGrant.rows[0].anon_execute, false);
+    });
+
+    await t.test("0025 refuses a same-signature callable function with a drifted body", async () => {
+      const migration = await readFile(
+        new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
+        "utf8",
+      );
+      const baseline = await readFile(
+        new URL("supabase/migrations/0010_rls_and_grants.sql", root),
+        "utf8",
+      );
+      const canonicalFunction = baseline.match(
+        /create or replace function private\.current_profile_is_active\(\)[\s\S]*?\$\$;/i,
+      )?.[0];
+      assert.ok(canonicalFunction);
+
+      await db.exec(`
+        create or replace function private.current_profile_is_active()
+        returns boolean
+        language sql
+        stable
+        security definer
+        set search_path = ''
+        as $$ select true; $$;
+      `);
+
+      await assert.rejects(
+        db.exec(migration),
+        /0025 refuses drifted reviewed callable function contract.*current_profile_is_active/is,
+      );
+      await db.exec("rollback;");
+      assert.equal((await db.query("select private.current_profile_is_active() as active")).rows[0].active, true);
+
+      await db.exec(canonicalFunction);
+      await db.exec(migration);
+      const restoredDefinition = await db.query(`
+        select pg_get_functiondef(
+          'private.current_profile_is_active()'::regprocedure
+        ) as definition
+      `);
+      assert.match(restoredDefinition.rows[0].definition, /public\.profiles/i);
+      assert.match(restoredDefinition.rows[0].definition, /status\s*=\s*'active'/i);
+      assert.doesNotMatch(restoredDefinition.rows[0].definition, /select\s+true\s*;/i);
+    });
+
+    await t.test("0025 refuses a same-signature callable function with a drifted default", async () => {
+      const migration = await readFile(
+        new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
+        "utf8",
+      );
+      const baseline = await readFile(
+        new URL("supabase/migrations/0019_city_premium_showcase.sql", root),
+        "utf8",
+      );
+      const canonicalFunction = baseline.match(
+        /create or replace function public\.get_city_premium_placements\([\s\S]*?\$\$;/i,
+      )?.[0];
+      assert.ok(canonicalFunction);
+      const driftedFunction = canonicalFunction.replace(
+        "p_limit integer default 15",
+        "p_limit integer default 50",
+      );
+      assert.notEqual(driftedFunction, canonicalFunction);
+      await db.exec(driftedFunction);
+
+      await assert.rejects(
+        db.exec(migration),
+        /0025 refuses drifted reviewed callable function contract.*get_city_premium_placements/is,
+      );
+      await db.exec("rollback;");
+      const driftedDefault = await db.query(`
+        select pg_get_expr(procedure.proargdefaults, 0, false) as expression
+        from pg_proc as procedure
+        where procedure.oid = to_regprocedure('public.get_city_premium_placements(uuid,integer)')
+      `);
+      assert.equal(driftedDefault.rows[0].expression, "50");
+
+      await db.exec(canonicalFunction);
+      await db.exec(migration);
+      const repairedDefault = await db.query(`
+        select pg_get_expr(procedure.proargdefaults, 0, false) as expression
+        from pg_proc as procedure
+        where procedure.oid = to_regprocedure('public.get_city_premium_placements(uuid,integer)')
+      `);
+      assert.equal(repairedDefault.rows[0].expression, "15");
+    });
+
+    await t.test("0025 rolls back every repair when a late postflight contract fails", async () => {
+      const migration = await readFile(
+        new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
+        "utf8",
+      );
+      const brokenMigration = migration.replace(
+        /('private\.has_any_role\(text\[\]\)', 'boolean', ')[0-9a-f]{32}(', true)/,
+        `$1${"0".repeat(32)}$2`,
+      );
+      assert.notEqual(brokenMigration, migration);
+      await db.exec(`
+        grant execute on function public.moderate_listing(uuid, text, text, text) to anon;
+        alter table public.listing_images disable row level security;
+      `);
+
+      await assert.rejects(
+        db.exec(brokenMigration),
+        /0025 postflight callable function contract mismatch.*has_any_role/is,
+      );
+      await db.exec("rollback;");
+      const rolledBack = await db.query(`
+        select
+          has_function_privilege(
+            'anon', 'public.moderate_listing(uuid,text,text,text)', 'EXECUTE'
+          ) as anon_execute,
+          not relation.relrowsecurity as rls_disabled
+        from pg_class as relation
+        join pg_namespace as namespace on namespace.oid = relation.relnamespace
+        where namespace.nspname = 'public' and relation.relname = 'listing_images'
+      `);
+      assert.deepEqual(rolledBack.rows[0], { anon_execute: true, rls_disabled: true });
+
+      await db.exec(migration);
+      const repaired = await db.query(`
+        select
+          has_function_privilege(
+            'anon', 'public.moderate_listing(uuid,text,text,text)', 'EXECUTE'
+          ) as anon_execute,
+          relation.relrowsecurity as rls_enabled
+        from pg_class as relation
+        join pg_namespace as namespace on namespace.oid = relation.relnamespace
+        where namespace.nspname = 'public' and relation.relname = 'listing_images'
+      `);
+      assert.deepEqual(repaired.rows[0], { anon_execute: false, rls_enabled: true });
     });
 
     await t.test("SECURITY DEFINER functions have fixed search paths and no anonymous EXECUTE", async () => {
