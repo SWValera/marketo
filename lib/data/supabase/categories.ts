@@ -128,7 +128,7 @@ async function listActiveCategoryParents(client: MarketoSupabaseClient) {
 }
 
 /**
- * The Home page needs full root presentation rows and immediate child counts.
+ * The Home page needs full root presentation rows and all descendant counts.
  * A compact id/parent hierarchy is loaded beside the roots in the same network
  * wave, avoiding both full leaf presentation payloads and a serial child query.
  */
@@ -140,15 +140,21 @@ export async function listHomeCategories(client: MarketoSupabaseClient): Promise
   if (roots.length === 0) return [];
 
   const rootIds = new Set(roots.map((category) => category.id));
-  const childCounts = new Map<string, number>();
+  const parentById = new Map(hierarchy.map((category) => [category.id, category.parent_id]));
+  const descendantCounts = new Map<string, number>();
   for (const category of hierarchy) {
-    if (category.parent_id && rootIds.has(category.parent_id)) {
-      childCounts.set(category.parent_id, (childCounts.get(category.parent_id) ?? 0) + 1);
+    if (rootIds.has(category.id)) continue;
+    let ancestorId = category.parent_id;
+    const visited = new Set<string>();
+    while (ancestorId && !rootIds.has(ancestorId) && !visited.has(ancestorId)) {
+      visited.add(ancestorId);
+      ancestorId = parentById.get(ancestorId) ?? null;
     }
+    if (ancestorId) descendantCounts.set(ancestorId, (descendantCounts.get(ancestorId) ?? 0) + 1);
   }
   return roots.map((category) => ({
     ...category,
-    child_count: childCounts.get(category.id) ?? 0,
+    child_count: descendantCounts.get(category.id) ?? 0,
   }));
 }
 

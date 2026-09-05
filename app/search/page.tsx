@@ -7,7 +7,7 @@ import { parseCatalogSearchParams, type CatalogSearchParams } from "@/lib/catalo
 import { listingRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/config";
-import { createCategoryCatalogView, getCategoryBySlug, getCategoryDescendantIds, getCategoryRoot } from "@/lib/reference-data/catalog";
+import { createCategoryCatalogView, getCategoryBySlug, getCategoryChildren, getCategoryDescendantIds, getCategoryRoot } from "@/lib/reference-data/catalog";
 import { sanitizeAttributeFilters } from "@/lib/reference-data/attributes";
 import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
 import { EMPTY_CATEGORIES } from "@/lib/reference-data/types";
@@ -20,16 +20,19 @@ export const metadata: Metadata = {
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<CatalogSearchParams> }) {
   const parsed = parseCatalogSearchParams(await searchParams);
+  const catalogPromise = parsed.categorySlug
+    ? getCategoryReferences()
+    : Promise.resolve({ status: "ready" as const, data: EMPTY_CATEGORIES });
   const [catalog, i18n] = await Promise.all([
-    parsed.categorySlug ? getCategoryReferences() : Promise.resolve(null),
+    catalogPromise,
     getServerI18n(),
   ]);
-  const view = createCategoryCatalogView(catalog?.data ?? EMPTY_CATEGORIES);
+  const view = createCategoryCatalogView(catalog.data);
   const category = getCategoryBySlug(view, parsed.categorySlug);
   const rootCategory = getCategoryRoot(view, category);
   const { locale, t } = i18n;
-  if (parsed.categorySlug && (catalog?.status !== "ready" || !category)) {
-    const unavailable = catalog?.status !== "ready";
+  if (parsed.categorySlug && (catalog.status !== "ready" || !category)) {
+    const unavailable = catalog.status !== "ready";
     return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState
       title={unavailable ? t("reference.categoriesUnavailableTitle") : t("catalog.emptyTitle")}
       description={unavailable ? t("reference.categoriesUnavailable") : t("catalog.emptyDescription")}
@@ -41,7 +44,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   let listings;
   let initialDynamicFilters: Record<string, string> = {};
   try {
-    initialAttributes = category ? await getCategoryAttributeReferences(category.id) : undefined;
+    const categoryIsLeaf = Boolean(category && getCategoryChildren(view, category).length === 0);
+    initialAttributes = categoryIsLeaf && category ? await getCategoryAttributeReferences(category.id) : undefined;
     initialDynamicFilters = initialAttributes?.status === "ready"
       ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
       : {};

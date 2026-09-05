@@ -9,6 +9,7 @@ import {
   createCategoryCatalogView,
   getCategoryBySlug,
   getCategoryChildren,
+  getCategoryDescendantCount,
   getCategoryParent,
   getCategoryPath,
   searchCategoryReferences,
@@ -37,7 +38,7 @@ export function CategoryPicker({
   const selectedPath = getCategoryPath(view, value);
   const currentParent = getCategoryBySlug(view, parentSlug);
   const currentItems = getCategoryChildren(view, parentSlug);
-  const searchResults = useMemo(() => searchCategoryReferences(view, query), [query, view]);
+  const searchResults = useMemo(() => searchCategoryReferences(view, query, 80), [query, view]);
 
   function openPicker() {
     const selectedParent = getCategoryParent(view, value);
@@ -150,7 +151,7 @@ export function CategoryPicker({
               return <button type="button" role="option" aria-selected={item.slug === value} className={item.slug === value ? "selected" : ""} key={item.id} onClick={() => choose(item.slug)}>
                 <span>
                   <strong>{localize(item.name, locale)}</strong>
-                  {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.sections", { count: children.length })}</small> : <small>{t("categories.exact")}</small>}
+                  {query ? <small>{path.map((pathItem) => localize(pathItem.name, locale)).join(" → ")}</small> : hasChildren ? <small>{t("categories.subcategories", { count: getCategoryDescendantCount(view, item) })}</small> : <small>{t("categories.exact")}</small>}
                 </span>
                 {item.slug === value ? <Check size={18} /> : hasChildren ? <ChevronRight size={19} /> : null}
               </button>;

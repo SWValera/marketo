@@ -7,7 +7,7 @@ const goods = (entries: Parameters<typeof leaves>[0], profiles: readonly string[
 /** Product vertical missing from the original Marketo tree. */
 const constructionRoot: MasterCatalogNode = {
   slug: "construction-repair",
-  name: tx("Строительство и ремонт", "Құрылыс және жөндеу"),
+  name: tx("Стройматериалы и инструменты", "Құрылыс материалдары мен құралдар"),
   icon: "hammer",
   tone: "amber",
   searchPlaceholder: tx("Стройматериалы, сантехника или инструмент", "Құрылыс материалы, сантехника немесе құрал"),

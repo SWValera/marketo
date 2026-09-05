@@ -32,6 +32,7 @@ const expectedMigrations = [
   "0023_owner_listing_draft_lifecycle.sql",
   "0024_catalog_completeness.sql",
   "0025_security_boundary_repair.sql",
+  "0026_catalog_navigation_ux.sql",
 ];
 
 const immutableMigrationHashes = {
@@ -348,6 +349,32 @@ check(
 check(
   !/\b(?:insert into|update|delete from)\s+public\.(?:categories|category_attributes|category_attribute_options)\b/i.test(securityBoundaryRepairSql),
   "Security repair must not mutate catalog reference data.",
+);
+
+const catalogNavigationSql = migrations.get("0026_catalog_navigation_ux.sql") ?? "";
+check(/active category count mismatch: expected 1356/i.test(catalogNavigationSql), "Catalog navigation migration has no exact active-category preflight.");
+check(/active root count mismatch: expected 16/i.test(catalogNavigationSql), "Catalog navigation migration has no exact active-root preflight.");
+check(/update public\.categories[\s\S]*slug = 'construction-repair'/i.test(catalogNavigationSql), "Catalog navigation migration does not update the reviewed root.");
+check(/Стройматериалы и инструменты/.test(catalogNavigationSql), "Catalog navigation migration is missing the clarified Russian root name.");
+check(/Құрылыс материалдары мен құралдар/.test(catalogNavigationSql), "Catalog navigation migration is missing the clarified Kazakh root name.");
+const catalogNavigationUpdateSql = catalogNavigationSql.match(/update public\.categories[\s\S]*?where slug = 'construction-repair'/i)?.[0] ?? "";
+const catalogNavigationPostflightSql = catalogNavigationSql.match(/do \$marketo_catalog_0026_postflight\$[\s\S]*?\$marketo_catalog_0026_postflight\$/i)?.[0] ?? "";
+const catalogNavigationPresentationAssignments = [
+  "search_placeholder_ru = 'Поиск строительных товаров: «Стройматериалы и инструменты»'",
+  "search_placeholder_kk = 'Құрылыс тауарларын іздеу: «Құрылыс материалдары мен құралдар»'",
+  "title_placeholder_ru = 'Укажите материал, товар или инструмент: «Стройматериалы и инструменты»'",
+  "title_placeholder_kk = 'Материалды, тауарды немесе құралды көрсетіңіз: «Құрылыс материалдары мен құралдар»'",
+  "description_hint_ru = 'Категория: «Стройматериалы и инструменты». Укажите назначение, материал, размер, количество, состояние и условия доставки.'",
+  "description_hint_kk = 'Санат: «Құрылыс материалдары мен құралдар». Мақсатын, материалын, өлшемін, санын, күйін және жеткізу шарттарын көрсетіңіз.'",
+];
+for (const assignment of catalogNavigationPresentationAssignments) {
+  check(catalogNavigationUpdateSql.includes(assignment), `Catalog navigation migration UPDATE is missing canonical assignment: ${assignment}`);
+  check(catalogNavigationPostflightSql.includes(assignment), `Catalog navigation migration postflight is missing canonical assignment: ${assignment}`);
+}
+check(/0026 postflight construction-repair root mismatch/i.test(catalogNavigationSql), "Catalog navigation migration has no complete root-metadata postflight.");
+check(
+  !/\b(?:insert into|delete from)\s+public\.(?:categories|category_attributes|category_attribute_options)\b/i.test(catalogNavigationSql),
+  "Catalog navigation migration must not insert or delete catalog reference rows.",
 );
 
 const drizzleConfig = await readFile(resolve(root, "drizzle.config.ts"), "utf8");

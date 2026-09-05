@@ -192,6 +192,7 @@ test("Home category query starts both bounded hierarchy pages without a sequenti
   ];
   const childRows = [
     { id: "child-a", parent_id: "root-a", sort_order: 1 },
+    { id: "grandchild-a", parent_id: "child-a", sort_order: 1 },
     { id: "child-b", parent_id: "root-b", sort_order: 1 },
   ];
   const calls = [];
@@ -234,7 +235,7 @@ test("Home category query starts both bounded hierarchy pages without a sequenti
 
   const rows = await listHomeCategories(client);
   assert.deepEqual(rows, [
-    { ...rootRows[0], child_count: 1 },
+    { ...rootRows[0], child_count: 2 },
     { ...rootRows[1], child_count: 1 },
   ]);
   assert.equal(calls.filter((call) => call.operation === "range").length, 2);

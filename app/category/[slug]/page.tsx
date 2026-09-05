@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppLink as Link } from "@/components/app-link";
 import { notFound } from "next/navigation";
+import { CategoryBrowseGrid } from "@/components/category-browse-grid";
 import { CatalogClient } from "@/components/catalog-client";
 import { EmptyState } from "@/components/empty-state";
 import { Header } from "@/components/header";
@@ -69,8 +70,9 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   let initialAttributes;
   let initialDynamicFilters: Record<string, string> = {};
   try {
-    initialAttributes = await getCategoryAttributeReferences(filteredCategory.id);
-    initialDynamicFilters = initialAttributes.status === "ready"
+    const categoryIsLeaf = getCategoryChildren(view, filteredCategory).length === 0;
+    initialAttributes = categoryIsLeaf ? await getCategoryAttributeReferences(filteredCategory.id) : undefined;
+    initialDynamicFilters = initialAttributes?.status === "ready"
       ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
       : {};
     listings = await listingRepository.list({
@@ -93,13 +95,11 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
       actionLabel={t("common.retry")}
     /></main><MobileNav /></>;
   }
-  const parent = getCategoryParent(view, category);
-  const path = getCategoryPath(view, category);
-  const children = getCategoryChildren(view, category);
+  const parent = getCategoryParent(view, filteredCategory);
+  const path = getCategoryPath(view, filteredCategory);
   const searchPlaceholder = localize(filteredCategory.searchPlaceholder ?? rootCategory?.searchPlaceholder, locale) || t("header.searchPlaceholder");
   return <><Header categorySlug={filteredCategory.slug} searchPlaceholder={searchPlaceholder} /><main id="main-content" tabIndex={-1} className="page-shell subpage-main">
     <nav className="breadcrumbs" aria-label={t("categories.eyebrow")}><Link href="/">{t("common.home")}</Link>{path.map((item) => <span key={item.slug}>/ <Link href={`/category/${item.slug}`}>{localize(item.name, locale)}</Link></span>)}</nav>
-    {children.length > 0 ? <section className="subcategory-strip" aria-label={`${t("categories.refine")}: ${localize(category.name, locale)}`}><strong>{t("categories.refine")}</strong><div>{children.map((child) => <Link href={`/category/${child.slug}`} key={child.id}>{localize(child.name, locale)}</Link>)}</div></section> : null}
-    <CatalogClient key={`${slug}:${JSON.stringify({ ...parsed, dynamicFilters: initialDynamicFilters })}`} basePath={`/category/${category.slug}`} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={initialDynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
+    <CatalogClient key={`${slug}:${JSON.stringify({ ...parsed, dynamicFilters: initialDynamicFilters })}`} basePath={`/category/${category.slug}`} categoryNavigation={<CategoryBrowseGrid data={catalog.data} categorySlug={filteredCategory.slug} locale={locale} />} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={initialDynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
   </main><MobileNav /></>;
 }

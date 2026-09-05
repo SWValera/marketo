@@ -26,6 +26,7 @@ export function CategoryCascade({
   const roots = getRootCategories(view);
 
   return <div className="category-cascade">
+    {path.length > 0 ? <p className="category-cascade-path" aria-live="polite">{path.map((item) => localize(item.name, locale)).join(" → ")}</p> : null}
     <label>
       <span>{t("catalog.category")}</span>
       <select value={path[0]?.slug ?? ""} onChange={(event) => onChange(event.target.value)} disabled={catalog.status !== "ready"}>

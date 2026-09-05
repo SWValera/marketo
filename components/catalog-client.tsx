@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { AppLink as Link } from "@/components/app-link";
@@ -15,6 +16,7 @@ import { ReferenceSelect } from "@/components/reference-select";
 import {
   createCategoryCatalogView,
   getCategoryBySlug,
+  getCategoryChildren,
   getCategoryPath,
   getCategoryPresentation,
   getCategoryRoot,
@@ -51,6 +53,7 @@ type CatalogRouteState = {
 };
 
 const MOBILE_FILTER_QUERY = "(max-width: 900px)";
+const PRIMARY_CATEGORY_FILTER_LIMIT = 8;
 
 function subscribeToMobileFilters(callback: () => void) {
   const query = window.matchMedia(MOBILE_FILTER_QUERY);
@@ -77,6 +80,7 @@ export function CatalogClient({
   initialSort = "new",
   initialDynamicFilters = {},
   initialCategoryAttributes,
+  categoryNavigation,
   title,
   titleText,
   initialListings = [],
@@ -95,6 +99,7 @@ export function CatalogClient({
   initialSort?: string;
   initialDynamicFilters?: Record<string, FilterValue>;
   initialCategoryAttributes?: ReferenceDataEnvelope<CategoryAttributeReferenceData>;
+  categoryNavigation?: ReactNode;
   title?: string;
   titleText?: LocalizedText;
   initialListings?: ListingSummary[];
@@ -120,17 +125,24 @@ export function CatalogClient({
   const [maxPrice, setMaxPrice] = useState(initialMaxPrice);
   const [sort, setSort] = useState(initialSort);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showAllCategoryFilters, setShowAllCategoryFilters] = useState(false);
   const filtersPanelRef = useRef<HTMLElement>(null);
   const mobileFilters = useSyncExternalStore(subscribeToMobileFilters, mobileFiltersSnapshot, () => false);
   const [dynamicFilters, setDynamicFilters] = useState<Record<string, FilterValue>>(initialDynamicFilters);
   const city = getSettlement(geography.data, cityId);
   const activeCategory = getCategoryBySlug(catalogView, categorySlug);
+  const activeCategoryIsLeaf = Boolean(activeCategory && getCategoryChildren(catalogView, activeCategory).length === 0);
   const activeRoot = getCategoryRoot(catalogView, categorySlug);
-  const attributeState = useCategoryAttributes(activeCategory?.id, initialCategoryAttributes);
+  const attributeState = useCategoryAttributes(activeCategoryIsLeaf ? activeCategory?.id : undefined, activeCategoryIsLeaf ? initialCategoryAttributes : undefined);
   const activeAttributes = useMemo(
     () => attributeState.data.attributes.filter((attribute) => attribute.filterable && isAttributeVisible(attribute, dynamicFilters)),
     [attributeState.data.attributes, dynamicFilters],
   );
+  const visibleCategoryAttributes = useMemo(() => activeAttributes.filter((attribute, index) => {
+    if (showAllCategoryFilters || index < PRIMARY_CATEGORY_FILTER_LIMIT) return true;
+    return Object.entries(dynamicFilters).some(([key, value]) => Boolean(value) && (key === attribute.key || key.startsWith(`${attribute.key}_`)));
+  }), [activeAttributes, dynamicFilters, showAllCategoryFilters]);
+  const hiddenCategoryFilterCount = activeAttributes.length - visibleCategoryAttributes.length;
   const activePresentation = getCategoryPresentation(catalogView, categorySlug);
   const activePlaceholder = localize(activePresentation.searchPlaceholder ?? activeRoot?.searchPlaceholder, locale) || t("header.searchPlaceholder");
 
@@ -266,6 +278,7 @@ export function CatalogClient({
   function changeCategory(slug: string) {
     setCategorySlug(slug);
     setDynamicFilters({});
+    setShowAllCategoryFilters(false);
   }
 
   function resetFilters() {
@@ -308,6 +321,7 @@ export function CatalogClient({
 
   return <>
     <div inert={mobileFilters && filtersOpen || undefined}><PageHeader fallback={fallback} eyebrow={t("categories.eyebrow")} title={pageTitle} description={`${initialTotal} ${t("catalog.listings")} · ${city ? localize(city.name, locale) : t("catalog.wholeCountry")}`} /></div>
+    {categoryNavigation}
     <div className="catalog-layout">
       <button className="filter-mobile-toggle" type="button" onClick={() => setFiltersOpen(true)} aria-expanded={filtersOpen}>
         <SlidersHorizontal size={18} /> {t("catalog.filters")} {activeChips.length > 0 && <b>{activeChips.length}</b>}
@@ -319,9 +333,10 @@ export function CatalogClient({
         <CategoryCascade value={categorySlug} onChange={changeCategory} catalog={catalog} />
         <div className="filter-location"><span>{t("catalog.location")}</span><LocationPicker value={cityId} onChange={setCityOverride} /></div>
         <div className="price-fields"><label>{t("catalog.priceFrom")}<input inputMode="numeric" value={minPrice} onChange={(event) => setMinPrice(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label><label>{t("catalog.to")}<input inputMode="numeric" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value.replace(/\D/g, ""))} placeholder="15 000 000" /></label></div>
+        {activeCategory && !activeCategoryIsLeaf ? <p className="filter-reference-state">{t("catalog.chooseExactForFilters")}</p> : null}
         {attributeState.status === "loading" ? <p className="filter-reference-state">{t("reference.attributesLoading")}</p> : null}
         {attributeState.status === "error" ? <p className="filter-reference-state is-error">{t("reference.attributesUnavailable")}</p> : null}
-        {activeAttributes.map((attribute) => {
+        {visibleCategoryAttributes.map((attribute) => {
           if (attribute.dataType === "select" || attribute.dataType === "multiselect") {
             return <label key={attribute.id}>{localize(attribute.label, locale)}<ReferenceSelect attribute={attribute} emptyMode="filter" value={String(dynamicFilters[attribute.key] ?? "")} parentOptionId={getDependentParentOptionId(attribute, attributeState.data.attributes, dynamicFilters)} onChange={(value) => setDynamicFilters((current) => clearDependentValues(attribute.key, value, attributeState.data.attributes, current))} /></label>;
           }
@@ -333,6 +348,7 @@ export function CatalogClient({
           }
           return <label key={attribute.id}>{localize(attribute.label, locale)}<input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" || attribute.dataType === "range" ? "number" : "text"} inputMode={attribute.dataType === "number" || attribute.dataType === "range" ? "decimal" : undefined} value={String(dynamicFilters[attribute.key] ?? "")} onChange={(event) => setDynamicFilters((current) => ({ ...current, [attribute.key]: event.target.value }))} /></label>;
         })}
+        {activeAttributes.length > PRIMARY_CATEGORY_FILTER_LIMIT ? <button className="filter-more-button" type="button" onClick={() => setShowAllCategoryFilters((current) => !current)}>{showAllCategoryFilters ? t("catalog.hideExtraFilters") : t("catalog.moreFilters", { count: hiddenCategoryFilterCount })}</button> : null}
         <button className="filter-apply" type="button" onClick={applyFilters}>{t("catalog.show", { count: result.length })}</button>
         <button className="reset-button" type="button" onClick={resetFilters}>{t("catalog.reset")}</button>
       </aside>

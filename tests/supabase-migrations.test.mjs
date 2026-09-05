@@ -70,7 +70,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 25);
+    assert.equal(names.length, 26);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -396,6 +396,36 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       active_options_on_inactive_attributes: 0,
       visible_when_mismatches: 0,
     });
+
+    const navigationRoot = await db.query(`
+      select
+        slug,
+        name_ru,
+        name_kk,
+        search_placeholder_ru,
+        search_placeholder_kk,
+        title_placeholder_ru,
+        title_placeholder_kk,
+        description_hint_ru,
+        description_hint_kk,
+        parent_id,
+        is_active
+      from public.categories
+      where slug = 'construction-repair'
+    `);
+    assert.deepEqual(navigationRoot.rows, [{
+      slug: "construction-repair",
+      name_ru: "Стройматериалы и инструменты",
+      name_kk: "Құрылыс материалдары мен құралдар",
+      search_placeholder_ru: "Поиск строительных товаров: «Стройматериалы и инструменты»",
+      search_placeholder_kk: "Құрылыс тауарларын іздеу: «Құрылыс материалдары мен құралдар»",
+      title_placeholder_ru: "Укажите материал, товар или инструмент: «Стройматериалы и инструменты»",
+      title_placeholder_kk: "Материалды, тауарды немесе құралды көрсетіңіз: «Құрылыс материалдары мен құралдар»",
+      description_hint_ru: "Категория: «Стройматериалы и инструменты». Укажите назначение, материал, размер, количество, состояние и условия доставки.",
+      description_hint_kk: "Санат: «Құрылыс материалдары мен құралдар». Мақсатын, материалын, өлшемін, санын, күйін және жеткізу шарттарын көрсетіңіз.",
+      parent_id: null,
+      is_active: true,
+    }]);
 
     const releasedCatalogCompatibility = await db.query(`
       select

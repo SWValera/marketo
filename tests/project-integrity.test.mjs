@@ -109,7 +109,7 @@ test("mobile category selection renders one Supabase-backed level and catalog fi
   const catalog = await readFile(new URL("components/catalog-client.tsx", root), "utf8");
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(picker, /getCategoryChildren\(view, parentSlug\)/);
-  assert.match(picker, /searchCategoryReferences\(view, query\)/);
+  assert.match(picker, /searchCategoryReferences\(view, query, 80\)/);
   assert.match(picker, /getCategoryChildren\(view, item\)\.length > 0[\s\S]*setParentSlug\(item\.slug\)/);
   assert.doesNotMatch(picker, /categoryOptions\.map|item\.depth|paddingLeft/);
   assert.match(cascade, /getRootCategories\(view\)/);

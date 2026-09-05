@@ -11,6 +11,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { localize } from "@/lib/i18n/config";
 import { getServerI18n } from "@/lib/i18n/server";
 import { translate, type Locale } from "@/lib/i18n/messages";
+import { sortCategoryReferences } from "@/lib/reference-data/catalog";
 import { getHomeCategoryReferences } from "@/lib/reference-data/server";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -32,7 +33,7 @@ function HomeCatalogFallback({ locale }: { locale: Locale }) {
 
 async function HomeCatalogPanel({ locale }: { locale: Locale }) {
   const catalog = await getHomeCategoryReferences();
-  const rootCategories = catalog.data.categories;
+  const rootCategories = sortCategoryReferences(catalog.data.categories);
   return <section className="home-tab-panel" aria-labelledby="home-catalog-title">
     <HomeCatalogHeading locale={locale} />
     {rootCategories.length ? <div className="category-grid">{rootCategories.map((category) => <Link href={`/category/${category.slug}`} className="category-tile" key={category.id}><span className={`category-icon tone-${category.tone ?? "green"}`}><CategoryIcon name={category.icon ?? undefined} size={26} /></span><strong>{localize(category.name, locale)}</strong><small>{category.childCount} {homeText(locale, "home.sections")}</small></Link>)}</div> : <EmptyState title={homeText(locale, "reference.categoriesUnavailableTitle")} description={homeText(locale, "reference.categoriesUnavailable")} actionHref="/help" actionLabel={homeText(locale, "nav.help")} />}

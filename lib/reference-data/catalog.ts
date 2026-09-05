@@ -16,13 +16,71 @@ const viewCache = new WeakMap<CategoryReferenceData, CategoryCatalogView>();
 const pathCache = new WeakMap<CategoryCatalogView, Map<string, ReferenceCategory[]>>();
 const descendantCache = new WeakMap<CategoryCatalogView, Map<string, { ids: string[]; set: Set<string> }>>();
 
-const compareCategories = (left: ReferenceCategory, right: ReferenceCategory) =>
-  left.sortOrder - right.sortOrder || left.name.ru.localeCompare(right.name.ru, "ru");
+const ROOT_CATEGORY_ORDER = [
+  "transport",
+  "real-estate",
+  "jobs",
+  "services",
+  "construction-repair",
+  "goods-rental",
+  "electronics",
+  "parts",
+  "home-garden",
+  "personal",
+  "kids",
+  "hobby",
+  "animals",
+  "business",
+  "free",
+  "exchange",
+] as const;
+const rootCategoryPriority = new Map<string, number>(ROOT_CATEGORY_ORDER.map((slug, index) => [slug, index]));
+
+const categorySearchAliases: Record<string, string> = {
+  cars: "машина машины авто автомобиль автомобили легковушка",
+  smartphones: "айфон iphone ios смартфон смартфоны телефон телефоны сотовый",
+  laptops: "ноут ноутбук ноутбуки laptop",
+  "flats-sale": "квартира квартиры жильё жилье купить квартиру",
+  "flats-rent": "квартира квартиры жильё жилье снять квартиру аренда квартиры",
+  "flats-daily": "квартира квартиры жильё жилье посуточно квартира на сутки",
+  "houses-sale": "дом дома коттедж купить дом",
+  "houses-rent": "дом дома коттедж снять дом аренда дома",
+  "jobs-driver": "водитель шофёр шофер",
+  "plumbing-services": "сантехник сантехнические работы",
+};
+
+const normalizeSearchText = (value: string) => value.normalize("NFKC").toLocaleLowerCase("ru").replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const stemSearchWord = (value: string) => value.length < 5 || !/[а-я]/u.test(value)
+  ? value
+  : value.replace(/(иями|ями|ами|ого|ему|ому|ыми|ими|иях|ах|ях|ую|юю|ая|яя|ое|ее|ые|ие|ый|ий|ой|ов|ев|ам|ям|ом|ем|а|я|ы|и|у|ю|е)$/u, "");
+const searchTokens = (value: string) => normalizeSearchText(value).split(" ").filter(Boolean).map(stemSearchWord);
+function matchesCategorySearch(haystack: string, query: string) {
+  const normalizedHaystack = normalizeSearchText(haystack);
+  if (normalizedHaystack.includes(query)) return true;
+  const haystackTokens = searchTokens(normalizedHaystack);
+  return searchTokens(query).every((needle) => haystackTokens.some((candidate) => (
+    candidate === needle
+    || (candidate.length >= 3 && needle.length >= 3 && (candidate.startsWith(needle) || needle.startsWith(candidate)))
+  )));
+}
+
+const compareCategories = (left: ReferenceCategory, right: ReferenceCategory) => {
+  if (left.parentId === null && right.parentId === null) {
+    const leftPriority = rootCategoryPriority.get(left.slug) ?? Number.MAX_SAFE_INTEGER;
+    const rightPriority = rootCategoryPriority.get(right.slug) ?? Number.MAX_SAFE_INTEGER;
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+  }
+  return left.sortOrder - right.sortOrder || left.name.ru.localeCompare(right.name.ru, "ru");
+};
+
+export function sortCategoryReferences<T extends ReferenceCategory>(items: readonly T[]) {
+  return [...items].sort(compareCategories);
+}
 
 export function createCategoryCatalogView(reference: CategoryReferenceData): CategoryCatalogView {
   const cached = viewCache.get(reference);
   if (cached) return cached;
-  const items = [...reference.categories].sort(compareCategories);
+  const items = [...reference.categories].sort((left, right) => left.sortOrder - right.sortOrder || left.name.ru.localeCompare(right.name.ru, "ru"));
   const byId = new Map(items.map((category) => [category.id, category]));
   const bySlug = new Map(items.map((category) => [category.slug, category]));
   const childrenByParentId = new Map<string | null, ReferenceCategory[]>();
@@ -32,6 +90,7 @@ export function createCategoryCatalogView(reference: CategoryReferenceData): Cat
     siblings.push(category);
     childrenByParentId.set(category.parentId, siblings);
   }
+  for (const siblings of childrenByParentId.values()) siblings.sort(compareCategories);
 
   const view = { items, byId, bySlug, childrenByParentId };
   viewCache.set(reference, view);
@@ -116,6 +175,10 @@ export function getCategoryDescendantIds(view: CategoryCatalogView, category: Re
   return getCategoryDescendants(view, category).ids;
 }
 
+export function getCategoryDescendantCount(view: CategoryCatalogView, category: ReferenceCategory | string) {
+  return Math.max(0, getCategoryDescendants(view, category).ids.length - 1);
+}
+
 export function getCategoryRoot(view: CategoryCatalogView, category?: ReferenceCategory | string | null) {
   return getCategoryPath(view, category)[0];
 }
@@ -131,15 +194,33 @@ export function isCategoryWithin(view: CategoryCatalogView, candidateSlug: strin
 }
 
 export function searchCategoryReferences(view: CategoryCatalogView, query: string, limit = 40) {
-  const normalized = query.normalize("NFKC").trim().toLocaleLowerCase("ru");
+  const normalized = normalizeSearchText(query);
   if (!normalized) return [];
 
   return view.items
-    .filter((item) => getCategoryPath(view, item)
-      .map((pathItem) => `${pathItem.name.ru} ${pathItem.name.kk}`)
-      .join(" ")
-      .toLocaleLowerCase("ru")
-      .includes(normalized))
+    .map((item) => {
+      const ownName = normalizeSearchText(`${item.name.ru} ${item.name.kk}`);
+      const aliases = normalizeSearchText(categorySearchAliases[item.slug] ?? "");
+      const pathName = getCategoryPath(view, item)
+        .map((pathItem) => `${pathItem.name.ru} ${pathItem.name.kk} ${categorySearchAliases[pathItem.slug] ?? ""}`)
+        .join(" ")
+        .normalize("NFKC");
+      const score = ownName === normalized
+        ? 0
+        : aliases.split(" ").includes(normalized)
+          ? 1
+          : ownName.startsWith(normalized)
+            ? 2
+            : matchesCategorySearch(`${ownName} ${aliases}`, normalized)
+              ? 3
+              : matchesCategorySearch(pathName, normalized)
+                ? 4
+                : null;
+      return { item, score };
+    })
+    .filter((candidate): candidate is { item: ReferenceCategory; score: number } => candidate.score !== null)
+    .sort((left, right) => left.score - right.score || compareCategories(left.item, right.item))
+    .map(({ item }) => item)
     .slice(0, limit);
 }
 
