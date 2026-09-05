@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { categoryOptions, getCategoryPresentation } from "../lib/catalog-config.ts";
+import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
+import { resolveCategoryAttributeSchema } from "../lib/reference-data/category-attribute-schemas.ts";
+import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 
 const root = new URL("../", import.meta.url);
+const execFileAsync = promisify(execFile);
+const generatorEnvironment = prepareNodeRuntimeEnvironment(process.env);
 
 async function createDatabase() {
   const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
@@ -70,7 +80,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 26);
+    assert.equal(names.length, 27);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -534,7 +544,21 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       trigger_exists: true,
     }]);
 
-    await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+    const releaseDirectory = await mkdtemp(join(tmpdir(), "marketo-release-pglite-"));
+    const releasePath = join(releaseDirectory, `${CATEGORY_REFERENCE_VERSION}.sql`);
+    try {
+      await execFileAsync(process.execPath, [
+        fileURLToPath(new URL("scripts/generate-catalog-completeness-migration.mjs", root)),
+        "--release-id",
+        CATEGORY_REFERENCE_VERSION,
+        "--output",
+        releasePath,
+      ], { cwd: fileURLToPath(root), env: generatorEnvironment });
+      await db.exec(await readFile(releasePath, "utf8"));
+      await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+    } finally {
+      await rm(releaseDirectory, { recursive: true, force: true });
+    }
     const result = await db.query(`
       select
         (select count(*) from public.countries)::int as countries,
@@ -555,9 +579,9 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       countries: 1,
       regions: 20,
       settlements: 90,
-      categories: 1356,
-      attributes: 14310,
-      options: 84490,
+      categories: 1358,
+      attributes: 14345,
+      options: 116412,
       premium_settings: 90,
       default_capacity_settings: 90,
       premium_accounts: 0,
@@ -578,7 +602,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         description_hint_kk
       from public.categories
     `);
-    assert.equal(contextualMetadata.rows.length, 1_356);
+    assert.equal(contextualMetadata.rows.length, 1_358);
     const contextualBySlug = new Map(contextualMetadata.rows.map((row) => [row.slug, row]));
     for (const category of categoryOptions) {
       const expected = getCategoryPresentation(category.slug);
@@ -635,22 +659,13 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       broken_dependencies: 0,
     });
 
-    for (let replay = 0; replay < 2; replay += 1) {
-      for (const migrationName of [
-        "0024_catalog_completeness.sql",
-        "0025_security_boundary_repair.sql",
-      ]) {
-        const migration = await readFile(new URL(`supabase/migrations/${migrationName}`, root), "utf8");
-        await db.exec(migration);
-      }
-    }
     await db.query("select private.apply_contextual_catalog_metadata()");
     const repeatedReferenceCounts = await db.query(`
       select
         (select count(*) from public.category_attributes where is_active)::int as attributes,
         (select count(*) from public.category_attribute_options where is_active)::int as options
     `);
-    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 14310, options: 84490 });
+    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 14345, options: 116412 });
 
     const repeatedSecurityBoundary = await db.query(`
       select
@@ -745,12 +760,14 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       join public.categories as category on category.id = attribute.category_id
       where category.slug = 'cars' or category.parent_id = (select id from public.categories where slug = 'cars')
     `);
+    const expectedSuvBrandCount = resolveCategoryAttributeSchema("cars-suv")
+      .attributes.find((attribute) => attribute.key === "brand")?.options?.length;
     assert.deepEqual(passengerCars.rows[0], {
       brand_fields: 11,
       engine_fields: 11,
       condition_fields: 11,
       active_body_fields: 0,
-      suv_brands: 141,
+      suv_brands: expectedSuvBrandCount,
     });
 
     const scopedModels = await db.query(`
@@ -795,6 +812,140 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       contact_phone_e164: "+77001234567",
     });
     await db.exec("reset role;");
+
+    const conditionalCategory = await db.query(`
+      select
+        category.id,
+        coalesce(max(attribute.sort_order), 0)::int as max_sort_order
+      from public.categories as category
+      left join public.category_attributes as attribute on attribute.category_id = category.id
+      where category.slug = 'free-other'
+      group by category.id
+    `);
+    const conditionalCategoryId = conditionalCategory.rows[0].id;
+    const conditionalSort = conditionalCategory.rows[0].max_sort_order;
+    const controllerAttribute = await db.query(`
+      insert into public.category_attributes (
+        category_id, key, label_ru, label_kk, data_type,
+        inherits_to_children, sort_order, is_active, is_visible
+      ) values ($1, 'marketo_test_kind', 'Тестовый вид', 'Сынақ түрі', 'select', false, $2, true, true)
+      returning id
+    `, [conditionalCategoryId, conditionalSort + 10]);
+    const controllerAttributeId = controllerAttribute.rows[0].id;
+    const manualAttribute = await db.query(`
+      insert into public.category_attributes (
+        category_id, key, label_ru, label_kk, data_type,
+        inherits_to_children, validation, sort_order, is_active, is_visible
+      ) values (
+        $1, 'marketo_test_manual', 'Уточнение', 'Нақтылау', 'text', false,
+        $2::jsonb, $3, true, true
+      )
+      returning id
+    `, [
+      conditionalCategoryId,
+      JSON.stringify({
+        visibleWhen: { key: "marketo_test_kind", values: ["other"] },
+        requiredWhen: { key: "marketo_test_kind", values: ["other"] },
+      }),
+      conditionalSort + 20,
+    ]);
+    const manualAttributeId = manualAttribute.rows[0].id;
+    const unrelatedAttribute = await db.query(`
+      insert into public.category_attributes (
+        category_id, key, label_ru, label_kk, data_type,
+        inherits_to_children, sort_order, is_active, is_visible
+      ) values ($1, 'marketo_test_unrelated', 'Постороннее поле', 'Бөгде өріс', 'select', false, $2, true, true)
+      returning id
+    `, [conditionalCategoryId, conditionalSort + 30]);
+    const unrelatedAttributeId = unrelatedAttribute.rows[0].id;
+    const conditionalOptions = await db.query(`
+      insert into public.category_attribute_options (
+        attribute_id, value, label_ru, label_kk, sort_order, is_active
+      ) values
+        ($1, 'standard', 'Стандартный', 'Стандартты', 10, true),
+        ($1, 'other', 'Другое', 'Басқа', 20, true)
+      returning id, value
+    `, [controllerAttributeId]);
+    const optionIds = new Map(conditionalOptions.rows.map((row) => [row.value, row.id]));
+    const unrelatedOption = await db.query(`
+      insert into public.category_attribute_options (
+        attribute_id, value, label_ru, label_kk, sort_order, is_active
+      ) values ($1, 'other', 'Другое', 'Басқа', 10, true)
+      returning id
+    `, [unrelatedAttributeId]);
+    const unrelatedOtherOptionId = unrelatedOption.rows[0].id;
+
+    async function createConditionalListing(slug, selectedOptionId, unrelatedOptionId) {
+      await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${userId}', false);`);
+      const listing = await db.query(`
+        insert into public.listings (
+          owner_id, category_id, settlement_id, slug, title, description, price_minor, currency_code
+        ) values ($1, $2, $3, $4, 'Проверка условия', 'Проверка серверного requiredWhen', 0, 'KZT')
+        returning id
+      `, [userId, conditionalCategoryId, accountSettlementId, slug]);
+      const listingId = listing.rows[0].id;
+      await db.query("insert into public.listing_contacts (listing_id, contact_name) values ($1, 'Test User')", [listingId]);
+      await db.query(`
+        insert into public.listing_attribute_option_values (listing_id, attribute_id, option_id)
+        values ($1, $2, $3)
+      `, [listingId, controllerAttributeId, selectedOptionId]);
+      if (unrelatedOptionId) {
+        await db.query(`
+          insert into public.listing_attribute_option_values (listing_id, attribute_id, option_id)
+          values ($1, $2, $3)
+        `, [listingId, unrelatedAttributeId, unrelatedOptionId]);
+      }
+      await db.exec("reset role;");
+      await db.query(
+        "insert into public.listing_images (listing_id, storage_key) values ($1, $2)",
+        [listingId, `tests/${slug}.webp`],
+      );
+      return listingId;
+    }
+
+    const conditionalListingId = await createConditionalListing(
+      "conditional-required-missing",
+      optionIds.get("other"),
+    );
+    await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${userId}', false);`);
+    await assert.rejects(
+      db.query("select public.submit_listing($1)", [conditionalListingId]),
+      /required category attributes are missing/i,
+    );
+    await db.query(`
+      insert into public.listing_attribute_values (listing_id, attribute_id, text_value)
+      values ($1, $2, '   ')
+    `, [conditionalListingId, manualAttributeId]);
+    await assert.rejects(
+      db.query("select public.submit_listing($1)", [conditionalListingId]),
+      /required category attributes are missing/i,
+    );
+    await db.query(`
+      update public.listing_attribute_values
+      set text_value = 'Ручное значение'
+      where listing_id = $1 and attribute_id = $2
+    `, [conditionalListingId, manualAttributeId]);
+    await db.query("select public.submit_listing($1)", [conditionalListingId]);
+    await db.exec("reset role;");
+
+    const nonConditionalListingId = await createConditionalListing(
+      "conditional-required-not-triggered",
+      optionIds.get("standard"),
+      unrelatedOtherOptionId,
+    );
+    await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${userId}', false);`);
+    await db.query("select public.submit_listing($1)", [nonConditionalListingId]);
+    await db.exec("reset role;");
+    const conditionalStates = await db.query(`
+      select slug, status
+      from public.listings
+      where id in ($1, $2)
+      order by slug
+    `, [conditionalListingId, nonConditionalListingId]);
+    assert.deepEqual(conditionalStates.rows, [
+      { slug: "conditional-required-missing", status: "pending" },
+      { slug: "conditional-required-not-triggered", status: "pending" },
+    ]);
 
     const vehicleReferences = await db.query(`
       select

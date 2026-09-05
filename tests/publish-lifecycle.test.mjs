@@ -285,6 +285,24 @@ test("dynamic attribute validation is type-safe and metadata-driven", () => {
     validation: { visibleWhen: { key: "mode", values: ["other"] } },
   });
   assert.deepEqual(validatePublishAttributes({}, [hiddenRequired]), {});
+
+  const mode = attribute({ key: "model", dataType: "select" });
+  const conditionalRequired = attribute({
+    key: "model_other",
+    validation: {
+      visibleWhen: { key: "model", values: ["other-model"] },
+      requiredWhen: { key: "model", values: ["other-model"] },
+    },
+  });
+  assert.deepEqual(validatePublishAttributes({ model: "known-model" }, [mode, conditionalRequired]), {});
+  assert.deepEqual(
+    validatePublishAttributes({ model: "other-model" }, [mode, conditionalRequired]),
+    { "attributes.model_other": ["required"] },
+  );
+  assert.deepEqual(
+    validatePublishAttributes({ model: "other-model", model_other: "Редкая модель" }, [mode, conditionalRequired]),
+    {},
+  );
 });
 
 test("option validation rejects unknown and mismatched dependent values", () => {

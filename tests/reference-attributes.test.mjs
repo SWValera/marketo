@@ -1,12 +1,28 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   clearDependentValues,
+  isAttributeRequired,
   isAttributeVisible,
   sanitizeAttributeFilters,
 } from "../lib/reference-data/attributes.ts";
 import { categorySchemaProfiles } from "../lib/reference-data/category-attribute-schemas.ts";
 import { validateMasterCatalog } from "../scripts/validate-master-catalog.mjs";
+
+const referenceSelectSource = await readFile(new URL("../components/reference-select.tsx", import.meta.url), "utf8");
+const attributeRouteSource = await readFile(new URL("../app/api/reference/categories/[id]/attributes/route.ts", import.meta.url), "utf8");
+const optionRouteSource = await readFile(new URL("../app/api/reference/attributes/[id]/options/route.ts", import.meta.url), "utf8");
+
+test("attribute and deferred-option payloads share the catalog release version", () => {
+  assert.match(referenceSelectSource, /params\.set\("v", CATEGORY_REFERENCE_VERSION\)/);
+  for (const source of [attributeRouteSource, optionRouteSource]) {
+    assert.match(source, /CATEGORY_REFERENCE_VERSION/);
+    assert.match(source, /x-marketo-reference-version/);
+    assert.match(source, /must-revalidate/);
+    assert.match(source, /no-store/);
+  }
+});
 
 const attribute = (key, validation = {}, dependsOnKey = null) => ({
   key,
@@ -50,6 +66,15 @@ test("dependent reference selections are still cleared when their parent changes
   });
 
   assert.deepEqual(next, { brand: "samsung" });
+});
+
+test("manual fallback fields become required only for the selected Other option", () => {
+  const manual = attribute("model_other", {
+    visibleWhen: { key: "model", values: ["other-model"] },
+    requiredWhen: { key: "model", values: ["other-model"] },
+  });
+  assert.equal(isAttributeRequired(manual, { model: "known-model" }), false);
+  assert.equal(isAttributeRequired(manual, { model: "other-model" }), true);
 });
 
 test("server filter sanitization drops unknown, hidden and orphaned dependent URL filters", () => {
@@ -128,6 +153,7 @@ test("catalog validation rejects malformed, non-option and cyclic visibleWhen me
   const option = { value: "x", label };
   profile.push(
     { key: "broken_condition", label, dataType: "text", validation: { visibleWhen: "broken" } },
+    { key: "broken_required_condition", label, dataType: "text", validation: { requiredWhen: "broken" } },
     { key: "empty_condition", label, dataType: "text", validation: { visibleWhen: { key: " ", values: [] } } },
     { key: "text_controller", label, dataType: "text" },
     { key: "text_controlled", label, dataType: "text", validation: { visibleWhen: { key: "text_controller", values: ["x"] } } },
@@ -140,6 +166,7 @@ test("catalog validation rejects malformed, non-option and cyclic visibleWhen me
     const result = validateMasterCatalog();
     assert.equal(result.ok, false);
     assert(result.failures.some((failure) => failure.includes("visibleWhen must be an object: smart-watches.broken_condition")));
+    assert(result.failures.some((failure) => failure.includes("requiredWhen must be an object: smart-watches.broken_required_condition")));
     assert(result.failures.some((failure) => failure.includes("visibleWhen has an invalid controller key: smart-watches.empty_condition")));
     assert(result.failures.some((failure) => failure.includes("visibleWhen controller is not option-backed: smart-watches.text_controlled")));
     assert(result.failures.some((failure) => failure.includes("visibleWhen cannot reference itself: smart-watches.self_cycle")));

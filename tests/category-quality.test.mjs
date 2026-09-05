@@ -4,13 +4,15 @@ import test from "node:test";
 import { categoryOptions, getCategoryBySlug, getCategoryPath } from "../lib/catalog-config.ts";
 import { resolveCategoryAttributeSchema } from "../lib/reference-data/category-attribute-schemas.ts";
 import { motorcycleModels, passengerVehicleModels, smartphoneModels } from "../lib/reference-data/dependent-options.ts";
-import { ereaderModels, tabletModels } from "../lib/reference-data/device-options.ts";
+import { ereaderModels, tabletBrands, tabletModels } from "../lib/reference-data/device-options.ts";
+import { motorcycleReferences } from "../lib/reference-data/motorcycle-options.ts";
+import { passengerVehicleBrands } from "../lib/reference-data/vehicle-brands.ts";
 
 const dependentSets = [passengerVehicleModels, motorcycleModels, smartphoneModels, tabletModels, ereaderModels];
 
-test("all 1,356 Master Catalog contracts are localized, composable and filter-safe", () => {
-  assert.equal(categoryOptions.length, 1356);
-  assert.equal(new Set(categoryOptions.map((category) => category.slug)).size, 1356);
+test("all 1,358 Master Catalog contracts are localized, composable and filter-safe", () => {
+  assert.equal(categoryOptions.length, 1358);
+  assert.equal(new Set(categoryOptions.map((category) => category.slug)).size, 1358);
 
   for (const category of categoryOptions) {
     assert.ok(getCategoryBySlug(category.slug), `missing category node: ${category.slug}`);
@@ -52,6 +54,43 @@ test("brand-model dictionaries have stable non-empty values and generic fallback
   assert.ok(passengerVehicleModels.length >= 750, "passenger model baseline unexpectedly shrank");
 });
 
+test("Toyota, mopeds and tablets keep reviewed marketplace-grade coverage", () => {
+  const realPassengerBrands = passengerVehicleBrands.filter((option) => option.value !== "other");
+  assert.equal(realPassengerBrands.length, 140);
+  assert.ok(realPassengerBrands.every((brand) => passengerVehicleModels.some((option) => option.parentValue === brand.value)));
+
+  const toyotaModels = passengerVehicleModels.filter((option) => option.parentValue === "toyota");
+  assert.ok(toyotaModels.length >= 150, `Toyota coverage is too small: ${toyotaModels.length}`);
+
+  const sedan = resolveCategoryAttributeSchema("cars-sedan", "transport").attributes;
+  const sedanModels = sedan.find((attribute) => attribute.key === "model")?.options ?? [];
+  const toyotaSedans = sedanModels.filter((option) => option.parentValue === "toyota");
+  assert.ok(toyotaSedans.length >= 40, `Toyota sedan coverage is too small: ${toyotaSedans.length}`);
+  for (const label of ["Allion", "Aristo", "Chaser", "Cresta", "Verossa", "Vista", "Windom"]) {
+    assert.ok(toyotaSedans.some((option) => option.label.ru === label), `Toyota sedan missing: ${label}`);
+  }
+  assert.ok(!toyotaSedans.some((option) => option.label.ru === "RAV4"));
+
+  const mopedBrands = new Set(motorcycleReferences.moped.brands.map((option) => option.value));
+  for (const allowed of ["alpha", "delta", "honda", "jawa", "minsk"]) assert.ok(mopedBrands.has(allowed));
+  for (const forbidden of ["ural", "kawasaki", "harley-davidson"]) assert.ok(!mopedBrands.has(forbidden));
+  assert.ok(motorcycleReferences.moped.models.every((option) => !/^(?:ural|kawasaki|harley-davidson):/.test(option.value)));
+
+  assert.ok(tabletBrands.filter((option) => option.value !== "other").length >= 27);
+  assert.ok(tabletModels.filter((option) => option.value !== "other-model").length >= 300);
+  for (const slug of ["tablets", "graphics-tablets", "tablet-accessories", "tablet-parts"]) {
+    assert.ok(categoryOptions.some((category) => category.slug === slug && !category.hasChildren), `tablet branch missing: ${slug}`);
+  }
+
+  for (const [slug, root] of [["cars-sedan", "transport"], ["mopeds", "transport"], ["tablets", "electronics"]]) {
+    const attributes = resolveCategoryAttributeSchema(slug, root).attributes;
+    const otherBrand = attributes.find((attribute) => attribute.key === "brand_other");
+    const otherModel = attributes.find((attribute) => attribute.key === "model_other");
+    assert.deepEqual(otherBrand?.validation?.requiredWhen, { key: "brand", values: ["other"] });
+    assert.deepEqual(otherModel?.validation?.requiredWhen, { key: "model", values: ["other-model"] });
+  }
+});
+
 test("every root vertical has a representative leaf with domain-specific seller fields and buyer filters", () => {
   const cases = [
     ["transport", "cars-sedan", ["brand", "model", "year", "mileage", "transmission"], ["salary_from", "rooms"]],
@@ -87,10 +126,10 @@ test("every root vertical has a representative leaf with domain-specific seller 
 
 test("generated coverage report contains one auditable row per category", async () => {
   const report = await readFile(new URL("../docs/CATEGORY_COVERAGE_REPORT.md", import.meta.url), "utf8");
-  assert.match(report, /Категорий: \*\*1356\*\*/);
-  assert.match(report, /Эффективных category-attribute связей: \*\*14310\*\*/);
-  assert.match(report, /Активных option rows в clean seed: \*\*84490\*\*/);
-  const matrix = report.split("## Полная матрица 1356 категорий\n")[1]?.split("## Принятые правила качества\n")[0] ?? "";
+  assert.match(report, /Категорий: \*\*1358\*\*/);
+  assert.match(report, /Эффективных category-attribute связей: \*\*14345\*\*/);
+  assert.match(report, /Активных option rows в clean seed: \*\*116412\*\*/);
+  const matrix = report.split("## Полная матрица 1358 категорий\n")[1]?.split("## Принятые правила качества\n")[0] ?? "";
   const dataRows = matrix.split("\n").filter((line) => /^\| [a-z0-9-]+ \|/.test(line));
-  assert.equal(dataRows.length, 1356);
+  assert.equal(dataRows.length, 1358);
 });

@@ -9,6 +9,7 @@ type AttributeValidation = {
   step?: number;
   maxLength?: number;
   visibleWhen?: { key: string; values: string[] };
+  requiredWhen?: { key: string; values: string[] };
 };
 
 export function getAttributeValidation(attribute: ReferenceCategoryAttribute): AttributeValidation {
@@ -21,6 +22,13 @@ export function isAttributeVisible(attribute: ReferenceCategoryAttribute, values
   if (!attribute.visible) return false;
   const condition = getAttributeValidation(attribute).visibleWhen;
   if (!condition?.key || !condition.values?.length) return true;
+  return condition.values.includes(String(values[condition.key] ?? ""));
+}
+
+export function isAttributeRequired(attribute: ReferenceCategoryAttribute, values: AttributeValues) {
+  if (attribute.required) return true;
+  const condition = getAttributeValidation(attribute).requiredWhen;
+  if (!condition?.key || !condition.values?.length) return false;
   return condition.values.includes(String(values[condition.key] ?? ""));
 }
 

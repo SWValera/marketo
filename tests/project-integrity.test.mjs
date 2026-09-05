@@ -30,7 +30,7 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.doesNotMatch(favicon, /#0C79D8|#2E9EFF/);
   const worker = await readFile(new URL("public/sw.js", root), "utf8");
   const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
-  assert.match(worker, /marketo-static-v8/);
+  assert.match(worker, /marketo-static-v9/);
   assert.match(worker, /"\/offline\.html"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
   assert.match(worker, /request\.mode === "navigate"[\s\S]*fetch\(request\)/);
@@ -206,7 +206,8 @@ test("catalog pages sanitize conditional URL filters before server search and cl
   for (const file of ["app/search/page.tsx", "app/category/[slug]/page.tsx"]) {
     const source = await readFile(new URL(file, root), "utf8");
     assert.match(source, /sanitizeAttributeFilters/);
-    assert.match(source, /attributeFilters: initialDynamicFilters/);
+    assert.match(source, /const list = \(attributeFilters: Record<string, string>\)[\s\S]*attributeFilters,/);
+    assert.match(source, /listings = await list\(initialDynamicFilters\)/);
     assert.match(source, /initialDynamicFilters=\{initialDynamicFilters\}/);
     assert.doesNotMatch(source, /attributeFilters: parsed\.dynamicFilters/);
     assert.doesNotMatch(source, /initialDynamicFilters=\{parsed\.dynamicFilters\}/);

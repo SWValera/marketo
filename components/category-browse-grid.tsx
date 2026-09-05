@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { AppLink as Link } from "@/components/app-link";
+import { CategoryLink } from "@/components/category-link";
 import { localize } from "@/lib/i18n/config";
 import { translate, type Locale } from "@/lib/i18n/messages";
 import {
@@ -17,10 +18,12 @@ export function CategoryBrowseGrid({
   data,
   categorySlug,
   locale,
+  cityId,
 }: {
   data: CategoryReferenceData;
   categorySlug: string;
   locale: Locale;
+  cityId?: string;
 }) {
   const view = createCategoryCatalogView(data);
   const category = getCategoryBySlug(view, categorySlug);
@@ -40,13 +43,13 @@ export function CategoryBrowseGrid({
         const descendantCount = getCategoryDescendantCount(view, child);
         const preview = nested.slice(0, CHILD_PREVIEW_LIMIT);
         return <article className="category-browse-card" key={child.id}>
-          <Link className="category-browse-card-title" href={`/category/${child.slug}`}>
+          <CategoryLink cityId={cityId} className="category-browse-card-title" href={`/category/${child.slug}`}>
             <span><strong>{localize(child.name, locale)}</strong><small>{descendantCount > 0 ? translate(locale, "categories.subcategories", { count: descendantCount }) : translate(locale, "categories.openListings")}</small></span>
             <ChevronRight size={18} aria-hidden="true" />
-          </Link>
+          </CategoryLink>
           {preview.length > 0 ? <div className="category-browse-links">
-            {preview.map((nestedItem) => <Link href={`/category/${nestedItem.slug}`} key={nestedItem.id}>{localize(nestedItem.name, locale)}</Link>)}
-            {nested.length > CHILD_PREVIEW_LIMIT ? <Link className="category-browse-more" href={`/category/${child.slug}`}>{translate(locale, "categories.moreSubcategories", { count: nested.length - CHILD_PREVIEW_LIMIT })}</Link> : null}
+            {preview.map((nestedItem) => <CategoryLink cityId={cityId} href={`/category/${nestedItem.slug}`} key={nestedItem.id}>{localize(nestedItem.name, locale)}</CategoryLink>)}
+            {nested.length > CHILD_PREVIEW_LIMIT ? <CategoryLink cityId={cityId} className="category-browse-more" href={`/category/${child.slug}`}>{translate(locale, "categories.moreSubcategories", { count: nested.length - CHILD_PREVIEW_LIMIT })}</CategoryLink> : null}
           </div> : null}
         </article>;
       })}

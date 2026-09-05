@@ -33,6 +33,7 @@ const expectedMigrations = [
   "0024_catalog_completeness.sql",
   "0025_security_boundary_repair.sql",
   "0026_catalog_navigation_ux.sql",
+  "0027_conditional_required_attributes.sql",
 ];
 
 const immutableMigrationHashes = {
@@ -129,7 +130,7 @@ check(/Contains no users, listings, chats/.test(seed), "Reference seed provenanc
 check(/reviewed Marketo v1\.0 reference taxonomy/i.test(seed), "Reference seed must identify the category taxonomy as reviewed.");
 check(/90-city bootstrap/i.test(seed), "Reference seed must identify geography as a 90-city bootstrap.");
 check(!/insert into public\.(?:profiles|profile_private|listings|favorites|conversations|messages|notifications|reports)\b/i.test(seed), "Reference seed contains product/user data.");
-check((seed.match(/insert into public\.categories \(/g) ?? []).length === 1356, "Reference seed category count drifted from the Master Catalog contract.");
+check((seed.match(/insert into public\.categories \(/g) ?? []).length === 1358, "Reference seed category count drifted from the Master Catalog contract.");
 check((seed.match(/insert into public\.settlements \(/g) ?? []).length === 90, "Reviewed city baseline must contain exactly 90 cities.");
 check(/filter_mode text not null default 'exact'/.test(allSql), "Category filter-mode metadata is missing.");
 check(/parent_option_id uuid/.test(allSql), "Dependent option parent relation is missing.");
@@ -375,6 +376,28 @@ check(/0026 postflight construction-repair root mismatch/i.test(catalogNavigatio
 check(
   !/\b(?:insert into|delete from)\s+public\.(?:categories|category_attributes|category_attribute_options)\b/i.test(catalogNavigationSql),
   "Catalog navigation migration must not insert or delete catalog reference rows.",
+);
+
+const conditionalRequirementsSql = migrations.get("0027_conditional_required_attributes.sql") ?? "";
+check(
+  /create or replace function public\.submit_listing\(target_listing_id uuid\)[\s\S]*security definer[\s\S]*set search_path = ''/i.test(conditionalRequirementsSql),
+  "Conditional requirement migration must preserve the hardened submit_listing execution contract.",
+);
+check(
+  /attribute\.validation \? 'requiredWhen'[\s\S]*jsonb_array_elements_text[\s\S]*required category attributes are missing/i.test(conditionalRequirementsSql),
+  "submit_listing does not enforce catalog requiredWhen metadata.",
+);
+check(
+  /nullif\(btrim\(value\.text_value\), ''\) is not null/i.test(conditionalRequirementsSql),
+  "submit_listing does not treat blank required text as missing.",
+);
+check(
+  /refuses a drifted submit_listing contract[\s\S]*86357b7d7fd5d43a17f7182e40009406[\s\S]*submit_listing grant postflight mismatch/i.test(conditionalRequirementsSql),
+  "Conditional requirement migration has no complete fingerprint/grant boundary.",
+);
+check(
+  /revoke all on function public\.submit_listing\(uuid\)[\s\S]*from public, anon, authenticated, service_role[\s\S]*grant execute on function public\.submit_listing\(uuid\)[\s\S]*to authenticated, service_role/i.test(conditionalRequirementsSql),
+  "Conditional requirement migration does not restore the exact submit_listing allowlist.",
 );
 
 const drizzleConfig = await readFile(resolve(root, "drizzle.config.ts"), "utf8");

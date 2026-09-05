@@ -19,25 +19,28 @@ export const transportCatalogOverlays: MasterCatalogNode[] = [
     overlay("motorcycles", [
       overlay("road-motorcycles", vehicle([
         ["motorcycles-sport", "Спортивные мотоциклы", "Спорттық мотоциклдер"],
-        ["motorcycles-naked", "Дорожные и naked", "Жол және naked мотоциклдері"],
-        ["motorcycles-touring", "Туристические", "Туристік мотоциклдер"],
-        ["motorcycles-cruiser", "Круизеры и чопперы", "Круизерлер мен чопперлер"],
-        ["motorcycles-enduro", "Эндуро и dual-sport", "Эндуро және dual-sport"],
-        ["motorcycles-motocross", "Кроссовые и питбайки", "Кросс және питбайктар"],
-        ["motorcycles-classic", "Классические и ретро", "Классикалық және ретро"],
-      ], ["motorcycle"]), ["motorcycle"]),
+      ], ["motorcycleSport"]).concat(
+        vehicle([["motorcycles-naked", "Дорожные и naked", "Жол және naked мотоциклдері"]], ["motorcycleNaked"]),
+        vehicle([["motorcycles-touring", "Туристические", "Туристік мотоциклдер"]], ["motorcycleTouring"]),
+        vehicle([["motorcycles-cruiser", "Круизеры и чопперы", "Круизерлер мен чопперлер"]], ["motorcycleCruiser"]),
+        vehicle([["motorcycles-enduro", "Эндуро и dual-sport", "Эндуро және dual-sport"]], ["motorcycleEnduro"]),
+        vehicle([["motorcycles-motocross", "Кроссовые и питбайки", "Кросс және питбайктар"]], ["motorcycleMotocross"]),
+        vehicle([["motorcycles-classic", "Классические и ретро", "Классикалық және ретро"]], ["motorcycleClassic"]),
+      ), ["motorcycleRoad"]),
       overlay("scooters", vehicle([
         ["scooters-standard", "Скутеры", "Скутерлер"],
-        ["scooters-maxi", "Максискутеры", "Максискутерлер"],
-        ["mopeds", "Мопеды", "Мопедтер"],
-        ["electric-scooters-seated", "Электроскутеры", "Электр скутерлер"],
-      ], ["motorcycle"]), ["motorcycle"]),
+      ], ["motorcycleScooter"]).concat(
+        vehicle([["scooters-maxi", "Максискутеры", "Максискутерлер"]], ["motorcycleMaxiScooter"]),
+        vehicle([["mopeds", "Мопеды", "Мопедтер"]], ["motorcycleMoped"]),
+        vehicle([["electric-scooters-seated", "Электроскутеры", "Электр скутерлер"]], ["motorcycleElectricScooter"]),
+      ), ["motorcycleScooter"]),
       overlay("atv", vehicle([
         ["quad-bikes", "Квадроциклы", "Квадроциклдер"],
-        ["utv-side-by-side", "UTV и side-by-side", "UTV және side-by-side"],
-        ["buggies", "Багги", "Баггилер"],
-      ], ["motorcycle"]), ["motorcycle"]),
-      leaf("snowmobiles", "Снегоходы", "Қар көліктері", ["motorcycle"]),
+      ], ["motorcycleAtv"]).concat(
+        vehicle([["utv-side-by-side", "UTV и side-by-side", "UTV және side-by-side"]], ["motorcycleUtv"]),
+        vehicle([["buggies", "Багги", "Баггилер"]], ["motorcycleBuggy"]),
+      ), ["motorcycleAtv"]),
+      leaf("snowmobiles", "Снегоходы", "Қар көліктері", ["motorcycleSnowmobile"]),
     ], ["motorcycle"]),
     overlay("commercial-transport", [
       overlay("trucks", vehicle([

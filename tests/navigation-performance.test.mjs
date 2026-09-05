@@ -93,6 +93,56 @@ test("listing intent prefetch waits for deliberate hover, cancels transient inte
   assert.doesNotMatch(card, /on(?:TouchStart|PointerEnter|Focus):/);
 });
 
+test("category navigation preserves city, uses bounded intent prefetch and keeps the full tree out of RSC", async () => {
+  const categoryLink = await source("components/category-link.tsx");
+  assert.match(categoryLink, /url\.searchParams\.set\("city", cityId\)/);
+  assert.match(categoryLink, /createIntentPrefetchController\(\(\) => router\.prefetch\(resolvedHref\), 80\)/);
+  assert.match(categoryLink, /onMouseEnter[\s\S]*intentPrefetch\.schedule\(\)/);
+  assert.match(categoryLink, /onPointerDown[\s\S]*intentPrefetch\.request\(\)/);
+  assert.match(categoryLink, /prefetch=\{false\}/);
+
+  for (const page of [
+    "app/page.tsx",
+    "app/category/[slug]/page.tsx",
+    "components/category-browse-grid.tsx",
+    "components/category-directory.tsx",
+    "components/city-premium-showcase.tsx",
+  ]) {
+    assert.match(await source(page), /CategoryLink/, `${page} must use city-aware category navigation`);
+  }
+
+  const directory = await source("components/category-directory.tsx");
+  assert.match(directory, /loadBrowserCategoryReferences/);
+  assert.match(directory, /useDeferredValue/);
+  assert.match(directory, /expandedBranches\.has\(child\.id\)\s*\?\s*<CategoryTreeList/);
+
+  const directoryPage = await source("app/categories/page.tsx");
+  assert.match(directoryPage, /getHomeCategoryReferences/);
+  assert.doesNotMatch(directoryPage, /getCategoryReferences/);
+
+  const browserReferences = await source("lib/reference-data/browser.ts");
+  assert.match(browserReferences, /fetch\(`\/api\/reference\/categories\?v=/);
+  assert.match(browserReferences, /fetch\(`\/api\/reference\/geography\?v=/);
+  assert.doesNotMatch(browserReferences, /getSupabaseBrowserClient|listActiveCategories|listSelectableSettlements/);
+
+  const categoryRoute = await source("app/api/reference/categories/route.ts");
+  const geographyRoute = await source("app/api/reference/geography/route.ts");
+  const releaseContract = await source("lib/reference-data/release.ts");
+  assert.match(categoryRoute, /CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT/);
+  assert.match(geographyRoute, /GEOGRAPHY_REFERENCE_EXPECTED_COUNTRY_COUNT/);
+  assert.match(geographyRoute, /GEOGRAPHY_REFERENCE_EXPECTED_REGION_COUNT/);
+  assert.match(geographyRoute, /GEOGRAPHY_REFERENCE_EXPECTED_SETTLEMENT_COUNT/);
+  assert.match(geographyRoute, /reference_release_not_ready/);
+  assert.match(releaseContract, /GEOGRAPHY_REFERENCE_EXPECTED_COUNTRY_COUNT = 1/);
+  assert.match(releaseContract, /GEOGRAPHY_REFERENCE_EXPECTED_REGION_COUNT = 20/);
+  assert.match(releaseContract, /GEOGRAPHY_REFERENCE_EXPECTED_SETTLEMENT_COUNT = 90/);
+
+  for (const page of ["app/search/page.tsx", "app/category/[slug]/page.tsx"]) {
+    const text = await source(page);
+    assert.match(text, /Promise\.all\(\[attributePromise, list\(\{\}\)\]\)/, `${page} must load attributes and unfiltered listings in parallel`);
+  }
+});
+
 test("catalog filters navigate only on explicit apply and route state remounts predictably", async () => {
   const client = await source("components/catalog-client.tsx");
   assert.match(client, /function\s+navigateWithFilters\s*\([^)]*\)[\s\S]*?router\.replace\s*\(/);

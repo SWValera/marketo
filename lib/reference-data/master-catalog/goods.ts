@@ -126,7 +126,9 @@ const electronicsOverlay = overlay("electronics", [
   branch("tablets-ereaders", "Планшеты и электронные книги", "Планшеттер мен электронды кітаптар", [
     ...goods([["tablets", "Планшеты", "Планшеттер"]], ["tablet", "tabletDeviceSpecs"]),
     ...goods([["ereaders", "Электронные книги", "Электронды кітаптар"]], ["ereader"]),
-    ...goods([["tablet-accessories", "Аксессуары для планшетов", "Планшет аксессуарлары"]], ["goodsBrand"]),
+    ...goods([["graphics-tablets", "Графические планшеты", "Графикалық планшеттер"]], ["graphicsTablet"]),
+    ...goods([["tablet-accessories", "Аксессуары для планшетов", "Планшет аксессуарлары"]], ["tabletAccessory"]),
+    ...goods([["tablet-parts", "Запчасти для планшетов", "Планшет бөлшектері"]], ["tabletPart"]),
   ], ["goodsBrand"]),
   branch("home-appliances", "Техника для дома", "Үйге арналған техника", goods([
     ["washing-machines", "Стиральные машины", "Кір жуғыш машиналар", ["appliance", "energyRatedAppliance", "laundryAppliance"]],

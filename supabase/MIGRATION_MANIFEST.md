@@ -1,9 +1,9 @@
 # Marketo Supabase migration manifest
 
-Status: local source contains 25 ordered migrations. 0001–0022 are the
-immutable baseline; 0023–0025 are forward-only owner-lifecycle, catalog
-completeness and security-boundary repair migrations. This workspace did not
-apply SQL to production.
+Status: local source contains 27 ordered migrations. 0001–0026 are released
+and immutable; 0027 is the reviewed forward database-contract change for
+conditional publication requirements. This workspace does not infer production
+state from local files.
 
 | Order | File | Depends on | Purpose |
 |---:|---|---|---|
@@ -32,18 +32,24 @@ apply SQL to production.
 | 23 | migrations/0023_owner_listing_draft_lifecycle.sql | 0003–0005, 0010, 0016, 0022 | atomic owner draft/rejected replacement and safe rejection feedback |
 | 24 | migrations/0024_catalog_completeness.sql | 0004–0005, 0014–0017, 0023 | forward-only category field synchronization, integrity pre/postflight and active-leaf listing guard |
 | 25 | migrations/0025_security_boundary_repair.sql | 0021–0024 | fail-closed function/schema ACL repair, canonical 19-policy RLS rebuild and restoration of active-staff/owner RPC contracts |
-| Seed | seeds/001_marketo_reference.sql | 0001–0025 | RU/KK geography/catalog bootstrap; no user/product records |
+| 26 | migrations/0026_catalog_navigation_ux.sql | 0017, 0024 | construction-goods root presentation update with stable category ids and tree structure |
+| 27 | migrations/0027_conditional_required_attributes.sql | 0005, 0014, 0024–0025 | fail-closed `requiredWhen` enforcement in the hardened listing submission RPC |
+| Seed | seeds/001_marketo_reference.sql | 0001–0027 | RU/KK geography/catalog bootstrap; no user/product records |
 
 ## Integrity boundary
 
-CHECKSUMS.sha256 records every migration and seed. validate:db also pins the
-reviewed SHA-256 values of immutable migrations 0001–0022, requires RLS on all
-29 public tables and rejects credential-like source values.
+CHECKSUMS.sha256 records all 27 migrations and the seed. validate:db also pins
+the reviewed SHA-256 values of the protected migration baseline, requires RLS
+on all 29 public tables and rejects credential-like source values.
 
 ## Execution rules
 
-1. Never edit 0001–0022; use a new numbered forward migration.
+1. Never edit a released migration (currently 0001–0026). Use a new numbered
+   forward migration only for schema or database-contract changes.
 2. Review and apply files in order—never as an opaque concatenated script.
 3. Rehearse first on a disposable branch and run Linter/Security Advisor.
 4. Verify backups/PITR and actual production migration history independently.
 5. Production application requires separate explicit authorization.
+6. Category-tree, attribute and option-dictionary updates are versioned catalog
+   data releases under `artifacts/catalog/releases`, never rewrites or additions
+   under `supabase/migrations`; see `docs/CATALOG_DATA_POLICY.md`.

@@ -5,10 +5,10 @@ import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 import { PageHeader } from "@/components/page-header";
 import { getServerI18n } from "@/lib/i18n/server";
-import { getCategoryReferences, getHomeCategoryReferences } from "@/lib/reference-data/server";
+import { getHomeCategoryReferences } from "@/lib/reference-data/server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [{ locale, t }, catalog] = await Promise.all([getServerI18n(), getCategoryReferences()]);
+  const [{ locale, t }, catalog] = await Promise.all([getServerI18n(), getHomeCategoryReferences()]);
   return {
     title: t("categories.title"),
     description: t("categories.description"),
@@ -20,5 +20,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CategoriesPage() {
   const [{ t }, catalog] = await Promise.all([getServerI18n(), getHomeCategoryReferences()]);
-  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><PageHeader fallback="/" eyebrow={t("categories.eyebrow")} title={t("categories.title")} description={t("categories.description")} />{catalog.status === "ready" && catalog.data.categories.length > 0 ? <CategoryDirectory initialData={{ categories: catalog.data.categories }} /> : <EmptyState title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/help" actionLabel={t("nav.help")} />}</main><MobileNav /></>;
+  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><PageHeader fallback="/" eyebrow={t("categories.eyebrow")} title={t("categories.title")} description={t("categories.description")} />{catalog.status === "ready" && catalog.data.categories.length > 0 ? <CategoryDirectory initialData={catalog.data} /> : <EmptyState title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/help" actionLabel={t("nav.help")} />}</main><MobileNav /></>;
 }

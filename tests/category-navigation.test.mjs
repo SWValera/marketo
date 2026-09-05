@@ -61,10 +61,12 @@ test("catalog UI exposes the full tree and protects branch-level filtering", asy
     readFile(new URL("../supabase/migrations/0026_catalog_navigation_ux.sql", import.meta.url), "utf8"),
   ]);
   assert.match(directory, /function CategoryTreeList[\s\S]*<CategoryTreeList items=\{children\}/);
-  assert.match(directory, /searchCategoryReferences\(view, normalizedQuery, view\.items\.length\)/);
+  assert.match(directory, /searchCategoryReferences\(view, deferredQuery, view\.items\.length\)/);
   assert.match(directory, /const searchActive = normalizedQuery\.length >= 3/);
-  assert.match(directory, /loadState === "ready" && searchActive \? searchCategoryReferences/);
-  assert.match(directory, /<Link id=\{\`category-\$\{root\.slug\}\`\} href=\{\`\/category\/\$\{root\.slug\}\`\}/);
+  assert.match(directory, /loadState === "ready" && deferredQuery\.length >= 3/);
+  assert.match(directory, /loadBrowserCategoryReferences\(\)/);
+  assert.match(directory, /<section className="category-directory-group" id=\{\`category-\$\{root\.slug\}\`\}/);
+  assert.match(directory, /<CategoryLink cityId=\{cityId\} className="category-directory-title"/);
   assert.match(categoryPage, /<CatalogClient[\s\S]*categoryNavigation=\{<CategoryBrowseGrid[^>]*categorySlug=\{filteredCategory\.slug\}/);
   assert.doesNotMatch(categoryPage, /categoryNavigation=\{<CategoryBrowseGrid[^>]*categorySlug=\{category\.slug\}/);
   assert.match(categoryPage, /const parent = getCategoryParent\(view, filteredCategory\)/);

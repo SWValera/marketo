@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useI18n } from "@/components/i18n-provider";
 import { localize } from "@/lib/i18n/config";
 import { readLruEntry, writeLruEntry } from "@/lib/reference-data/bounded-map";
+import { CATEGORY_REFERENCE_VERSION } from "@/lib/reference-data/release";
 import type { ReferenceAttributeOption, ReferenceCategoryAttribute } from "@/lib/reference-data/types";
 import { activateModalFocus } from "@/lib/browser/modal";
 
@@ -35,7 +36,7 @@ export function ReferenceSelect({
   const [queryState, setQueryState] = useState({ cacheKey: "", value: "" });
   const [remoteState, setRemoteState] = useState<{ cacheKey: string; options: ReferenceAttributeOption[]; status: "ready" | "error" } | null>(null);
   const dependencyReady = !attribute.dependsOnKey || Boolean(parentOptionId);
-  const cacheKey = `${attribute.id}:${parentOptionId ?? "root"}`;
+  const cacheKey = `${CATEGORY_REFERENCE_VERSION}:${attribute.id}:${parentOptionId ?? "root"}`;
   const cachedOptions = deferredCache.get(cacheKey);
   const remoteOptions = cachedOptions ?? (remoteState?.cacheKey === cacheKey ? remoteState.options : []);
   const status = cachedOptions ? "ready" : remoteState?.cacheKey === cacheKey ? remoteState.status : attribute.optionsLoadMode === "deferred" && dependencyReady && open ? "loading" : "idle";
@@ -47,6 +48,7 @@ export function ReferenceSelect({
     if (cached) return;
     const controller = new AbortController();
     const params = new URLSearchParams();
+    params.set("v", CATEGORY_REFERENCE_VERSION);
     if (parentOptionId) params.set("parent_option_id", parentOptionId);
     void fetch(`/api/reference/attributes/${encodeURIComponent(attribute.id)}/options?${params}`, {
       headers: { accept: "application/json" },
@@ -83,8 +85,21 @@ export function ReferenceSelect({
   const selected = options.find((option) => option.value === value) ?? attribute.options.find((option) => option.value === value);
   const selectedMultiple = options.filter((option) => multipleValues.includes(option.value));
   const normalized = query.trim().toLocaleLowerCase(locale);
-  const filtered = useMemo(() => options.filter((option) => !normalized
-    || `${option.label.ru} ${option.label.kk}`.toLocaleLowerCase(locale).includes(normalized)), [locale, normalized, options]);
+  const validation = attribute.validation && typeof attribute.validation === "object" && !Array.isArray(attribute.validation)
+    ? attribute.validation as Record<string, unknown>
+    : {};
+  const fallbackValue = typeof validation.fallbackOption === "string"
+    ? validation.fallbackOption
+    : options.some((option) => option.value === "other")
+      ? "other"
+      : undefined;
+  const filtered = useMemo(() => {
+    const matched = options.filter((option) => !normalized
+      || `${option.label.ru} ${option.label.kk}`.toLocaleLowerCase(locale).includes(normalized));
+    const fallback = fallbackValue ? options.find((option) => option.value === fallbackValue) : undefined;
+    if (fallback && !matched.some((option) => option.id === fallback.id)) matched.push(fallback);
+    return matched;
+  }, [fallbackValue, locale, normalized, options]);
   const placeholder = emptyMode === "filter" ? t("common.notImportant") : t("common.selectValue");
 
   return <>

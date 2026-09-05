@@ -53,6 +53,7 @@ import {
   clearDependentValues,
   getAttributeValidation,
   getDependentParentOptionId,
+  isAttributeRequired,
   isAttributeVisible,
 } from "@/lib/reference-data/attributes";
 import {
@@ -719,11 +720,12 @@ export function PublishForm({
               {categoryAttributeState.status === "error" ? <p className="filter-reference-state is-error form-field-wide">{t("reference.attributesUnavailable")}</p> : null}
               {visibleCategoryAttributes.map((attribute) => {
                 const validation = getAttributeValidation(attribute);
+                const attributeRequired = isAttributeRequired(attribute, attributes);
                 const field = `attributes.${attribute.key}`;
                 if (attribute.dataType === "select" || attribute.dataType === "multiselect") {
                   const selected = attributes[attribute.key];
                   return <div className="form-field" key={attribute.id} ref={(node) => setFieldRef(field, node)}>
-                    <span>{localize(attribute.label, locale)}{attribute.required ? " *" : ""}</span>
+                    <span>{localize(attribute.label, locale)}{attributeRequired ? " *" : ""}</span>
                     <ReferenceSelect
                       attribute={attribute}
                       value={typeof selected === "string" ? selected : ""}
@@ -738,7 +740,7 @@ export function PublishForm({
                 if (attribute.dataType === "boolean") {
                   const value = attributes[attribute.key];
                   return <label className="form-field" key={attribute.id} ref={(node) => setFieldRef(field, node)}>
-                    <span>{localize(attribute.label, locale)}{attribute.required ? " *" : ""}</span>
+                    <span>{localize(attribute.label, locale)}{attributeRequired ? " *" : ""}</span>
                     <select value={typeof value === "boolean" ? String(value) : ""} onChange={(event) => {
                       if (event.target.value === "") {
                         setAttributes((current) => {
@@ -759,7 +761,7 @@ export function PublishForm({
                 if (attribute.dataType === "range") {
                   const value = rangeValue(attributes[attribute.key]);
                   return <div className="form-field" key={attribute.id} ref={(node) => setFieldRef(field, node)}>
-                    <span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attribute.required ? " *" : ""}</span>
+                    <span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attributeRequired ? " *" : ""}</span>
                     <div className="range-inputs">
                       <input type="number" inputMode="decimal" min={validation.min} max={validation.max} step={validation.step} value={String(value.min)} placeholder={t("catalog.priceFrom")} onChange={(event) => updateAttribute(attribute.key, { ...value, min: event.target.value })} aria-invalid={Boolean(fieldErrors[field])} />
                       <input type="number" inputMode="decimal" min={validation.min} max={validation.max} step={validation.step} value={String(value.max)} placeholder={t("catalog.to")} onChange={(event) => updateAttribute(attribute.key, { ...value, max: event.target.value })} aria-invalid={Boolean(fieldErrors[field])} />
@@ -768,7 +770,7 @@ export function PublishForm({
                   </div>;
                 }
                 return <label className="form-field" key={attribute.id} ref={(node) => setFieldRef(field, node)}>
-                  <span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attribute.required ? " *" : ""}</span>
+                  <span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attributeRequired ? " *" : ""}</span>
                   <input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" ? "number" : "text"} inputMode={attribute.dataType === "number" ? "decimal" : "text"} min={validation.min} max={validation.max} step={validation.step} maxLength={validation.maxLength} value={String(attributes[attribute.key] ?? "")} onChange={(event) => updateAttribute(attribute.key, event.target.value)} aria-invalid={Boolean(fieldErrors[field])} />
                   {fieldError(field)}
                 </label>;

@@ -18,8 +18,11 @@ import {
 import {
   ereaderModels,
   fastMovingReferenceSources,
+  tabletBrands,
   tabletModels,
 } from "../lib/reference-data/device-options.ts";
+import { motorcycleReferences } from "../lib/reference-data/motorcycle-options.ts";
+import { passengerVehicleBrands } from "../lib/reference-data/vehicle-brands.ts";
 import {
   passengerVehicleBodyScopes,
   passengerVehicleModelsByBody,
@@ -254,6 +257,8 @@ export function validateMasterCatalog() {
         check(Boolean(manual), `dependent fallback has no manual value field: ${category.slug}.${attribute.key}`);
         const visibleWhen = manual?.validation?.visibleWhen;
         check(visibleWhen?.key === attribute.key && visibleWhen?.values?.includes("other-model"), `manual fallback visibility is invalid: ${category.slug}.${attribute.key}`);
+        const requiredWhen = manual?.validation?.requiredWhen;
+        check(requiredWhen?.key === attribute.key && requiredWhen?.values?.includes("other-model"), `manual fallback requirement is invalid: ${category.slug}.${attribute.key}`);
       }
       const validation = attribute.validation;
       const hasVisibleWhen = Boolean(
@@ -286,6 +291,32 @@ export function validateMasterCatalog() {
         for (const value of rawVisibleWhen.values) check(controllingValues.has(value), `visibleWhen references missing option: ${category.slug}.${attribute.key}.${value}`);
         visibleWhenParents.set(attribute.key, rawVisibleWhen.key);
       }
+      const hasRequiredWhen = Boolean(
+        validation
+        && typeof validation === "object"
+        && !Array.isArray(validation)
+        && Object.prototype.hasOwnProperty.call(validation, "requiredWhen"),
+      );
+      if (hasRequiredWhen) {
+        const rawRequiredWhen = validation.requiredWhen;
+        const conditionIsObject = Boolean(rawRequiredWhen && typeof rawRequiredWhen === "object" && !Array.isArray(rawRequiredWhen));
+        check(conditionIsObject, `requiredWhen must be an object: ${category.slug}.${attribute.key}`);
+        if (!conditionIsObject) continue;
+        const keyIsValid = typeof rawRequiredWhen.key === "string" && rawRequiredWhen.key.trim().length > 0 && rawRequiredWhen.key === rawRequiredWhen.key.trim();
+        const valuesAreValid = Array.isArray(rawRequiredWhen.values)
+          && rawRequiredWhen.values.length > 0
+          && rawRequiredWhen.values.every((value) => typeof value === "string" && value.trim().length > 0 && value === value.trim());
+        check(keyIsValid, `requiredWhen has an invalid controller key: ${category.slug}.${attribute.key}`);
+        check(valuesAreValid, `requiredWhen must contain non-empty string values: ${category.slug}.${attribute.key}`);
+        if (!keyIsValid || !valuesAreValid) continue;
+        check(!attribute.required, `requiredWhen must not also set unconditional is_required: ${category.slug}.${attribute.key}`);
+        check(rawRequiredWhen.key !== attribute.key, `requiredWhen cannot reference itself: ${category.slug}.${attribute.key}`);
+        const controlling = resolved.attributes.find((candidate) => candidate.key === rawRequiredWhen.key);
+        check(Boolean(controlling), `requiredWhen references missing attribute: ${category.slug}.${attribute.key}`);
+        check(["select", "multiselect"].includes(controlling?.dataType ?? ""), `requiredWhen controller is not option-backed: ${category.slug}.${attribute.key}`);
+        const controllingValues = new Set(controlling?.options?.map((option) => option.value) ?? []);
+        for (const value of rawRequiredWhen.values) check(controllingValues.has(value), `requiredWhen references missing option: ${category.slug}.${attribute.key}.${value}`);
+      }
     }
 
     for (const start of visibleWhenParents.keys()) {
@@ -303,8 +334,15 @@ export function validateMasterCatalog() {
   }
 
   for (const slug of bodyLeafSlugs) {
-    const keys = new Set(resolveCategoryAttributeSchema(slug, "transport").attributes.map((attribute) => attribute.key));
+    const attributes = resolveCategoryAttributeSchema(slug, "transport").attributes;
+    const keys = new Set(attributes.map((attribute) => attribute.key));
     check(!keys.has("body") && !keys.has("body_type"), `body leaf asks seller for body again: ${slug}`);
+    const brandValues = new Set(attributes.find((attribute) => attribute.key === "brand")?.options?.map((option) => option.value) ?? []);
+    const modelParents = new Set(attributes.find((attribute) => attribute.key === "model")?.options?.map((option) => option.parentValue).filter(Boolean) ?? []);
+    for (const brand of brandValues) {
+      if (brand !== "other") check(modelParents.has(brand), `body leaf exposes a brand without a compatible model: ${slug}.${brand}`);
+    }
+    for (const parent of modelParents) check(brandValues.has(parent), `body leaf model references a hidden brand: ${slug}.${parent}`);
   }
   for (const slug of ["air-conditioner-installation", "air-conditioner-repair", "air-conditioner-cleaning", "air-conditioner-refill", "air-conditioner-maintenance"]) {
     const keys = new Set(resolveCategoryAttributeSchema(slug, "services").attributes.map((attribute) => attribute.key));
@@ -526,11 +564,36 @@ export function validateMasterCatalog() {
       check(passengerVehicleModelsByBody[body].some((candidate) => candidate.value === option.value) === scopes.includes(body), `vehicle body dictionary mismatch: ${option.value}.${body}`);
     }
   }
+  const realPassengerBrands = passengerVehicleBrands.filter((option) => option.value !== "other");
+  for (const brand of realPassengerBrands) {
+    check(
+      passengerVehicleModels.some((option) => option.parentValue === brand.value),
+      `passenger vehicle brand has no models: ${brand.value}`,
+    );
+  }
+  check(realPassengerBrands.length === 140, `passenger vehicle brand reference changed: ${realPassengerBrands.length}/140`);
   check(optionExists(passengerVehicleModelsByBody.sedan, "toyota", "Camry"), "Camry missing from sedan");
   check(!optionExists(passengerVehicleModelsByBody.suv, "toyota", "Camry"), "Camry incorrectly available in SUV");
   check(optionExists(passengerVehicleModelsByBody.suv, "bmw", "X5"), "BMW X5 missing from SUV");
   check(optionExists(passengerVehicleModelsByBody.sedan, "audi", "A3") && optionExists(passengerVehicleModelsByBody.hatchback, "audi", "A3"), "Audi A3 multi-body scope regressed");
   check(optionExists(passengerVehicleModelsByBody.sedan, "toyota", "Corolla") && optionExists(passengerVehicleModelsByBody.wagon, "toyota", "Corolla"), "Toyota Corolla multi-body scope regressed");
+  const toyotaModels = passengerVehicleModels.filter((option) => option.parentValue === "toyota");
+  const toyotaSedans = passengerVehicleModelsByBody.sedan.filter((option) => option.parentValue === "toyota");
+  check(toyotaModels.length >= 150, `Toyota model coverage is too small: ${toyotaModels.length}/150`);
+  check(toyotaSedans.length >= 40, `Toyota sedan coverage is too small: ${toyotaSedans.length}/40`);
+  for (const label of ["Allion", "Aristo", "Chaser", "Cresta", "Verossa", "Vista", "Windom"]) {
+    check(optionExists(toyotaSedans, "toyota", label), `Toyota sedan is missing: ${label}`);
+  }
+  check(!optionExists(toyotaSedans, "toyota", "RAV4"), "Toyota RAV4 incorrectly available in sedans");
+
+  const mopedBrandValues = new Set(motorcycleReferences.moped.brands.map((option) => option.value));
+  const mopedModelValues = motorcycleReferences.moped.models.map((option) => option.value);
+  for (const brand of ["alpha", "delta", "honda", "jawa", "minsk"]) check(mopedBrandValues.has(brand), `moped brand missing: ${brand}`);
+  for (const brand of ["ural", "kawasaki", "harley-davidson"]) check(!mopedBrandValues.has(brand), `motorcycle-only brand leaked into mopeds: ${brand}`);
+  check(mopedModelValues.every((value) => !/^(?:ural|kawasaki|harley-davidson):/.test(value)), "motorcycle-only model leaked into mopeds");
+
+  check(tabletBrands.filter((option) => option.value !== "other").length >= 27, "tablet brand coverage is too small");
+  check(tabletModels.filter((option) => option.value !== "other-model").length >= 300, "tablet model coverage is too small");
 
   for (const dictionary of [passengerVehicleModels, motorcycleModels, smartphoneModels, tabletModels, ereaderModels]) {
     check(new Set(dictionary.map((option) => option.value)).size === dictionary.length, "reference dictionary has duplicate stable values");
@@ -579,8 +642,8 @@ export function validateMasterCatalog() {
   check(migrationSource.includes("attribute.is_filterable"), "catalog filter RPC ignores buyer-filter metadata");
   check(migrationSource.includes("listing_attribute_option_values") && migrationSource.includes("listing_attribute_values"), "catalog filter RPC does not cover scalar and option seller values");
   check(listingSource.includes('rpc("search_catalog_listing_cards"'), "listing repository does not use full-dataset catalog filter RPC");
-  check(searchPageSource.includes("sanitizeAttributeFilters") && searchPageSource.includes("attributeFilters: initialDynamicFilters"), "search page does not sanitize and pass dynamic buyer filters to repository");
-  check(categoryPageSource.includes("sanitizeAttributeFilters") && categoryPageSource.includes("attributeFilters: initialDynamicFilters"), "category page does not sanitize and pass dynamic buyer filters to repository");
+  check(searchPageSource.includes("sanitizeAttributeFilters") && searchPageSource.includes("list(initialDynamicFilters)"), "search page does not sanitize and pass dynamic buyer filters to repository");
+  check(categoryPageSource.includes("sanitizeAttributeFilters") && categoryPageSource.includes("list(initialDynamicFilters)"), "category page does not sanitize and pass dynamic buyer filters to repository");
 
   const contextualMetadata = validateContextualCategoryMetadata();
   assertions += contextualMetadata.assertions;

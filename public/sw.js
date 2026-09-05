@@ -1,11 +1,24 @@
-const CACHE_NAME = "marketo-static-v8";
+const CACHE_NAME = "marketo-static-v9";
 const CACHE_PREFIX = "marketo-static-";
 // HTML and authenticated pages are deliberately never cached. Only the
-// self-contained offline document and immutable/static assets are stored.
+// self-contained offline document, immutable/static assets and explicitly
+// versioned public reference payloads are stored.
 // The fallback is deliberately language-neutral and has no external assets,
 // so it cannot retain a stale locale or render a broken offline shell.
 const OFFLINE_URL = "/offline.html";
 const APP_SHELL = [OFFLINE_URL];
+const PUBLIC_REFERENCE_PATHS = new Set([
+  "/api/reference/categories",
+  "/api/reference/geography",
+]);
+
+function publicReferenceVersion(url) {
+  if (!PUBLIC_REFERENCE_PATHS.has(url.pathname)) return null;
+  const versions = url.searchParams.getAll("v");
+  if (versions.length !== 1 || !versions[0]) return null;
+  for (const key of url.searchParams.keys()) if (key !== "v") return null;
+  return versions[0];
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -30,12 +43,35 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (
-    request.method !== "GET"
-    || url.origin !== self.location.origin
-    || url.pathname === "/api"
-    || url.pathname.startsWith("/api/")
-  ) return;
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  const referenceVersion = publicReferenceVersion(url);
+  if (referenceVersion) {
+    const result = (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request).catch(() => undefined);
+      if (cached) return { response: cached, cacheWrite: Promise.resolve() };
+
+      const response = await fetch(request);
+      let cacheWrite = Promise.resolve();
+      const responseVersion = response.headers?.get("x-marketo-reference-version");
+      const contentType = response.headers?.get("content-type") ?? "";
+      if (response.ok && responseVersion === referenceVersion && contentType.includes("application/json")) {
+        try {
+          cacheWrite = cache.put(request, response.clone()).catch(() => undefined);
+        } catch {
+          // A cache copy is optional; the successful public response remains authoritative.
+        }
+      }
+      return { response, cacheWrite };
+    })();
+    event.respondWith(result.then(({ response }) => response));
+    event.waitUntil(result.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
+    return;
+  }
+
+  // Every other API route may be authenticated, personalized or mutable.
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(async () => {

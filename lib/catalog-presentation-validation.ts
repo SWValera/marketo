@@ -13,8 +13,8 @@ import { resolveCategoryAttributeSchema } from "./reference-data/category-attrib
 import { passengerVehicleModels, smartphoneModels } from "./reference-data/dependent-options.ts";
 import { ereaderModels, tabletModels } from "./reference-data/device-options.ts";
 
-const EXPECTED_CATEGORIES = 1_356;
-const EXPECTED_LEAVES = 1_137;
+const EXPECTED_CATEGORIES = 1_358;
+const EXPECTED_LEAVES = 1_139;
 const metadataFields = ["searchPlaceholder", "titlePlaceholder", "descriptionHint"] as const;
 const locales = ["ru", "kk"] as const;
 const vehicleBodyLeaves = [

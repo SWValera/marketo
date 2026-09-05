@@ -45,22 +45,30 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   let initialDynamicFilters: Record<string, string> = {};
   try {
     const categoryIsLeaf = Boolean(category && getCategoryChildren(view, category).length === 0);
-    initialAttributes = categoryIsLeaf && category ? await getCategoryAttributeReferences(category.id) : undefined;
-    initialDynamicFilters = initialAttributes?.status === "ready"
-      ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
-      : {};
-    listings = await listingRepository.list({
+    const attributePromise = categoryIsLeaf && category
+      ? getCategoryAttributeReferences(category.id)
+      : Promise.resolve(undefined);
+    const list = (attributeFilters: Record<string, string>) => listingRepository.list({
       locale,
       categoryIds: category ? getCategoryDescendantIds(view, category) : undefined,
       settlementId: parsed.cityId && parsed.cityId !== "all" ? parsed.cityId : undefined,
       query: parsed.query,
       minPriceMinor: parsed.minPrice ? Number(parsed.minPrice) : undefined,
       maxPriceMinor: parsed.maxPrice ? Number(parsed.maxPrice) : undefined,
-      attributeFilters: initialDynamicFilters,
+      attributeFilters,
       sort: parsed.sort,
       page: parsed.page,
       limit: 60,
     });
+    if (Object.keys(parsed.dynamicFilters).length === 0) {
+      [initialAttributes, listings] = await Promise.all([attributePromise, list({})]);
+    } else {
+      initialAttributes = await attributePromise;
+      initialDynamicFilters = initialAttributes?.status === "ready"
+        ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
+        : {};
+      listings = await list(initialDynamicFilters);
+    }
   } catch {
     return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState
       title={t("state.error")}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppLink as Link } from "@/components/app-link";
+import { CategoryLink } from "@/components/category-link";
 import { ArrowRight, Heart, MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { CityPremiumShowcase } from "@/components/city-premium-showcase";
@@ -36,7 +37,7 @@ async function HomeCatalogPanel({ locale }: { locale: Locale }) {
   const rootCategories = sortCategoryReferences(catalog.data.categories);
   return <section className="home-tab-panel" aria-labelledby="home-catalog-title">
     <HomeCatalogHeading locale={locale} />
-    {rootCategories.length ? <div className="category-grid">{rootCategories.map((category) => <Link href={`/category/${category.slug}`} className="category-tile" key={category.id}><span className={`category-icon tone-${category.tone ?? "green"}`}><CategoryIcon name={category.icon ?? undefined} size={26} /></span><strong>{localize(category.name, locale)}</strong><small>{category.childCount} {homeText(locale, "home.sections")}</small></Link>)}</div> : <EmptyState title={homeText(locale, "reference.categoriesUnavailableTitle")} description={homeText(locale, "reference.categoriesUnavailable")} actionHref="/help" actionLabel={homeText(locale, "nav.help")} />}
+    {rootCategories.length ? <div className="category-grid">{rootCategories.map((category) => <CategoryLink href={`/category/${category.slug}`} className="category-tile" key={category.id}><span className={`category-icon tone-${category.tone ?? "green"}`}><CategoryIcon name={category.icon ?? undefined} size={26} /></span><strong>{localize(category.name, locale)}</strong><small>{category.childCount} {homeText(locale, "home.sections")}</small></CategoryLink>)}</div> : <EmptyState title={homeText(locale, "reference.categoriesUnavailableTitle")} description={homeText(locale, "reference.categoriesUnavailable")} actionHref="/help" actionLabel={homeText(locale, "nav.help")} />}
   </section>;
 }
 

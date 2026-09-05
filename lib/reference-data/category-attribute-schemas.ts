@@ -1,7 +1,5 @@
 import { passengerVehicleBrands } from "./vehicle-brands.ts";
 import {
-  motorcycleBrands,
-  motorcycleModels,
   passengerVehicleModels,
   smartphoneBrands,
   smartphoneModels,
@@ -9,6 +7,7 @@ import {
 } from "./dependent-options.ts";
 import { ereaderBrands, ereaderModels, tabletBrands, tabletModels } from "./device-options.ts";
 import { masterCatalogProfileAssignments } from "./master-catalog/index.ts";
+import { motorcycleReferences, type MotorcycleReference } from "./motorcycle-options.ts";
 import { passengerVehicleModelsByBody } from "./vehicle-body-models.ts";
 
 export type SeedLocalizedText = { ru: string; kk: string };
@@ -144,7 +143,37 @@ const DEVICE_SPECS: SeedAttributeDefinition[] = [
   bool("imei_available", "IMEI / серийный номер доступен для проверки", "IMEI / сериялық нөмір тексеруге қолжетімді"),
 ];
 
-const TABLET_DEVICE_SPECS: SeedAttributeDefinition[] = DEVICE_SPECS;
+const TABLET_DEVICE_SPECS: SeedAttributeDefinition[] = [
+  ...DEVICE_SPECS,
+  text("model_code", "Заводской номер модели", "Зауыттық модель нөмірі", {
+    searchable: true,
+    validation: { maxLength: 80 },
+  }),
+  number("release_year", "Год выпуска модели", "Модель шыққан жыл", "год", "жыл", {
+    validation: { min: 2010, max: 2100 },
+  }),
+  select("ram", "Оперативная память", "Жедел жад", [
+    op("1", "1 ГБ", "1 ГБ"), op("2", "2 ГБ", "2 ГБ"), op("3", "3 ГБ", "3 ГБ"),
+    op("4", "4 ГБ", "4 ГБ"), op("6", "6 ГБ", "6 ГБ"), op("8", "8 ГБ", "8 ГБ"),
+    op("12", "12 ГБ", "12 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("24+", "24 ГБ и больше", "24 ГБ және көп"),
+  ]),
+  select("sim_support", "SIM / eSIM", "SIM / eSIM", [
+    op("none", "Нет", "Жоқ"), op("nano-sim", "Nano-SIM", "Nano-SIM"),
+    op("esim", "eSIM", "eSIM"), op("nano-esim", "Nano-SIM + eSIM", "Nano-SIM + eSIM"),
+  ]),
+  number("refresh_rate", "Частота обновления экрана", "Экранды жаңарту жиілігі", "Гц", "Гц", {
+    validation: { min: 30, max: 360 },
+  }),
+  select("device_form", "Тип планшета", "Планшет түрі", [
+    op("standard", "Обычный", "Қалыпты"), op("rugged", "Защищённый", "Қорғалған"),
+    op("kids", "Детский", "Балаларға"), op("two-in-one", "2-в-1 / трансформер", "2-де-1 / трансформер"),
+  ]),
+  select("charging_connector", "Разъём зарядки", "Қуаттау қосқышы", [
+    op("usb-c", "USB-C", "USB-C"), op("micro-usb", "Micro-USB", "Micro-USB"),
+    op("lightning", "Lightning", "Lightning"), op("proprietary", "Фирменный", "Фирмалық"),
+  ]),
+  bool("keyboard_included", "Клавиатура в комплекте", "Пернетақта жинақта"),
+];
 
 const VEHICLE_COMPLIANCE: SeedAttributeDefinition[] = [
   text("generation", "Поколение", "Буын", { filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 100 } }),
@@ -229,7 +258,6 @@ const REGULATED_SAFETY: SeedAttributeDefinition[] = [
 ];
 
 const PASSENGER_BRANDS: SeedAttributeOption[] = passengerVehicleBrands;
-const MOTORCYCLE_BRANDS: SeedAttributeOption[] = motorcycleBrands;
 const SMARTPHONE_BRANDS: SeedAttributeOption[] = smartphoneBrands;
 const WATCH_BRANDS: SeedAttributeOption[] = [
   ...SMARTPHONE_BRANDS.filter((option) => option.value !== "other"),
@@ -254,39 +282,77 @@ const dependentSelect = (
   optionsLoadMode: "deferred",
   validation: { fallbackOption: "other-model" },
 });
-const OTHER_MODEL = text("model_other", "Другая модель", "Басқа модель", {
+const OTHER_BRAND = text("brand_other", "Укажите марку", "Марканы көрсетіңіз", {
+  filterable: true,
   searchable: true,
-  validation: { maxLength: 100, visibleWhen: { key: "model", values: ["other-model"] } },
+  filterMode: "search",
+  validation: { maxLength: 80, visibleWhen: { key: "brand", values: ["other"] }, requiredWhen: { key: "brand", values: ["other"] } },
+});
+const OTHER_MODEL = text("model_other", "Укажите модель", "Модельді көрсетіңіз", {
+  filterable: true,
+  searchable: true,
+  filterMode: "search",
+  validation: { maxLength: 100, visibleWhen: { key: "model", values: ["other-model"] }, requiredWhen: { key: "model", values: ["other-model"] } },
 });
 const OTHER_COMPATIBLE_MODEL = text("compatible_model_other", "Другая совместимая модель", "Басқа үйлесімді модель", {
   searchable: true,
-  validation: { maxLength: 100, visibleWhen: { key: "compatible_model", values: ["other-model"] } },
+  validation: {
+    maxLength: 100,
+    visibleWhen: { key: "compatible_model", values: ["other-model"] },
+    requiredWhen: { key: "compatible_model", values: ["other-model"] },
+  },
 });
 
 const passengerCarProfile = (
   models: DependentReferenceOption[] = passengerVehicleModels,
-): SeedAttributeDefinition[] => [
-  select("brand", "Марка", "Маркасы", PASSENGER_BRANDS, { required: true }),
-  dependentSelect("model", "Модель", "Моделі", "brand", models), OTHER_MODEL,
-  YEAR,
-  number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0, max: 5_000_000 } }),
-  select("transmission", "Коробка передач", "Беріліс қорабы", [op("automatic", "Автомат", "Автомат"), op("manual", "Механика", "Механика"), op("robot", "Робот", "Робот"), op("cvt", "Вариатор", "Вариатор")]),
-  select("fuel", "Топливо", "Отын", [op("petrol", "Бензин", "Бензин"), op("diesel", "Дизель", "Дизель"), op("gas", "Газ", "Газ"), op("petrol-gas", "Бензин / газ", "Бензин / газ"), op("hybrid", "Гибрид", "Гибрид"), op("plugin-hybrid", "Plug-in hybrid", "Қуатталатын гибрид"), op("electric", "Электро", "Электр")]),
-  select("drive", "Привод", "Жетек", [op("front", "Передний", "Алдыңғы"), op("rear", "Задний", "Артқы"), op("all", "Полный", "Толық")]),
-  number("engine_volume", "Объём двигателя", "Қозғалтқыш көлемі", "л", "л", { validation: { min: 0.1, max: 20, step: 0.1 } }),
-  select("steering", "Руль", "Руль", [op("left", "Слева", "Сол жақта"), op("right", "Справа", "Оң жақта")]),
-  select("color", "Цвет", "Түсі", [op("black", "Чёрный", "Қара"), op("white", "Белый", "Ақ"), op("silver", "Серебристый", "Күміс"), op("gray", "Серый", "Сұр"), op("blue", "Синий", "Көк"), op("red", "Красный", "Қызыл"), op("green", "Зелёный", "Жасыл"), op("beige", "Бежевый", "Сарғыш"), op("brown", "Коричневый", "Қоңыр"), op("other", "Другой", "Басқа")]),
-  select("condition", "Состояние автомобиля", "Автомобиль күйі", [op("new", "Новое", "Жаңа"), op("like-new", "Как новое", "Жаңа сияқты"), op("used", "С пробегом", "Жүрілген"), op("repair", "Требует ремонта", "Жөндеуді қажет етеді")], { required: true }),
-];
+): SeedAttributeDefinition[] => {
+  const scopedBrands = new Set(models.map((option) => option.parentValue).filter(Boolean));
+  const brands = PASSENGER_BRANDS.filter((option) => option.value === "other" || scopedBrands.has(option.value));
+  return [
+    select("brand", "Марка", "Маркасы", brands, { required: true }),
+    OTHER_BRAND, dependentSelect("model", "Модель", "Моделі", "brand", models), OTHER_MODEL,
+    YEAR,
+    number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0, max: 5_000_000 } }),
+    select("transmission", "Коробка передач", "Беріліс қорабы", [op("automatic", "Автомат", "Автомат"), op("manual", "Механика", "Механика"), op("robot", "Робот", "Робот"), op("cvt", "Вариатор", "Вариатор")]),
+    select("fuel", "Топливо", "Отын", [op("petrol", "Бензин", "Бензин"), op("diesel", "Дизель", "Дизель"), op("gas", "Газ", "Газ"), op("petrol-gas", "Бензин / газ", "Бензин / газ"), op("hybrid", "Гибрид", "Гибрид"), op("plugin-hybrid", "Plug-in hybrid", "Қуатталатын гибрид"), op("electric", "Электро", "Электр")]),
+    select("drive", "Привод", "Жетек", [op("front", "Передний", "Алдыңғы"), op("rear", "Задний", "Артқы"), op("all", "Полный", "Толық")]),
+    number("engine_volume", "Объём двигателя", "Қозғалтқыш көлемі", "л", "л", { validation: { min: 0.1, max: 20, step: 0.1 } }),
+    select("steering", "Руль", "Руль", [op("left", "Слева", "Сол жақта"), op("right", "Справа", "Оң жақта")]),
+    select("color", "Цвет", "Түсі", [op("black", "Чёрный", "Қара"), op("white", "Белый", "Ақ"), op("silver", "Серебристый", "Күміс"), op("gray", "Серый", "Сұр"), op("blue", "Синий", "Көк"), op("red", "Красный", "Қызыл"), op("green", "Зелёный", "Жасыл"), op("beige", "Бежевый", "Сарғыш"), op("brown", "Коричневый", "Қоңыр"), op("other", "Другой", "Басқа")]),
+    select("condition", "Состояние автомобиля", "Автомобиль күйі", [op("new", "Новое", "Жаңа"), op("like-new", "Как новое", "Жаңа сияқты"), op("used", "С пробегом", "Жүрілген"), op("repair", "Требует ремонта", "Жөндеуді қажет етеді")], { required: true }),
+  ];
+};
 
 const passengerCarExchangeProfile = (): SeedAttributeDefinition[] =>
   passengerCarProfile().flatMap((attribute) => {
     if (attribute.key === "brand") return [BRAND_TEXT];
     if (attribute.key === "model") return [MODEL_TEXT];
-    if (attribute.key === "model_other") return [];
+    if (attribute.key === "brand_other" || attribute.key === "model_other") return [];
     if (attribute.key === "condition") return [CONDITION];
     return [attribute];
   });
+
+const motorcycleProfile = (
+  reference: MotorcycleReference,
+  powertrain: "combustion" | "electric" = "combustion",
+): SeedAttributeDefinition[] => [
+  select("brand", "Марка", "Маркасы", reference.brands, { required: true }),
+  OTHER_BRAND,
+  dependentSelect("model", "Модель", "Моделі", "brand", reference.models),
+  OTHER_MODEL,
+  YEAR,
+  number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0 } }),
+  ...(powertrain === "electric"
+    ? [
+      number("motor_power", "Мощность электродвигателя", "Электр қозғалтқыш қуаты", "Вт", "Вт", { validation: { min: 100, max: 100_000 } }),
+      number("battery_capacity", "Ёмкость аккумулятора", "Аккумулятор сыйымдылығы", "Вт·ч", "Вт·сағ", { validation: { min: 100, max: 100_000 } }),
+      number("range", "Запас хода", "Жүріс қоры", "км", "км", { validation: { min: 1, max: 1_000 } }),
+      number("max_speed", "Максимальная скорость", "Ең жоғары жылдамдық", "км/ч", "км/сағ", { validation: { min: 1, max: 300 } }),
+    ]
+    : [number("engine_volume", "Объём двигателя", "Қозғалтқыш көлемі", "см³", "см³", { validation: { min: 25, max: 3000 } })]),
+  select("condition", "Состояние", "Күйі", [op("new", "Новое", "Жаңа"), op("used", "С пробегом", "Жүрілген"), op("repair", "Требует ремонта", "Жөндеуді қажет етеді")], { required: true }),
+  bool("documents", "Есть документы", "Құжаттары бар"),
+];
 
 const COMMERCIAL_PROPERTY_BASE: SeedAttributeDefinition[] = [
   select("commercial_type", "Тип объекта", "Нысан түрі", [
@@ -337,15 +403,23 @@ const profiles = {
   passengerCarPickup: passengerCarProfile(passengerVehicleModelsByBody.pickup),
   passengerCarOther: passengerCarProfile(passengerVehicleModelsByBody.other),
   passengerCarExchange: passengerCarExchangeProfile(),
-  motorcycle: [
-    select("brand", "Марка", "Маркасы", MOTORCYCLE_BRANDS, { required: true }),
-    dependentSelect("model", "Модель", "Моделі", "brand", motorcycleModels), OTHER_MODEL, YEAR,
-    number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0 } }),
-    number("engine_volume", "Объём двигателя", "Қозғалтқыш көлемі", "см³", "см³", { validation: { min: 25, max: 3000 } }),
-    select("motorcycle_class", "Класс", "Сыныбы", [op("road", "Дорожный", "Жолдық"), op("sport", "Спортивный", "Спорттық"), op("touring", "Туристический", "Туристік"), op("cruiser", "Круизер", "Круизер"), op("enduro", "Эндуро", "Эндуро"), op("cross", "Кроссовый", "Кросс"), op("scooter", "Скутер", "Скутер"), op("atv", "Квадроцикл", "Квадроцикл"), op("snowmobile", "Снегоход", "Қар көлігі")]),
-    select("condition", "Состояние", "Күйі", [op("new", "Новое", "Жаңа"), op("used", "С пробегом", "Жүрілген"), op("repair", "Требует ремонта", "Жөндеуді қажет етеді")], { required: true }),
-    bool("documents", "Есть документы", "Құжаттары бар"),
-  ],
+  motorcycle: motorcycleProfile(motorcycleReferences.road),
+  motorcycleRoad: motorcycleProfile(motorcycleReferences.road),
+  motorcycleSport: motorcycleProfile(motorcycleReferences.sport),
+  motorcycleNaked: motorcycleProfile(motorcycleReferences.naked),
+  motorcycleTouring: motorcycleProfile(motorcycleReferences.touring),
+  motorcycleCruiser: motorcycleProfile(motorcycleReferences.cruiser),
+  motorcycleEnduro: motorcycleProfile(motorcycleReferences.enduro),
+  motorcycleMotocross: motorcycleProfile(motorcycleReferences.motocross),
+  motorcycleClassic: motorcycleProfile(motorcycleReferences.classic),
+  motorcycleScooter: motorcycleProfile(motorcycleReferences.scooter),
+  motorcycleMaxiScooter: motorcycleProfile(motorcycleReferences.maxiScooter),
+  motorcycleMoped: motorcycleProfile(motorcycleReferences.moped),
+  motorcycleElectricScooter: motorcycleProfile(motorcycleReferences.electricScooter, "electric"),
+  motorcycleAtv: motorcycleProfile(motorcycleReferences.atv),
+  motorcycleUtv: motorcycleProfile(motorcycleReferences.utv),
+  motorcycleBuggy: motorcycleProfile(motorcycleReferences.buggy),
+  motorcycleSnowmobile: motorcycleProfile(motorcycleReferences.snowmobile),
   motorcycleExchange: [
     BRAND_TEXT, MODEL_TEXT, YEAR,
     number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0 } }),
@@ -435,7 +509,7 @@ const profiles = {
   businessService: [select("client_type", "Клиент", "Клиент", [op("startup", "Стартап", "Стартап"), op("sme", "Малый и средний бизнес", "Шағын және орта бизнес"), op("enterprise", "Крупная компания", "Ірі компания"), op("individual", "Частное лицо", "Жеке тұлға")]), bool("contract_available", "Работа по договору", "Келісімшартпен жұмыс"), bool("vat", "Работа с НДС", "ҚҚС-пен жұмыс")],
   travelService: [text("destination", "Страна / направление", "Ел / бағыт", { filterable: true, searchable: true, filterMode: "search" }), select("customer_scope", "Клиенты", "Клиенттер", [op("individual", "Один человек", "Бір адам"), op("family", "Семья", "Отбасы"), op("group", "Группа", "Топ"), op("business", "Бизнес", "Бизнес")]), bool("document_support", "Сопровождение документов", "Құжаттарды сүйемелдеу")],
 
-  smartphone: [select("brand", "Бренд", "Бренд", SMARTPHONE_BRANDS, { required: true }), dependentSelect("model", "Модель", "Модель", "brand", smartphoneModels), OTHER_MODEL, select("storage", "Память", "Жад", [op("32", "32 ГБ", "32 ГБ"), op("64", "64 ГБ", "64 ГБ"), op("128", "128 ГБ", "128 ГБ"), op("256", "256 ГБ", "256 ГБ"), op("512", "512 ГБ", "512 ГБ"), op("1024", "1 ТБ", "1 ТБ")]), select("ram", "Оперативная память", "Жедел жад", [op("4", "4 ГБ", "4 ГБ"), op("6", "6 ГБ", "6 ГБ"), op("8", "8 ГБ", "8 ГБ"), op("12", "12 ГБ", "12 ГБ"), op("16", "16 ГБ и больше", "16 ГБ және көп")]), select("sim", "SIM / eSIM", "SIM / eSIM", [op("single", "1 SIM", "1 SIM"), op("dual", "2 SIM", "2 SIM"), op("esim", "eSIM", "eSIM"), op("dual-esim", "SIM + eSIM", "SIM + eSIM")]), select("color", "Цвет", "Түсі", [op("black", "Чёрный", "Қара"), op("white", "Белый", "Ақ"), op("blue", "Синий", "Көк"), op("green", "Зелёный", "Жасыл"), op("gold", "Золотистый", "Алтын"), op("other", "Другой", "Басқа")]), CONDITION, select("package", "Комплект", "Жинақ", [op("phone", "Только устройство", "Тек құрылғы"), op("box", "С коробкой", "Қорабымен"), op("full", "Полный комплект", "Толық жинақ")]), WARRANTY],
+  smartphone: [select("brand", "Бренд", "Бренд", SMARTPHONE_BRANDS, { required: true }), OTHER_BRAND, dependentSelect("model", "Модель", "Модель", "brand", smartphoneModels), OTHER_MODEL, select("storage", "Память", "Жад", [op("32", "32 ГБ", "32 ГБ"), op("64", "64 ГБ", "64 ГБ"), op("128", "128 ГБ", "128 ГБ"), op("256", "256 ГБ", "256 ГБ"), op("512", "512 ГБ", "512 ГБ"), op("1024", "1 ТБ", "1 ТБ")]), select("ram", "Оперативная память", "Жедел жад", [op("4", "4 ГБ", "4 ГБ"), op("6", "6 ГБ", "6 ГБ"), op("8", "8 ГБ", "8 ГБ"), op("12", "12 ГБ", "12 ГБ"), op("16", "16 ГБ и больше", "16 ГБ және көп")]), select("sim", "SIM / eSIM", "SIM / eSIM", [op("single", "1 SIM", "1 SIM"), op("dual", "2 SIM", "2 SIM"), op("esim", "eSIM", "eSIM"), op("dual-esim", "SIM + eSIM", "SIM + eSIM")]), select("color", "Цвет", "Түсі", [op("black", "Чёрный", "Қара"), op("white", "Белый", "Ақ"), op("blue", "Синий", "Көк"), op("green", "Зелёный", "Жасыл"), op("gold", "Золотистый", "Алтын"), op("other", "Другой", "Басқа")]), CONDITION, select("package", "Комплект", "Жинақ", [op("phone", "Только устройство", "Тек құрылғы"), op("box", "С коробкой", "Қорабымен"), op("full", "Полный комплект", "Толық жинақ")]), WARRANTY],
   smartWatch: [
     select("wearable_type", "Тип устройства", "Құрылғы түрі", [op("smart-watch", "Смарт-часы", "Смарт-сағат"), op("fitness-band", "Фитнес-браслет", "Фитнес-білезік")], { required: true }),
     select("brand", "Бренд", "Бренд", WATCH_BRANDS, { required: true }),
@@ -451,8 +525,50 @@ const profiles = {
     WARRANTY,
     select("repair_history", "История ремонта", "Жөндеу тарихы", [op("none", "Не ремонтировались", "Жөнделмеген"), op("repaired", "Были в ремонте", "Жөндеуде болған"), op("unknown", "Неизвестно", "Белгісіз")]),
   ],
-  tablet: [select("brand", "Бренд", "Бренд", tabletBrands, { required: true }), dependentSelect("model", "Модель", "Модель", "brand", tabletModels), OTHER_MODEL, select("storage", "Память", "Жад", [op("32", "32 ГБ", "32 ГБ"), op("64", "64 ГБ", "64 ГБ"), op("128", "128 ГБ", "128 ГБ"), op("256", "256 ГБ", "256 ГБ"), op("512", "512 ГБ", "512 ГБ"), op("1024", "1 ТБ", "1 ТБ")]), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), select("connectivity", "Связь", "Байланыс", [op("wifi", "Wi-Fi", "Wi-Fi"), op("cellular", "Wi-Fi + Cellular", "Wi-Fi + Cellular")]), bool("stylus_included", "Стилус в комплекте", "Стилус жинақта"), CONDITION, WARRANTY],
-  ereader: [select("brand", "Бренд", "Бренд", ereaderBrands, { required: true }), dependentSelect("model", "Модель", "Модель", "brand", ereaderModels), OTHER_MODEL, number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), bool("color_screen", "Цветной экран", "Түсті экран"), bool("backlight", "Подсветка", "Артқы жарық"), bool("waterproof", "Защита от воды", "Судан қорғау"), CONDITION],
+  tablet: [select("brand", "Бренд", "Бренд", tabletBrands, { required: true }), OTHER_BRAND, dependentSelect("model", "Модель", "Модель", "brand", tabletModels), OTHER_MODEL, select("storage", "Память", "Жад", [op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64", "64 ГБ", "64 ГБ"), op("128", "128 ГБ", "128 ГБ"), op("256", "256 ГБ", "256 ГБ"), op("512", "512 ГБ", "512 ГБ"), op("1024", "1 ТБ", "1 ТБ"), op("2048", "2 ТБ", "2 ТБ")]), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), select("connectivity", "Связь", "Байланыс", [op("wifi", "Wi-Fi", "Wi-Fi"), op("cellular", "Wi-Fi + Cellular", "Wi-Fi + Cellular")]), bool("stylus_included", "Стилус в комплекте", "Стилус жинақта"), CONDITION, WARRANTY],
+  ereader: [select("brand", "Бренд", "Бренд", ereaderBrands, { required: true }), OTHER_BRAND, dependentSelect("model", "Модель", "Модель", "brand", ereaderModels), OTHER_MODEL, number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), bool("color_screen", "Цветной экран", "Түсті экран"), bool("backlight", "Подсветка", "Артқы жарық"), bool("waterproof", "Защита от воды", "Судан қорғау"), CONDITION],
+  graphicsTablet: [
+    BRAND_TEXT, MODEL_TEXT,
+    select("graphics_tablet_type", "Тип графического планшета", "Графикалық планшет түрі", [
+      op("pen-tablet", "Перьевой без экрана", "Экрансыз қаламды"),
+      op("pen-display", "Интерактивный дисплей", "Интерактивті дисплей"),
+      op("standalone", "Автономный", "Дербес"),
+    ], { required: true }),
+    number("working_width", "Ширина рабочей области", "Жұмыс аймағының ені", "мм", "мм"),
+    number("working_height", "Высота рабочей области", "Жұмыс аймағының биіктігі", "мм", "мм"),
+    number("pressure_levels", "Уровни нажатия", "Қысым деңгейлері"),
+    select("connection", "Подключение", "Қосылу", [
+      op("usb", "USB", "USB"), op("bluetooth", "Bluetooth", "Bluetooth"),
+      op("wireless", "Радиоканал", "Радиоарна"), op("combined", "Комбинированное", "Аралас"),
+    ]),
+    bool("stylus_included", "Перо в комплекте", "Қалам жинақта"), CONDITION, WARRANTY,
+  ],
+  tabletAccessory: [
+    select("accessory_type", "Тип аксессуара", "Аксессуар түрі", [
+      op("case", "Чехол", "Қап"), op("keyboard", "Клавиатура", "Пернетақта"),
+      op("stylus", "Стилус / перо", "Стилус / қалам"), op("screen-protector", "Защитное стекло / плёнка", "Қорғаныш шыны / үлдір"),
+      op("charger", "Зарядное устройство", "Қуаттау құрылғысы"), op("cable", "Кабель / переходник", "Кабель / адаптер"),
+      op("stand", "Подставка / держатель", "Тұғыр / ұстағыш"), op("dock", "Док-станция", "Док-станция"),
+      op("other", "Другое", "Басқа"),
+    ], { required: true }),
+    text("compatibility", "Совместимые планшеты", "Үйлесімді планшеттер", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 200 } }),
+    CONDITION,
+  ],
+  tabletPart: [
+    select("part_type", "Тип запчасти", "Бөлшек түрі", [
+      op("display", "Дисплей / сенсор", "Дисплей / сенсор"), op("battery", "Аккумулятор", "Аккумулятор"),
+      op("housing", "Корпус", "Корпус"), op("connector", "Разъём", "Қосқыш"),
+      op("camera", "Камера", "Камера"), op("speaker", "Динамик", "Динамик"),
+      op("motherboard", "Системная плата", "Жүйелік тақша"), op("buttons", "Кнопки / шлейф", "Түймелер / шлейф"),
+      op("other", "Другое", "Басқа"),
+    ], { required: true }),
+    text("compatible_brand", "Совместимый бренд", "Үйлесімді бренд", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 80 } }),
+    text("compatible_model", "Совместимая модель", "Үйлесімді модель", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 120 } }),
+    select("part_origin", "Происхождение", "Шығу тегі", [
+      op("original", "Оригинал", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"),
+      op("used-original", "Оригинал Б/у", "Қолданылған түпнұсқа"),
+    ]), CONDITION,
+  ],
   computerDeviceSpecs: [
     select("operating_system", "Операционная система", "Операциялық жүйе", [op("windows", "Windows", "Windows"), op("macos", "macOS", "macOS"), op("linux", "Linux", "Linux"), op("chromeos", "ChromeOS", "ChromeOS"), op("none", "Без ОС", "ОЖ жоқ"), op("other", "Другая", "Басқа")]),
     select("screen_resolution", "Разрешение экрана", "Экран ажыратымдылығы", [op("hd", "HD", "HD"), op("full-hd", "Full HD", "Full HD"), op("qhd", "QHD / 2K", "QHD / 2K"), op("4k", "4K", "4K"), op("other", "Другое", "Басқа")]),
@@ -934,7 +1050,7 @@ const rootDefaults: Record<string, CategorySchemaProfile[]> = {
 const profileAssignments: Record<string, CategorySchemaProfile[]> = {
   transport: ["transportSimple"],
   cars: ["passengerCar", "vehicleCompliance"], "cars-sedan": ["passengerCar", "vehicleCompliance"], "cars-suv": ["passengerCar", "vehicleCompliance"], "cars-hatchback": ["passengerCar", "vehicleCompliance"], "cars-wagon": ["passengerCar", "vehicleCompliance"], "cars-minivan": ["passengerCar", "vehicleCompliance"], "cars-coupe": ["passengerCar", "vehicleCompliance"], "cars-cabriolet": ["passengerCar", "vehicleCompliance"], "cars-pickup": ["passengerCar", "vehicleCompliance"],
-  motorcycles: ["motorcycle"], "road-motorcycles": ["motorcycle"], scooters: ["motorcycle"], atv: ["motorcycle"], snowmobiles: ["motorcycle"],
+  motorcycles: ["motorcycle"], "road-motorcycles": ["motorcycleRoad"], scooters: ["motorcycleScooter"], atv: ["motorcycleAtv"], snowmobiles: ["motorcycleSnowmobile"],
   "commercial-transport": ["commercialVehicle"], trucks: ["commercialVehicle"], buses: ["commercialVehicle", "passengerCommercial"], minibuses: ["commercialVehicle", "passengerCommercial"], trailers: ["trailer"],
   "special-transport": ["machinery"], "construction-machinery": ["machinery"], "road-machinery": ["machinery"], "warehouse-machinery": ["machinery"], "municipal-machinery": ["machinery"], "agricultural-transport": ["machinery"], tractors: ["machinery"], harvesters: ["machinery"], "agro-attachments": ["machinery"],
   "water-transport": ["transportSimple"], "air-transport": ["transportSimple"], "other-transport": ["transportSimple"],

@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
+import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 
 const root = new URL("../", import.meta.url);
+const execFileAsync = promisify(execFile);
+const generatorEnvironment = prepareNodeRuntimeEnvironment(process.env);
 const users = {
   owner: "10000000-0000-4000-8000-000000000001",
   buyer: "20000000-0000-4000-8000-000000000002",
@@ -17,11 +26,17 @@ const users = {
   bannedAdmin: "80000000-0000-4000-8000-000000000008",
 };
 
-async function applyMigrations(db) {
+async function applyMigrations(db, { through = null, seed = true } = {}) {
   const names = (await readdir(new URL("supabase/migrations/", root)))
     .filter((name) => name.endsWith(".sql"))
     .sort();
-  for (const name of names) {
+  if (through && !names.includes(through)) {
+    throw new Error("Unknown migration boundary: " + through);
+  }
+  const selectedNames = through
+    ? names.filter((name) => name <= through)
+    : names;
+  for (const name of selectedNames) {
     if (name === "0025_security_boundary_repair.sql") {
       await db.exec(`
         alter default privileges grant execute on functions
@@ -109,7 +124,56 @@ async function applyMigrations(db) {
     }
     await db.exec(await readFile(new URL(`supabase/migrations/${name}`, root), "utf8"));
   }
-  await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+  if (seed) {
+    const releaseDirectory = await mkdtemp(join(tmpdir(), "marketo-security-release-"));
+    const releasePath = join(releaseDirectory, `${CATEGORY_REFERENCE_VERSION}.sql`);
+    try {
+      await execFileAsync(process.execPath, [
+        fileURLToPath(new URL("scripts/generate-catalog-completeness-migration.mjs", root)),
+        "--release-id",
+        CATEGORY_REFERENCE_VERSION,
+        "--output",
+        releasePath,
+      ], { cwd: fileURLToPath(root), env: generatorEnvironment });
+      await db.exec(await readFile(releasePath, "utf8"));
+      await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+    } finally {
+      await rm(releaseDirectory, { recursive: true, force: true });
+    }
+  }
+}
+
+async function createDatabaseThrough0025() {
+  const db = await createPGliteTestDatabase({ extensions: { pg_trgm, pgcrypto } });
+  try {
+    await db.exec(`
+      create schema auth;
+      create role anon nologin;
+      create role authenticated nologin;
+      create role service_role nologin;
+      grant usage on schema auth to anon, authenticated, service_role;
+      create table auth.users (
+        id uuid primary key,
+        raw_user_meta_data jsonb not null default '{}'::jsonb
+      );
+      create function auth.uid()
+      returns uuid
+      language sql
+      stable
+      as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+      $$;
+      create publication supabase_realtime;
+    `);
+    await applyMigrations(db, {
+      through: "0025_security_boundary_repair.sql",
+      seed: false,
+    });
+    return db;
+  } catch (error) {
+    await closePGliteTestDatabase(db);
+    throw error;
+  }
 }
 
 async function asAuthenticated(db, userId, operation) {
@@ -394,6 +458,7 @@ async function createFixtureDatabase() {
 
 test("Supabase v2 security and reference-data audit", async (t) => {
   const { db, refs, listings } = await createFixtureDatabase();
+  let currentDbClosed = false;
   try {
     await t.test("category tree has no cycles, orphans, localization gaps or ordering collisions", async () => {
       const result = await db.query(`
@@ -446,8 +511,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as active_under_inactive
       `);
       assert.deepEqual(result.rows[0], {
-        total: 1356,
-        reachable: 1356,
+        total: 1358,
+        reachable: 1358,
         cycles: 0,
         max_depth: 4,
         duplicate_sibling_ru: 0,
@@ -500,8 +565,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as invalid_options
       `);
       assert.deepEqual(result.rows[0], {
-        attributes: 14310,
-        options: 84490,
+        attributes: 14345,
+        options: 116412,
         orphan_attributes: 0,
         orphan_options: 0,
         invalid_attributes: 0,
@@ -1286,6 +1351,32 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       });
     });
 
+    await t.test("SECURITY DEFINER functions have fixed search paths and no anonymous EXECUTE", async () => {
+      const functions = await db.query(`
+        select
+          namespace.nspname,
+          procedure.proname,
+          procedure.proconfig,
+          has_function_privilege('anon', procedure.oid, 'EXECUTE') as anon_execute,
+          has_function_privilege('authenticated', procedure.oid, 'EXECUTE') as authenticated_execute
+        from pg_proc as procedure
+        join pg_namespace as namespace on namespace.oid = procedure.pronamespace
+        where procedure.prosecdef
+          and namespace.nspname in ('public', 'private')
+        order by namespace.nspname, procedure.proname
+      `);
+      assert.equal(functions.rows.length, 17);
+      assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
+      assert.ok(functions.rows.every((row) => row.anon_execute === false));
+      const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
+      assert.deepEqual(notClientCallable, ["handle_new_auth_user", "touch_conversation_after_message"]);
+    });
+
+    await closePGliteTestDatabase(db);
+    currentDbClosed = true;
+    {
+      const db = await createDatabaseThrough0025();
+      try {
     await t.test("0025 refuses unknown policies before changing RPC grants", async () => {
       const migration = await readFile(
         new URL("supabase/migrations/0025_security_boundary_repair.sql", root),
@@ -1490,28 +1581,13 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       `);
       assert.deepEqual(repaired.rows[0], { anon_execute: false, rls_enabled: true });
     });
-
-    await t.test("SECURITY DEFINER functions have fixed search paths and no anonymous EXECUTE", async () => {
-      const functions = await db.query(`
-        select
-          namespace.nspname,
-          procedure.proname,
-          procedure.proconfig,
-          has_function_privilege('anon', procedure.oid, 'EXECUTE') as anon_execute,
-          has_function_privilege('authenticated', procedure.oid, 'EXECUTE') as authenticated_execute
-        from pg_proc as procedure
-        join pg_namespace as namespace on namespace.oid = procedure.pronamespace
-        where procedure.prosecdef
-          and namespace.nspname in ('public', 'private')
-        order by namespace.nspname, procedure.proname
-      `);
-      assert.equal(functions.rows.length, 17);
-      assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
-      assert.ok(functions.rows.every((row) => row.anon_execute === false));
-      const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
-      assert.deepEqual(notClientCallable, ["handle_new_auth_user", "touch_conversation_after_message"]);
-    });
+      } finally {
+        await closePGliteTestDatabase(db);
+      }
+    }
   } finally {
-    await closePGliteTestDatabase(db);
+    if (!currentDbClosed) {
+      await closePGliteTestDatabase(db);
+    }
   }
 });

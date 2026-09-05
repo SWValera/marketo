@@ -35,7 +35,7 @@ dimensions, size and MIME.
 
 ## Master Catalog
 
-The reference seed contains 1,356 categories, 1,137 meaningful leaves and 16
+The reference seed contains 1,358 categories, 1,139 meaningful leaves and 16
 root verticals. Stable slugs and values are language-neutral; names, seller
 labels, filter labels and options have RU/KK text. Vehicle model options are
 scoped by body category, and smartphones/tablets/e-readers use independent

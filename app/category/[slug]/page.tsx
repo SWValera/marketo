@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppLink as Link } from "@/components/app-link";
+import { CategoryLink } from "@/components/category-link";
 import { notFound } from "next/navigation";
 import { CategoryBrowseGrid } from "@/components/category-browse-grid";
 import { CatalogClient } from "@/components/catalog-client";
@@ -71,22 +72,30 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   let initialDynamicFilters: Record<string, string> = {};
   try {
     const categoryIsLeaf = getCategoryChildren(view, filteredCategory).length === 0;
-    initialAttributes = categoryIsLeaf ? await getCategoryAttributeReferences(filteredCategory.id) : undefined;
-    initialDynamicFilters = initialAttributes?.status === "ready"
-      ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
-      : {};
-    listings = await listingRepository.list({
+    const attributePromise = categoryIsLeaf
+      ? getCategoryAttributeReferences(filteredCategory.id)
+      : Promise.resolve(undefined);
+    const list = (attributeFilters: Record<string, string>) => listingRepository.list({
       locale,
       categoryIds: getCategoryDescendantIds(view, filteredCategory),
       settlementId: parsed.cityId && parsed.cityId !== "all" ? parsed.cityId : undefined,
       query: parsed.query,
       minPriceMinor: parsed.minPrice ? Number(parsed.minPrice) : undefined,
       maxPriceMinor: parsed.maxPrice ? Number(parsed.maxPrice) : undefined,
-      attributeFilters: initialDynamicFilters,
+      attributeFilters,
       sort: parsed.sort,
       page: parsed.page,
       limit: 60,
     });
+    if (Object.keys(parsed.dynamicFilters).length === 0) {
+      [initialAttributes, listings] = await Promise.all([attributePromise, list({})]);
+    } else {
+      initialAttributes = await attributePromise;
+      initialDynamicFilters = initialAttributes?.status === "ready"
+        ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
+        : {};
+      listings = await list(initialDynamicFilters);
+    }
   } catch {
     return <><Header categorySlug={category.slug} /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState
       title={t("state.error")}
@@ -99,7 +108,7 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   const path = getCategoryPath(view, filteredCategory);
   const searchPlaceholder = localize(filteredCategory.searchPlaceholder ?? rootCategory?.searchPlaceholder, locale) || t("header.searchPlaceholder");
   return <><Header categorySlug={filteredCategory.slug} searchPlaceholder={searchPlaceholder} /><main id="main-content" tabIndex={-1} className="page-shell subpage-main">
-    <nav className="breadcrumbs" aria-label={t("categories.eyebrow")}><Link href="/">{t("common.home")}</Link>{path.map((item) => <span key={item.slug}>/ <Link href={`/category/${item.slug}`}>{localize(item.name, locale)}</Link></span>)}</nav>
-    <CatalogClient key={`${slug}:${JSON.stringify({ ...parsed, dynamicFilters: initialDynamicFilters })}`} basePath={`/category/${category.slug}`} categoryNavigation={<CategoryBrowseGrid data={catalog.data} categorySlug={filteredCategory.slug} locale={locale} />} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={initialDynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
+    <nav className="breadcrumbs" aria-label={t("categories.eyebrow")}><Link href="/">{t("common.home")}</Link>{path.map((item) => <span key={item.slug}>/ <CategoryLink cityId={parsed.cityId} href={`/category/${item.slug}`}>{localize(item.name, locale)}</CategoryLink></span>)}</nav>
+    <CatalogClient key={`${slug}:${JSON.stringify({ ...parsed, dynamicFilters: initialDynamicFilters })}`} basePath={`/category/${category.slug}`} categoryNavigation={<CategoryBrowseGrid data={catalog.data} categorySlug={filteredCategory.slug} locale={locale} cityId={parsed.cityId} />} initialCategoryAttributes={initialAttributes} initialQuery={parsed.query} initialCategorySlug={filteredCategory.slug} initialCityId={parsed.cityId} initialMinPrice={parsed.minPrice} initialMaxPrice={parsed.maxPrice} initialSort={parsed.sort} initialDynamicFilters={initialDynamicFilters} titleText={filteredCategory.name} initialListings={listings.items} initialTotal={listings.total} initialPage={listings.page} initialTotalPages={listings.totalPages} initialState={listings.state} fallback={parent ? `/category/${parent.slug}` : "/categories"} />
   </main><MobileNav /></>;
 }

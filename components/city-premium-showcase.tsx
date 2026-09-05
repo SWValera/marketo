@@ -19,6 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { AppLink as Link } from "@/components/app-link";
+import { CategoryLink } from "@/components/category-link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { useStoredLocation } from "@/components/location-picker";
@@ -242,11 +243,11 @@ export function CityPremiumShowcase() {
           </Link>;
         }
         const Icon = item.icon;
-        return <Link className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={`${slot}-${item.id}`}>
+        return <CategoryLink cityId={selectedLocation} className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={`${slot}-${item.id}`}>
           <span className="showcase-badge">Marketo</span>
           <span className="showcase-brand-icon"><Icon size={34} /></span>
           <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small>{t("showcase.open")} <ArrowRight size={13} /></small></div>
-        </Link>;
+        </CategoryLink>;
       })}
     </div>
   </section>;

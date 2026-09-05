@@ -34,7 +34,7 @@ npm run validate:catalog
 - smartphone, tablet и e-reader dictionaries изолированы;
 - быстро меняющиеся device dictionaries имеют source URL, `verifiedAt` и
   ограничение допустимого возраста справочника.
-- все 1 356 категорий имеют explicit contextual `searchPlaceholder`,
+- все 1 358 категорий имеют explicit contextual `searchPlaceholder`,
   `titlePlaceholder` и `descriptionHint` на RU/KK; каждое поле сверяется с
   единым semantic source-of-truth и содержит название текущей категории;
 - metadata моделей дополнительно сверяется с допустимым vehicle/device scope,
@@ -60,13 +60,13 @@ npm run validate:catalog
 
 ## Зафиксированный результат
 
-На 2026-09-04:
+На 2026-09-05:
 
 ```text
 Master Catalog semantic validation passed:
-1356 categories, 1137 leaves, 516426 assertions,
-8136 contextual RU/KK metadata assignments,
-14310 seller-attribute assignments, 84490 option assignments.
+1358 categories, 1139 leaves, 689894 assertions,
+8148 contextual RU/KK metadata assignments,
+14345 seller-attribute assignments, 116412 option assignments.
 ```
 
 Это подтверждает semantic source-of-truth в памяти приложения. SQL migration,

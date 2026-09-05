@@ -1,22 +1,49 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { categoryOptions } from "../lib/catalog-config.ts";
+import { categoryOptions, categoryTree } from "../lib/catalog-config.ts";
 import { resolveCategoryAttributeSchema } from "../lib/reference-data/category-attribute-schemas.ts";
+import {
+  CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT,
+  CATEGORY_REFERENCE_VERSION,
+} from "../lib/reference-data/release.ts";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const releasedMigrationsDirectory = resolve(projectRoot, "supabase/migrations");
+const releaseArgumentIndex = process.argv.indexOf("--release-id");
+if (releaseArgumentIndex < 0 || !process.argv[releaseArgumentIndex + 1]) {
+  throw new Error("--release-id is required for every catalog data release.");
+}
+const releaseId = process.argv[releaseArgumentIndex + 1];
+if (!/^[a-z0-9](?:[a-z0-9._-]{0,26}[a-z0-9])?$/i.test(releaseId)) {
+  throw new Error("--release-id must be 1-28 characters using letters, numbers, dots, underscores or hyphens.");
+}
+if (releaseId !== CATEGORY_REFERENCE_VERSION) {
+  throw new Error(
+    `--release-id must match CATEGORY_REFERENCE_VERSION (${CATEGORY_REFERENCE_VERSION}) so immutable browser caches and database data stay aligned.`,
+  );
+}
+const releaseSqlTag = `release_${releaseId.replaceAll(/[^a-z0-9]/gi, "_").toLowerCase()}`;
+const requiredSubmitListingFingerprint = "86357b7d7fd5d43a17f7182e40009406";
 const outputArgumentIndex = process.argv.indexOf("--output");
 if (outputArgumentIndex >= 0 && !process.argv[outputArgumentIndex + 1]) {
   throw new Error("--output requires a destination path.");
 }
 const outputPath = outputArgumentIndex >= 0
   ? resolve(projectRoot, process.argv[outputArgumentIndex + 1])
-  : resolve(projectRoot, "supabase/migrations/0024_catalog_completeness.sql");
+  : resolve(projectRoot, "artifacts/catalog/releases", `${releaseId}.sql`);
+const relativeToReleasedMigrations = relative(releasedMigrationsDirectory, outputPath);
+if (
+  relativeToReleasedMigrations === ""
+  || (!relativeToReleasedMigrations.startsWith("..") && !isAbsolute(relativeToReleasedMigrations))
+) {
+  throw new Error("Refusing to write a catalog data release under supabase/migrations. Released migrations are immutable.");
+}
 
-// These profiles are the reviewed forward-only completeness release. The
-// migration manages the full category catalog as one authoritative snapshot;
-// this set is retained as a coverage assertion so a declared release profile
-// cannot silently disappear from all resolved category assignments.
+// These profiles define the reviewed catalog data snapshot. The generated
+// release synchronizes that snapshot without changing database schema; this
+// set is retained as a coverage assertion so a declared release profile cannot
+// silently disappear from all resolved category assignments.
 const changedProfiles = new Set([
   "productCore",
   "goods",
@@ -24,6 +51,40 @@ const changedProfiles = new Set([
   "consumableLot",
   "deviceSpecs",
   "tabletDeviceSpecs",
+  "passengerCar",
+  "passengerCarSedan",
+  "passengerCarSuv",
+  "passengerCarHatchback",
+  "passengerCarLiftback",
+  "passengerCarWagon",
+  "passengerCarMinivan",
+  "passengerCarCoupe",
+  "passengerCarCabriolet",
+  "passengerCarPickup",
+  "passengerCarOther",
+  "motorcycle",
+  "motorcycleRoad",
+  "motorcycleSport",
+  "motorcycleNaked",
+  "motorcycleTouring",
+  "motorcycleCruiser",
+  "motorcycleEnduro",
+  "motorcycleMotocross",
+  "motorcycleClassic",
+  "motorcycleScooter",
+  "motorcycleMaxiScooter",
+  "motorcycleMoped",
+  "motorcycleElectricScooter",
+  "motorcycleAtv",
+  "motorcycleUtv",
+  "motorcycleBuggy",
+  "motorcycleSnowmobile",
+  "smartphone",
+  "tablet",
+  "ereader",
+  "graphicsTablet",
+  "tabletAccessory",
+  "tabletPart",
   "videoCamera",
   "actionCamera",
   "projector",
@@ -109,17 +170,60 @@ const invariant = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+const categoryRows = [];
+function collectCategories(nodes, parentSlug = null, inherited = {}, depth = 0) {
+  for (const [index, node] of nodes.entries()) {
+    const presentation = {
+      searchPlaceholder: node.searchPlaceholder ?? inherited.searchPlaceholder,
+      titlePlaceholder: node.titlePlaceholder ?? inherited.titlePlaceholder,
+      descriptionHint: node.descriptionHint ?? inherited.descriptionHint,
+      priceMode: node.priceMode ?? inherited.priceMode ?? "price",
+      icon: node.icon ?? inherited.icon,
+      tone: node.tone ?? inherited.tone,
+    };
+    categoryRows.push({
+      slug: node.slug,
+      parentSlug,
+      nameRu: node.name.ru,
+      nameKk: node.name.kk,
+      icon: presentation.icon ?? null,
+      tone: presentation.tone ?? null,
+      searchPlaceholderRu: presentation.searchPlaceholder?.ru ?? null,
+      searchPlaceholderKk: presentation.searchPlaceholder?.kk ?? null,
+      titlePlaceholderRu: presentation.titlePlaceholder?.ru ?? null,
+      titlePlaceholderKk: presentation.titlePlaceholder?.kk ?? null,
+      descriptionHintRu: presentation.descriptionHint?.ru ?? null,
+      descriptionHintKk: presentation.descriptionHint?.kk ?? null,
+      priceMode: presentation.priceMode,
+      sortOrder: (index + 1) * 10,
+      depth,
+    });
+    if (node.children?.length) collectCategories(node.children, node.slug, presentation, depth + 1);
+  }
+}
+collectCategories(categoryTree);
+
+const categoryRowsBySlug = new Map(categoryRows.map((category) => [category.slug, category]));
+invariant(categoryRowsBySlug.size === categoryRows.length, "Duplicate category slug in the catalog tree.");
+invariant(categoryRows.length === categoryOptions.length, "Catalog tree and category index are out of sync.");
+invariant(
+  categoryRows.length === CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT,
+  `CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT is stale: ${CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT}/${categoryRows.length}.`,
+);
+
 const targetCategories = [];
 const attributeRows = [];
 const optionRows = [];
 const coveredChangedProfiles = new Set();
 
 for (const category of categoryOptions) {
+  const categoryRow = categoryRowsBySlug.get(category.slug);
+  invariant(categoryRow, `Missing category release row: ${category.slug}`);
   const resolved = resolveCategoryAttributeSchema(category.slug, category.rootSlug);
   const matchingProfiles = resolved.profileNames.filter((profile) => changedProfiles.has(profile));
 
   matchingProfiles.forEach((profile) => coveredChangedProfiles.add(profile));
-  targetCategories.push({ slug: category.slug, profileNames: resolved.profileNames });
+  targetCategories.push({ ...categoryRow, profileNames: resolved.profileNames });
 
   resolved.attributes.forEach((attribute, attributeIndex) => {
     const sortOrder = (attributeIndex + 1) * 10;
@@ -228,17 +332,20 @@ const sql = [];
 const add = (value) => sql.push(value.trim());
 
 add(`
--- Marketo v1.0 catalog completeness: category-specific seller fields and buyer filters.
+-- Marketo catalog data release: ${releaseId}.
 -- Generated by scripts/generate-catalog-completeness-migration.mjs from the reviewed
--- runtime catalog source. All catalog categories are managed as one authoritative
--- snapshot. Stable attribute and option keys preserve UUIDs. Obsolete rows are
--- softly deactivated only after proving that no listing references them.
--- Required fields are released in two phases: this migration preserves an existing
+-- runtime catalog source. This is a versioned reference-data synchronization,
+-- not a schema migration, and must remain outside supabase/migrations. Stable
+-- category slugs plus attribute and option keys preserve UUIDs. Obsolete rows
+-- are softly deactivated only after proving that no listing references them.
+-- Required fields are released in two phases: this release preserves an existing
 -- true requirement, permits an explicit demotion, and keeps every new/past-optional
--- field optional. Promotion requires a later draft audit/backfill migration. The
--- clean-database reference seed remains the canonical required-state snapshot.
+-- field optional. Promotion requires a separately reviewed schema migration after
+-- draft audit/backfill. The reference seed remains the clean-database bootstrap.
 
 begin;
+set local lock_timeout = '5s';
+set local statement_timeout = '15min';
 
 lock table
   public.categories,
@@ -250,7 +357,21 @@ lock table
 in share row exclusive mode;
 
 create temporary table marketo_catalog_0024_categories (
-  category_slug text primary key
+  category_slug text primary key,
+  parent_slug text,
+  name_ru text not null,
+  name_kk text not null,
+  icon_key text,
+  tone_key text,
+  search_placeholder_ru text,
+  search_placeholder_kk text,
+  title_placeholder_ru text,
+  title_placeholder_kk text,
+  description_hint_ru text,
+  description_hint_kk text,
+  price_mode text not null check (price_mode in ('price', 'salary', 'free', 'exchange')),
+  sort_order integer not null check (sort_order >= 0),
+  depth integer not null check (depth >= 0)
 ) on commit drop;
 
 create temporary table marketo_catalog_0024_attributes (
@@ -292,13 +413,111 @@ create temporary table marketo_catalog_0024_options (
 `);
 
 for (const chunk of chunks(targetCategories)) {
-  const payload = chunk.map((row) => [row.slug]);
+  const payload = chunk.map((row) => [
+    row.slug,
+    row.parentSlug,
+    row.nameRu,
+    row.nameKk,
+    row.icon,
+    row.tone,
+    row.searchPlaceholderRu,
+    row.searchPlaceholderKk,
+    row.titlePlaceholderRu,
+    row.titlePlaceholderKk,
+    row.descriptionHintRu,
+    row.descriptionHintKk,
+    row.priceMode,
+    row.sortOrder,
+    row.depth,
+  ]);
   add(`
-insert into marketo_catalog_0024_categories (category_slug)
-select payload.value ->> 0
+insert into marketo_catalog_0024_categories (
+  category_slug, parent_slug, name_ru, name_kk, icon_key, tone_key,
+  search_placeholder_ru, search_placeholder_kk,
+  title_placeholder_ru, title_placeholder_kk,
+  description_hint_ru, description_hint_kk,
+  price_mode, sort_order, depth
+)
+select
+  payload.value ->> 0,
+  payload.value ->> 1,
+  payload.value ->> 2,
+  payload.value ->> 3,
+  payload.value ->> 4,
+  payload.value ->> 5,
+  payload.value ->> 6,
+  payload.value ->> 7,
+  payload.value ->> 8,
+  payload.value ->> 9,
+  payload.value ->> 10,
+  payload.value ->> 11,
+  payload.value ->> 12,
+  (payload.value ->> 13)::integer,
+  (payload.value ->> 14)::integer
 from pg_catalog.jsonb_array_elements(${q(JSON.stringify(payload))}::jsonb) as payload(value);
 `);
 }
+
+add(`
+do $marketo_catalog_0024_category_sync$
+declare
+  current_depth integer;
+begin
+  if exists (
+    select 1
+    from marketo_catalog_0024_categories as category
+    left join marketo_catalog_0024_categories as parent on parent.category_slug = category.parent_slug
+    where category.parent_slug is not null and parent.category_slug is null
+  ) then
+    raise exception '0024 source contains a category with a missing parent';
+  end if;
+
+  for current_depth in 0..coalesce((select max(depth) from marketo_catalog_0024_categories), 0) loop
+    insert into public.categories (
+      parent_id, slug, name_ru, name_kk, icon_key, tone_key,
+      search_placeholder_ru, search_placeholder_kk,
+      title_placeholder_ru, title_placeholder_kk,
+      description_hint_ru, description_hint_kk,
+      price_mode, sort_order, is_active
+    )
+    select
+      parent.id,
+      target.category_slug,
+      target.name_ru,
+      target.name_kk,
+      target.icon_key,
+      target.tone_key,
+      target.search_placeholder_ru,
+      target.search_placeholder_kk,
+      target.title_placeholder_ru,
+      target.title_placeholder_kk,
+      target.description_hint_ru,
+      target.description_hint_kk,
+      target.price_mode,
+      target.sort_order,
+      true
+    from marketo_catalog_0024_categories as target
+    left join public.categories as parent on parent.slug = target.parent_slug
+    where target.depth = current_depth
+    on conflict (slug) do update set
+      parent_id = excluded.parent_id,
+      name_ru = excluded.name_ru,
+      name_kk = excluded.name_kk,
+      icon_key = excluded.icon_key,
+      tone_key = excluded.tone_key,
+      search_placeholder_ru = excluded.search_placeholder_ru,
+      search_placeholder_kk = excluded.search_placeholder_kk,
+      title_placeholder_ru = excluded.title_placeholder_ru,
+      title_placeholder_kk = excluded.title_placeholder_kk,
+      description_hint_ru = excluded.description_hint_ru,
+      description_hint_kk = excluded.description_hint_kk,
+      price_mode = excluded.price_mode,
+      sort_order = excluded.sort_order,
+      is_active = true;
+  end loop;
+end;
+$marketo_catalog_0024_category_sync$;
+`);
 
 for (const chunk of chunks(attributeRows)) {
   const payload = chunk.map((row) => [
@@ -379,7 +598,40 @@ add(`
 do $marketo_catalog_0024_preflight$
 declare
   actual_count bigint;
+  submit_listing_fingerprint text;
 begin
+  if to_regprocedure('public.submit_listing(uuid)') is null then
+    raise exception '0024 requires migration 0027 before applying conditional catalog data';
+  end if;
+
+  select md5(
+    language.lanname || ' | ' ||
+    procedure.prokind::text || ' | ' ||
+    procedure.provolatile::text || ' | ' ||
+    procedure.prosecdef::text || ' | ' ||
+    procedure.proleakproof::text || ' | ' ||
+    procedure.proisstrict::text || ' | ' ||
+    procedure.proretset::text || ' | ' ||
+    procedure.proparallel::text || ' | ' ||
+    coalesce((
+      select array_agg(config_value order by config_value)::text
+      from unnest(coalesce(procedure.proconfig, '{}'::text[])) as config_value
+    ), '{}') || ' | ' ||
+    coalesce(to_jsonb(procedure.proargnames)::text, 'null') || ' | ' ||
+    coalesce(to_jsonb(procedure.proargmodes)::text, 'null') || ' | ' ||
+    procedure.pronargdefaults::text || ' | ' ||
+    coalesce(pg_get_expr(procedure.proargdefaults, 0, false), 'null') || ' | ' ||
+    replace(replace(procedure.prosrc, E'\r\n', E'\n'), E'\r', E'\n')
+  )
+  into submit_listing_fingerprint
+  from pg_proc as procedure
+  join pg_language as language on language.oid = procedure.prolang
+  where procedure.oid = 'public.submit_listing(uuid)'::regprocedure;
+
+  if submit_listing_fingerprint is distinct from '${requiredSubmitListingFingerprint}' then
+    raise exception '0024 requires the reviewed requiredWhen-aware submit_listing contract from migration 0027';
+  end if;
+
   select count(*) into actual_count from marketo_catalog_0024_categories;
   if actual_count <> ${targetCategories.length} then
     raise exception '0024 source category count mismatch: expected ${targetCategories.length}, got %', actual_count;
@@ -399,9 +651,39 @@ begin
     select 1
     from marketo_catalog_0024_categories as target
     left join public.categories as category on category.slug = target.category_slug
-    where category.id is null or not category.is_active
+    left join public.categories as parent on parent.slug = target.parent_slug
+    where category.id is null
+       or not category.is_active
+       or category.parent_id is distinct from parent.id
+       or category.name_ru is distinct from target.name_ru
+       or category.name_kk is distinct from target.name_kk
+       or category.icon_key is distinct from target.icon_key
+       or category.tone_key is distinct from target.tone_key
+       or category.search_placeholder_ru is distinct from target.search_placeholder_ru
+       or category.search_placeholder_kk is distinct from target.search_placeholder_kk
+       or category.title_placeholder_ru is distinct from target.title_placeholder_ru
+       or category.title_placeholder_kk is distinct from target.title_placeholder_kk
+       or category.description_hint_ru is distinct from target.description_hint_ru
+       or category.description_hint_kk is distinct from target.description_hint_kk
+       or category.price_mode is distinct from target.price_mode
+       or category.sort_order is distinct from target.sort_order
   ) then
-    raise exception '0024 requires every managed category to exist and be active';
+    raise exception '0024 category synchronization mismatch';
+  end if;
+
+  if exists (
+    select 1
+    from public.listings as listing
+    join public.categories as category on category.id = listing.category_id
+    join marketo_catalog_0024_categories as target
+      on target.category_slug = category.slug
+    where exists (
+      select 1
+      from marketo_catalog_0024_categories as target_child
+      where target_child.parent_slug = target.category_slug
+    )
+  ) then
+    raise exception '0024 target tree would make a referenced listing category non-leaf';
   end if;
 
   if exists (
@@ -530,6 +812,101 @@ begin
 
   if exists (
     select 1
+    from marketo_catalog_0024_attributes as target
+    join public.categories as category on category.slug = target.category_slug
+    join public.listings as listing on listing.category_id = category.id
+    join public.category_attributes as parent_attribute
+      on parent_attribute.category_id = category.id
+     and parent_attribute.key = target.validation #>> '{requiredWhen,key}'
+    join public.listing_attribute_option_values as parent_value
+      on parent_value.listing_id = listing.id
+     and parent_value.attribute_id = parent_attribute.id
+    join public.category_attribute_options as parent_option
+      on parent_option.attribute_id = parent_value.attribute_id
+     and parent_option.id = parent_value.option_id
+    left join public.category_attributes as actual
+      on actual.category_id = category.id and actual.key = target.key
+    where jsonb_typeof(target.validation #> '{requiredWhen}') = 'object'
+      and parent_option.value in (
+        select required_item.value
+        from pg_catalog.jsonb_array_elements_text(target.validation #> '{requiredWhen,values}') as required_item(value)
+      )
+      and (
+        actual.id is null
+        or (
+          not exists (
+            select 1 from public.listing_attribute_values as value
+            where value.listing_id = listing.id
+              and value.attribute_id = actual.id
+              and (
+                (actual.data_type = 'text' and nullif(btrim(value.text_value), '') is not null)
+                or (actual.data_type = 'number' and value.number_value is not null)
+                or (actual.data_type = 'boolean' and value.boolean_value is not null)
+                or (actual.data_type = 'date' and value.date_value is not null)
+                or (
+                  actual.data_type = 'range'
+                  and value.number_min_value is not null
+                  and value.number_max_value is not null
+                )
+              )
+          )
+          and not exists (
+            select 1
+            from public.listing_attribute_option_values as value
+            join public.category_attribute_options as selected_option
+              on selected_option.attribute_id = value.attribute_id
+             and selected_option.id = value.option_id
+             and selected_option.is_active
+            where value.listing_id = listing.id
+              and value.attribute_id = actual.id
+          )
+        )
+      )
+  ) then
+    raise exception '0024 conditional requirement would invalidate an existing listing';
+  end if;
+
+  if exists (
+    select 1
+    from public.categories as category
+    where category.is_active
+      and not exists (
+        select 1 from marketo_catalog_0024_categories as target
+        where target.category_slug = category.slug
+      )
+      and exists (
+        select 1 from public.listings as listing
+        where listing.category_id = category.id
+      )
+  ) then
+    raise exception '0024 refuses to deactivate a category referenced by a listing';
+  end if;
+
+  if exists (
+    select 1
+    from public.categories as category
+    join public.category_attributes as attribute on attribute.category_id = category.id
+    where category.is_active
+      and not exists (
+        select 1 from marketo_catalog_0024_categories as target
+        where target.category_slug = category.slug
+      )
+      and (
+        exists (
+          select 1 from public.listing_attribute_values as value
+          where value.attribute_id = attribute.id
+        )
+        or exists (
+          select 1 from public.listing_attribute_option_values as value
+          where value.attribute_id = attribute.id
+        )
+      )
+  ) then
+    raise exception '0024 refuses to deactivate obsolete category metadata referenced by a listing';
+  end if;
+
+  if exists (
+    select 1
     from public.category_attributes as existing
     join public.categories as category on category.id = existing.category_id
     join marketo_catalog_0024_categories as managed on managed.category_slug = category.slug
@@ -596,12 +973,45 @@ begin
 end;
 $marketo_catalog_0024_preflight$;
 
+-- Categories outside the canonical snapshot are historical reference rows.
+-- Deactivate their dependent metadata first, then the category itself. The
+-- preflight above aborts the whole transaction when any listing still uses one.
+update public.category_attribute_options as option
+set is_active = false
+from public.category_attributes as attribute
+join public.categories as category on category.id = attribute.category_id
+where option.attribute_id = attribute.id
+  and category.is_active
+  and not exists (
+    select 1 from marketo_catalog_0024_categories as target
+    where target.category_slug = category.slug
+  );
+
+update public.category_attributes as attribute
+set is_active = false,
+    is_visible = false
+from public.categories as category
+where attribute.category_id = category.id
+  and category.is_active
+  and not exists (
+    select 1 from marketo_catalog_0024_categories as target
+    where target.category_slug = category.slug
+  );
+
+update public.categories as category
+set is_active = false
+where category.is_active
+  and not exists (
+    select 1 from marketo_catalog_0024_categories as target
+    where target.category_slug = category.slug
+  );
+
 -- Avoid invalidating existing draft/rejected listings when a source field is new
 -- or becomes required. This effective target is also used by the postflight checks.
 update marketo_catalog_0024_attributes as target
 set is_required = target.is_required
   and coalesce((
-    select existing.is_required
+    select existing.is_active and existing.is_required
     from public.categories as category
     join public.category_attributes as existing
       on existing.category_id = category.id and existing.key = target.key
@@ -903,6 +1313,23 @@ do $marketo_catalog_0024_postflight$
 declare
   actual_count bigint;
 begin
+  select count(*) into actual_count from public.categories where is_active;
+  if actual_count <> ${targetCategories.length} then
+    raise exception '0024 active category count mismatch: expected ${targetCategories.length}, got %', actual_count;
+  end if;
+
+  if exists (
+    select 1
+    from public.categories as category
+    where category.is_active
+      and not exists (
+        select 1 from marketo_catalog_0024_categories as target
+        where target.category_slug = category.slug
+      )
+  ) then
+    raise exception '0024 left an obsolete category active';
+  end if;
+
   select count(*) into actual_count
   from public.category_attributes as attribute
   join public.categories as category on category.id = attribute.category_id
@@ -1050,52 +1477,26 @@ begin
 end;
 $marketo_catalog_0024_postflight$;
 
--- Enforce the same leaf-only rule for every direct table/RPC path, not only UI.
-create or replace function private.validate_listing_leaf_category()
-returns trigger
-language plpgsql
-security invoker
-set search_path = ''
-as $marketo_listing_leaf_guard$
-begin
-  if not exists (
-    select 1
-    from public.categories as category
-    where category.id = new.category_id
-      and category.is_active
-      and not exists (
-        select 1
-        from public.categories as child
-        where child.parent_id = category.id and child.is_active
-      )
-  ) then
-    raise exception using
-      errcode = '23514',
-      message = 'listing category must be an active leaf category';
-  end if;
-
-  return new;
-end;
-$marketo_listing_leaf_guard$;
-
-revoke all on function private.validate_listing_leaf_category()
-from public, anon, authenticated, service_role;
-
-drop trigger if exists listings_validate_leaf_category on public.listings;
-create trigger listings_validate_leaf_category
-before insert or update of category_id on public.listings
-for each row execute function private.validate_listing_leaf_category();
-
-comment on function private.validate_listing_leaf_category()
-is 'Rejects listing writes unless category_id names an active category with no active children.';
+-- Permanent functions, triggers and grants belong only to schema migrations.
+-- The active-leaf database guard remains owned by released migration 0024.
 
 commit;
 `);
 
 await mkdir(dirname(outputPath), { recursive: true });
-await writeFile(outputPath, `${sql.join("\n\n")}\n`, "utf8");
+const releaseSql = `${sql.join("\n\n")}\n`
+  .replaceAll("marketo_catalog_0024", `marketo_catalog_${releaseSqlTag}`)
+  .replaceAll("'0024 ", `'${releaseId} `);
+try {
+  await writeFile(outputPath, releaseSql, { encoding: "utf8", flag: "wx" });
+} catch (error) {
+  if (error?.code === "EEXIST") {
+    throw new Error(`Refusing to overwrite existing catalog data release: ${outputPath}`);
+  }
+  throw error;
+}
 
 console.log(
-  `Generated ${outputPath} with ${targetCategories.length} managed categories, `
+  `Generated catalog data release ${releaseId} at ${outputPath} with ${targetCategories.length} managed categories, `
   + `${attributeRows.length} attributes and ${optionRows.length} options.`,
 );

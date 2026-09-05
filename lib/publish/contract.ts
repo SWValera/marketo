@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getAttributeValidation, isAttributeVisible } from "../reference-data/attributes.ts";
+import { getAttributeValidation, isAttributeRequired, isAttributeVisible } from "../reference-data/attributes.ts";
 import type {
   CategoryPriceMode,
   ReferenceAttributeOption,
@@ -223,7 +223,7 @@ export function validatePublishAttributes(
     const field = `attributes.${attribute.key}`;
     const value = values[attribute.key];
     if (isPublishValueMissing(value)) {
-      if (attribute.required) addError(errors, field, "required");
+      if (isAttributeRequired(attribute, values)) addError(errors, field, "required");
       continue;
     }
     const validation = getAttributeValidation(attribute);
