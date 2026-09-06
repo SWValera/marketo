@@ -263,7 +263,8 @@ test("production CSS has shared mobile primitives and no compiled webfonts", asy
   const source = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(source, /overflow-x:\s*(?:hidden|clip)/);
   assert.match(source, /env\(safe-area-inset-bottom\)/);
-  assert.match(source, /@media \(max-width: 640px\)[\s\S]*font-size:\s*16px/);
+  assert.match(source, /--font-ui:\s*1rem/);
+  assert.match(source, /@media \(max-width: 640px\)[\s\S]*font-size:\s*var\(--font-ui\)/);
   assert.match(source, /select[\s\S]{0,180}appearance:\s*none/);
 });
 

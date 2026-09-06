@@ -22,7 +22,7 @@ import { AppLink as Link } from "@/components/app-link";
 import { CategoryLink } from "@/components/category-link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n-provider";
-import { useStoredLocation } from "@/components/location-picker";
+import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
 import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { localize, localeTag } from "@/lib/i18n/config";
@@ -157,6 +157,7 @@ export function CityPremiumShowcase() {
   const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
   const [autoplayPaused, setAutoplayPaused] = useState(false);
+  const [viewAll, setViewAll] = useState(false);
   const [deadlineNow, setDeadlineNow] = useState(0);
 
   useEffect(() => {
@@ -213,7 +214,7 @@ export function CityPremiumShowcase() {
   // cannot replace a running carousel with index zero.
   const getServerSnapshot = useCallback(() => rotationOffsets.get(rotationKey) ?? 0, [rotationKey]);
   const persistedOffset = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const timelineFrame = useShowcaseTimeline(items.length < 2 || autoplayPaused);
+  const timelineFrame = useShowcaseTimeline(items.length < 2 || autoplayPaused || viewAll);
   const activeIndex = rotationIndexAt(timelineFrame, items.length, persistedOffset);
   const advance = useCallback((delta: number) => {
     if (items.length < 2) return;
@@ -232,25 +233,34 @@ export function CityPremiumShowcase() {
   }, [autoplayPaused, items.length, persistedOffset, rotationKey]);
 
   const visible = Array.from({ length: 3 }, (_, slot) => items[(activeIndex + slot) % items.length]).filter(Boolean);
+  const displayed = viewAll ? paid.map((placement) => ({ kind: "paid" as const, ...placement })) : visible;
+  const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
 
   return <section
     className="city-premium-showcase"
-    aria-roledescription="carousel"
+    aria-roledescription={viewAll ? undefined : "carousel"}
     aria-label={t("showcase.aria")}
   >
     <div className="showcase-heading">
-      <div><span className="section-kicker">{t("showcase.eyebrow")}</span><h1>{t("showcase.title")}</h1><p><MapPin size={15} /> {cityLabel} · {t("showcase.activeOnly")}</p></div>
-      <div className="showcase-controls">
+      <div className="showcase-heading-copy"><h1>{t("showcase.title")}</h1><p><MapPin size={18} aria-hidden="true" /><span>{cityLabel} · {t("showcase.activeOnly")}</span></p></div>
+      <div className="showcase-heading-actions">
+      <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setViewAll((value) => !value)}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}</button>
+      {!viewAll ? <div className="showcase-controls">
         <button type="button" onClick={() => advance(-1)} aria-label={t("showcase.previous")}><ArrowLeft size={19} /></button>
         <span>{items.length ? `${activeIndex + 1} / ${items.length}` : ""}</span>
         <button type="button" onClick={() => advance(1)} aria-label={t("showcase.next")}><ArrowRight size={19} /></button>
         <button type="button" onClick={toggleAutoplay} aria-pressed={autoplayPaused} aria-label={t(autoplayPaused ? "showcase.resume" : "showcase.pause")}>{autoplayPaused ? <Play size={19} /> : <Pause size={19} />}</button>
+      </div> : null}
       </div>
     </div>
     {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
-    <div className="showcase-grid" aria-live="off">
-      {visible.map((item, slot) => {
+    <div id="city-premium-items">
+    {viewAll && selectedLocation === "all" ? <div className="showcase-status"><p>{t("showcase.chooseCity")}</p><LocationPicker allowAll={false} /></div> : null}
+    {viewAll && paidLoading ? <p className="showcase-status" role="status">{t("common.loading")}…</p> : null}
+    {viewAll && selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t(paid.length ? "showcase.total" : "showcase.empty", { count: paid.length })}</p> : null}
+    <div className={["showcase-grid", viewAll ? "showcase-grid-all" : ""].filter(Boolean).join(" ")} aria-live="off">
+      {displayed.map((item, slot) => {
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;
           return <Link className="showcase-card showcase-paid-card" href={`/listing/${item.listingId}-${item.slug}`} key={`${slot}-${item.id}`}>
@@ -266,6 +276,7 @@ export function CityPremiumShowcase() {
           <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small>{t("showcase.open")} <ArrowRight size={13} /></small></div>
         </CategoryLink>;
       })}
+    </div>
     </div>
   </section>;
 }

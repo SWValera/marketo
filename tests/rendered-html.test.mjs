@@ -309,7 +309,7 @@ test("Home streams its shell before bounded category data resolves and performs 
 
 test("core routes render through the production worker", async () => {
   const routes = [
-    ["/", "Лучшее рядом с вами"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
+    ["/", "Городская Premium витрина"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
     ["/category/jobs", "Работа"], ["/category/services", "Услуги"], ["/category/cars", "Легковые автомобили"],
     ["/profile", "Войдите, чтобы открыть профиль"],
     ["/favorites", "Войдите, чтобы открыть избранное"], ["/messages", "Войдите, чтобы написать продавцу"],
@@ -369,7 +369,7 @@ test("Home listing preview stays idle until its explicit public API request", as
 
 test("Kazakh locale renders server-side without changing routes", async () => {
   const routes = [
-    ["/", "Жаныңыздағы үздік ұсыныстар"],
+    ["/", "Қалалық Premium витрина"],
     ["/categories", "Барлық санаттар"],
     ["/category/jobs", "Жұмыс"],
     ["/category/services", "Қызметтер"],

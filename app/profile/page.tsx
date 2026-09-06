@@ -4,6 +4,7 @@ import { AppLink as Link } from "@/components/app-link";
 import {
   AlertTriangle,
   BadgeCheck,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ImageOff,
@@ -151,7 +152,10 @@ export default async function ProfilePage({
         <Link className="primary-action" href="/publish" prefetch={false}><Plus size={17} />{t("profile.createListing")}</Link>
       </div>
 
-      <p>{t("profile.publicationTermNote")}</p>
+      <aside className="publication-term-notice" aria-labelledby="publication-term-title">
+        <span className="publication-term-icon" aria-hidden="true"><CalendarDays size={24} /></span>
+        <div><h3 id="publication-term-title">{t("profile.publicationTermTitle")}</h3><p>{t("profile.publicationTermNote")}</p></div>
+      </aside>
       <nav className="profile-listing-tabs" aria-label={t("profile.myListings")}>
         {ownerListingTabs.map((value) => <Link key={value} className="secondary-button" href={ownerProfileHref(value)} aria-current={tab === value ? "page" : undefined}>{t(`profile.tab.${value}`)}</Link>)}
       </nav>

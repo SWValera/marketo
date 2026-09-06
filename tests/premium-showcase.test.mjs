@@ -25,7 +25,7 @@ test("showcase uses the persistent elapsed-time timeline with locale-stable offs
   assert.match(rotation, /SHOWCASE_ROTATION_MS = 3000/);
   assert.match(timeline, /rotationFrameAt\(Date\.now\(\)\)/);
   assert.match(timeline, /window\.setInterval\(listener, SHOWCASE_ROTATION_MS\)/);
-  assert.match(source, /useShowcaseTimeline\(items\.length < 2 \|\| autoplayPaused\)/);
+  assert.match(source, /useShowcaseTimeline\(items\.length < 2 \|\| autoplayPaused \|\| viewAll\)/);
   assert.match(source, /rotationIndexAt\(timelineFrame, items\.length, persistedOffset\)/);
   assert.doesNotMatch(source, /setInterval/);
   assert.match(source, /safeWriteBrowserStorage\("localStorage", storageKey, String\(value\)\)/);
@@ -72,6 +72,6 @@ test("showcase renders three complete desktop cards, two complete mobile cards, 
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(css, /\.showcase-grid \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.showcase-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.showcase-card:nth-child\(3\) \{ display: none; \}/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.showcase-grid:not\(\.showcase-grid-all\) > \.showcase-card:nth-child\(3\) \{ display: none; \}/);
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.listing-grid \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
 });
