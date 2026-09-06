@@ -114,10 +114,31 @@ test("the full showcase is city-scoped, uses all paid entries and never hides it
   assert.doesNotMatch(css, /(?:^|\n)\s*\.showcase-card:nth-child\(3\)/);
 });
 
+test("compact showcase keeps city and full-list button side by side with readable wrapping", () => {
+  assert.equal(declarations(".showcase-heading", "display").at(-1), "grid");
+  assert.equal(declarations(".showcase-city-row", "display").at(-1), "grid");
+  assert.equal(declarations(".showcase-city-row", "grid-template-columns").at(-1), "minmax(0, 1fr) auto");
+  assert.equal(declarations(".showcase-city-row", "grid-template-columns", "(max-width: 640px)").at(-1), "minmax(0, 1fr) minmax(0, 1.35fr)");
+  assert.equal(declarations(".showcase-city-row .showcase-view-all", "font-size").at(-1), "var(--font-ui)");
+  assert.equal(declarations(".showcase-city-row .showcase-view-all", "white-space").at(-1), "normal");
+  assert.equal(declarations(".showcase-city-row .showcase-view-all", "min-height").at(-1), "44px");
+  assert.equal(declarations(".showcase-heading p", "overflow-wrap").at(-1), "anywhere");
+  assert.doesNotMatch(css, /showcase-controls|showcase-heading-actions/);
+});
+
+test("compact showcase reduces the gap before categories without fixing text heights", () => {
+  assert.equal(declarations(".home-showcase-shell.page-shell", "padding-bottom").at(-1), "0");
+  assert.equal(declarations(".home-marketplace", "margin-top", "(max-width: 640px)").at(-1), "14px");
+  assert.equal(declarations(".showcase-heading", "gap", "(max-width: 640px)").at(-1), "8px");
+  assert.equal(declarations(".city-premium-showcase", "padding", "(max-width: 640px)").at(-1), "12px");
+  assert.equal(declarations(".showcase-city-row", "height").length, 0);
+  assert.equal(declarations(".showcase-heading", "height").length, 0);
+});
+
 test("requested showcase name and publication notice are localized without the old slogan", async () => {
   const messages = await readFile(new URL("lib/i18n/messages.ts", root), "utf8");
   const profile = await readFile(new URL("app/profile/page.tsx", root), "utf8");
-  assert.match(messages, /"showcase\.title": "Городская Premium витрина"/);
+  assert.match(messages, /"showcase\.title": "Городская премиум витрина"/);
   assert.doesNotMatch(messages, /City Premium Showcase|Лучшее рядом с вами/);
   assert.equal((messages.match(/"showcase\.viewAll":/g) ?? []).length, 2);
   assert.equal((messages.match(/"profile\.publicationTermTitle":/g) ?? []).length, 2);

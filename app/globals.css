@@ -138,15 +138,11 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 
 /* Home city premium showcase */
 .home-showcase-shell { padding-top: 22px; }
-.city-premium-showcase { overflow: hidden; padding: 28px; border: 1px solid #cde5d5; border-radius: 24px; background: linear-gradient(135deg, #f4fbf6 0%, #edf8f1 45%, #f8faf9 100%); box-shadow: 0 18px 55px rgba(12, 76, 41, .08); }
-.showcase-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 19px; }
-.showcase-heading .section-kicker { color: var(--green-dark); }
-.showcase-heading h1 { margin: 6px 0 7px; font-size: clamp(27px, 3vw, 42px); line-height: 1.05; letter-spacing: -.045em; }
-.showcase-heading p { display: flex; align-items: center; gap: 5px; margin: 0; color: #547060; font-size: var(--font-ui); }
-.showcase-controls { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
-.showcase-controls button { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #b9d9c4; border-radius: 50%; background: rgba(255,255,255,.9); color: var(--green-dark); cursor: pointer; box-shadow: 0 5px 14px rgba(16, 65, 36, .07); }
-.showcase-controls button:hover, .showcase-controls button:focus-visible { border-color: var(--green); outline: 3px solid rgba(22,163,74,.12); }
-.showcase-controls span { min-width: 45px; color: #547060; text-align: center; font-size: var(--font-ui); font-weight: 750; }
+.home-showcase-shell.page-shell { padding-bottom: 0; }
+.city-premium-showcase { overflow: hidden; padding: 20px; border: 1px solid #cde5d5; border-radius: 24px; background: linear-gradient(135deg, #f4fbf6 0%, #edf8f1 45%, #f8faf9 100%); box-shadow: 0 18px 55px rgba(12, 76, 41, .08); }
+.showcase-heading { display: grid; gap: 10px; margin-bottom: 14px; }
+.showcase-heading h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.2; letter-spacing: -.025em; }
+.showcase-heading p { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 0; color: #547060; font-size: var(--font-ui); line-height: 1.4; overflow-wrap: anywhere; }
 .showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .showcase-card { position: relative; min-width: 0; min-height: 258px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid rgba(12, 90, 46, .14); border-radius: 19px; background: #fff; box-shadow: 0 12px 30px rgba(15, 55, 32, .08); transition: transform .2s, box-shadow .2s; }
 .showcase-card:hover { transform: translateY(-3px); box-shadow: 0 17px 38px rgba(15, 55, 32, .13); }
@@ -171,7 +167,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .showcase-tone-business { background: linear-gradient(145deg,#1f2937,#475569); }
 .showcase-tone-exchange { background: linear-gradient(145deg,#7c2d12,#ea580c); }
 .showcase-tone-free { background: linear-gradient(145deg,#9f1239,#e11d48); }
-.home-marketplace { margin-top: 30px; }
+.home-marketplace { margin-top: 20px; }
 .home-marketplace-tabs { width: fit-content; display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); margin-bottom: 22px; padding: 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-muted); }
 .home-marketplace-tabs button { min-height: 42px; padding: 0 20px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: var(--font-ui); font-weight: 800; cursor: pointer; }
 .home-marketplace-tabs button.is-active { background: #fff; color: var(--green-dark); box-shadow: 0 4px 13px rgba(15, 55, 32, .09); }
@@ -357,7 +353,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .trust-row > div:nth-child(2) { border-right: 0; }
   .trust-row > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .listing-grid { grid-template-columns: repeat(2,1fr); }
-  .city-premium-showcase { padding: 22px; }
+  .city-premium-showcase { padding: 18px; }
   .showcase-card { min-height: 240px; }
 }
 
@@ -373,13 +369,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .header-inner > .language-switcher button { min-width: 32px; min-height: 36px; padding-inline: 4px; }
   .header-search button { min-width: 70px; }
   .home-showcase-shell { padding-top: 12px; }
-  .city-premium-showcase { padding: 17px 12px 13px; border-radius: 19px; }
-  .showcase-heading { align-items: center; margin-bottom: 14px; padding-inline: 3px; }
-  .showcase-heading h1 { margin-top: 4px; font-size: 1.5625rem; }
-  .showcase-heading p { font-size: var(--font-ui); }
-  .showcase-controls { gap: 5px; }
-  .showcase-controls button { width: 38px; height: 38px; }
-  .showcase-controls span { display: none; }
+  .city-premium-showcase { padding: 12px; border-radius: 19px; }
+  .showcase-heading { gap: 8px; margin-bottom: 12px; padding-inline: 0; }
   .showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .showcase-card { min-height: 224px; border-radius: 14px; }
   .showcase-grid:not(.showcase-grid-all) > .showcase-card:nth-child(3) { display: none; }
@@ -393,7 +384,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .showcase-brand-card { padding-top: 44px; }
   .showcase-brand-icon { width: 48px; height: 48px; margin: 2px 10px 0; border-radius: 15px; }
   .showcase-brand-icon svg { width: 25px; height: 25px; }
-  .home-marketplace { margin-top: 22px; }
+  .home-marketplace { margin-top: 14px; }
   .home-marketplace-tabs { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 18px; }
   .home-marketplace-tabs button { min-height: 40px; padding-inline: 8px; }
   .hero-shell { padding-top: 12px; }
@@ -1188,15 +1179,11 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 .breadcrumbs { flex-wrap: wrap; line-height: 1.45; }
 .breadcrumbs span:last-child { white-space: normal; overflow-wrap: anywhere; }
 
-/* The full showcase uses the same city and live paid placements as the carousel. */
-.showcase-heading { align-items: center; flex-wrap: wrap; }
-.showcase-heading-copy { flex: 1 1 20rem; min-width: 0; }
-.showcase-heading h1 { margin: 0 0 10px; font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.2; letter-spacing: -.025em; }
-.showcase-heading p { align-items: flex-start; font-size: var(--font-ui); line-height: 1.45; }
-.showcase-heading p svg { flex: 0 0 auto; margin-top: .15em; }
-.showcase-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.showcase-view-all { border-color: #97c7a8; color: var(--green-dark); }
-.showcase-controls button { flex: 0 0 44px; width: 44px; height: 44px; }
+/* The compact preview and full showcase share the selected city's paid placements. */
+.showcase-city > svg { flex: 0 0 auto; }
+.showcase-city > span { min-width: 0; }
+.showcase-city-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.showcase-city-row .showcase-view-all { min-width: 0; min-height: 44px; max-width: 16rem; padding: 8px 10px; border-color: #97c7a8; color: var(--green-dark); font-size: var(--font-ui); line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
 .showcase-status { margin: 0 0 18px; font-size: var(--font-ui); line-height: 1.5; }
 .showcase-status p { margin: 0 0 12px; }
 .showcase-card-copy strong { white-space: normal; overflow-wrap: anywhere; }
@@ -1214,11 +1201,7 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 @media (max-width: 640px) {
   .header-inner { column-gap: 10px; }
   .header-inner > .location-trigger.compact { min-width: 0; flex-shrink: 1; white-space: normal; }
-  .showcase-heading { gap: 16px; }
-  .showcase-heading-actions { width: 100%; justify-content: space-between; }
-  .showcase-view-all { flex: 1 1 100%; }
-  .showcase-controls { margin-left: auto; }
-  .showcase-controls span { display: inline; }
+  .showcase-city-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 10px; }
   .showcase-card-copy { padding: 12px 10px; }
   .showcase-card-copy p, .showcase-card-copy small { font-size: var(--font-ui); }
   .category-directory-branches, .category-browse-grid { grid-template-columns: minmax(0, 1fr); }
