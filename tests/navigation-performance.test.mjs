@@ -93,12 +93,10 @@ test("listing intent prefetch waits for deliberate hover, cancels transient inte
   assert.doesNotMatch(card, /on(?:TouchStart|PointerEnter|Focus):/);
 });
 
-test("category navigation preserves city, uses bounded intent prefetch and keeps the full tree out of RSC", async () => {
+test("category navigation preserves city without duplicate prefetch and keeps the full tree out of RSC", async () => {
   const categoryLink = await source("components/category-link.tsx");
   assert.match(categoryLink, /url\.searchParams\.set\("city", cityId\)/);
-  assert.match(categoryLink, /createIntentPrefetchController\(\(\) => router\.prefetch\(resolvedHref\), 80\)/);
-  assert.match(categoryLink, /onMouseEnter[\s\S]*intentPrefetch\.schedule\(\)/);
-  assert.match(categoryLink, /onPointerDown[\s\S]*intentPrefetch\.request\(\)/);
+  assert.doesNotMatch(categoryLink, /router\.prefetch|createIntentPrefetchController|onPointerDown|onMouseEnter/);
   assert.match(categoryLink, /prefetch=\{false\}/);
 
   for (const page of [
@@ -139,7 +137,9 @@ test("category navigation preserves city, uses bounded intent prefetch and keeps
 
   for (const page of ["app/search/page.tsx", "app/category/[slug]/page.tsx"]) {
     const text = await source(page);
-    assert.match(text, /Promise\.all\(\[attributePromise, list\(\{\}\)\]\)/, `${page} must load attributes and unfiltered listings in parallel`);
+    assert.match(text, /const hasAttributeFilters = Object\.keys\(parsed\.dynamicFilters\)\.length > 0/);
+    assert.match(text, /const attributePromise = categoryIsLeaf[^\n]*&& hasAttributeFilters/, `${page} must defer unused attributes until the filter UI loads`);
+    assert.match(text, /sanitizeAttributeFilters\(initialAttributes\.data\.attributes, parsed\.dynamicFilters\)/, `${page} must still validate applied filters on the server`);
   }
 });
 

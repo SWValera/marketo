@@ -1222,3 +1222,9 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 @media (max-width: 360px) {
   .characteristics-grid { grid-template-columns: minmax(0, 1fr); }
 }
+/* Navigation feedback never covers links or captures touch input. */
+.navigation-feedback { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.navigation-progress { display: block; height: 4px; background: #16a34a; transform-origin: left; animation: navigation-progress 1.2s ease-in-out infinite alternate; }
+.navigation-status { position: absolute; top: 0.75rem; left: 50%; transform: translateX(-50%); padding: 0.5rem 1rem; border: 1px solid #86c89c; border-radius: 999px; background: #fff; color: #14532d; box-shadow: 0 3px 12px #0002; font-size: 1rem; font-weight: 600; }
+@keyframes navigation-progress { from { transform: scaleX(0.15); } to { transform: scaleX(0.9); } }
+@media (prefers-reduced-motion: reduce) { .navigation-progress { animation: none; } }

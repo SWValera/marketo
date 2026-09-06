@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { announceNavigation } from "@/components/navigation-feedback";
 import { AppLink as Link } from "@/components/app-link";
 import { CategoryCascade } from "@/components/category-cascade";
 import { EmptyState } from "@/components/empty-state";
@@ -242,6 +243,7 @@ export function CatalogClient({
     const nextUrl = filterUrl(overrides);
     setFiltersOpen(false);
     if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      announceNavigation(nextUrl);
       router.replace(nextUrl, { scroll: false });
     }
   }

@@ -1,5 +1,8 @@
+"use client";
+
 import NextLink from "next/link";
 import type { ComponentProps } from "react";
+import { announceNavigation } from "@/components/navigation-feedback";
 
 type AppLinkProps = ComponentProps<typeof NextLink>;
 
@@ -25,5 +28,9 @@ export function AppLink({ prefetch = false, ...props }: AppLinkProps) {
     // server's 307/Auth contract for these conditional redirect routes.
     return <a {...props} href={href} />;
   }
-  return <NextLink {...props} prefetch={prefetch} />;
+  return <NextLink {...props} prefetch={prefetch} onNavigate={(event) => {
+    let prevented = false;
+    props.onNavigate?.({ preventDefault: () => { prevented = true; event.preventDefault(); } });
+    if (!prevented && !props.download && typeof href === "string") announceNavigation(href);
+  }} />;
 }

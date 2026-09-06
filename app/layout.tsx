@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
+import { metadataOrigin } from "@/lib/site-origin";
 import { PwaRuntime } from "@/components/pwa-runtime";
 import { NavigationHistory } from "@/components/navigation-history";
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { I18nProvider } from "@/components/i18n-provider";
 import { ReferenceGeographyProvider } from "@/components/reference-geography-provider";
 import { getLocale, getServerI18n } from "@/lib/i18n/server";
@@ -8,8 +11,9 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { locale, t } = await getServerI18n();
+  const requestHeaders = await headers();
   return {
-    metadataBase: new URL("https://marketo.kz"),
+    metadataBase: metadataOrigin(requestHeaders.get("host")),
     title: { default: t("seo.homeTitle"), template: "%s | Marketo" },
     description: t("seo.homeDescription"),
     applicationName: "Marketo",
@@ -38,5 +42,5 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
-  return <html lang={locale}><body><a className="skip-link" href="#main-content">{locale === "kk" ? "Негізгі мазмұнға өту" : "Перейти к основному содержанию"}</a><I18nProvider initialLocale={locale}><ReferenceGeographyProvider>{children}<NavigationHistory /><PwaRuntime /></ReferenceGeographyProvider></I18nProvider></body></html>;
+  return <html lang={locale}><body><a className="skip-link" href="#main-content">{locale === "kk" ? "Негізгі мазмұнға өту" : "Перейти к основному содержанию"}</a><I18nProvider initialLocale={locale}><ReferenceGeographyProvider>{children}<NavigationHistory /><NavigationFeedback /><PwaRuntime /></ReferenceGeographyProvider></I18nProvider></body></html>;
 }

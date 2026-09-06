@@ -1,11 +1,8 @@
 "use client";
 
-import type { ComponentProps, MouseEvent, PointerEvent } from "react";
-import { useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import type { ComponentProps } from "react";
 import { AppLink } from "@/components/app-link";
 import { useStoredLocation } from "@/components/location-picker";
-import { createIntentPrefetchController } from "@/lib/navigation/intent-prefetch";
 
 type CategoryLinkProps = Omit<ComponentProps<typeof AppLink>, "href" | "prefetch"> & {
   href: string;
@@ -20,48 +17,22 @@ export function categoryHref(href: string, cityId?: string) {
 }
 
 /**
- * Category links keep the active city in the first navigation and prefetch
- * only after real user intent. This avoids both the old second router.replace
- * and an expensive automatic prefetch of every node in the 1,000+ item tree.
+ * Keep the city in the first request. Do not start an RSC prefetch on touch
+ * or hover: the router cannot consume an in-flight prefetch, so a tap used
+ * to issue two competing requests. Previously visited routes remain cached
+ * by the router without prefetching the 1,000+ item category tree.
  */
 function ResolvedCategoryLink({
   href,
   cityId,
-  onClick,
-  onMouseEnter,
-  onMouseLeave,
-  onPointerDown,
   ...props
 }: CategoryLinkProps) {
-  const router = useRouter();
   const resolvedHref = categoryHref(href, cityId);
-  const intentPrefetch = useMemo(
-    () => createIntentPrefetchController(() => router.prefetch(resolvedHref), 80),
-    [resolvedHref, router],
-  );
-
-  useEffect(() => () => intentPrefetch.dispose(), [intentPrefetch]);
 
   return <AppLink
     {...props}
     href={resolvedHref}
     prefetch={false}
-    onMouseEnter={(event: MouseEvent<HTMLAnchorElement>) => {
-      onMouseEnter?.(event);
-      if (!event.defaultPrevented) intentPrefetch.schedule();
-    }}
-    onMouseLeave={(event: MouseEvent<HTMLAnchorElement>) => {
-      onMouseLeave?.(event);
-      intentPrefetch.cancel();
-    }}
-    onPointerDown={(event: PointerEvent<HTMLAnchorElement>) => {
-      onPointerDown?.(event);
-      if (!event.defaultPrevented) intentPrefetch.request();
-    }}
-    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-      onClick?.(event);
-      intentPrefetch.cancel();
-    }}
   />;
 }
 

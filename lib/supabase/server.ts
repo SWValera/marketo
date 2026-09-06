@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { Database } from "@/lib/supabase/database.types";
 import { getServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
@@ -19,7 +20,9 @@ export function createSupabasePublicServerClient(): SupabaseClient<Database> {
   });
 }
 
-export async function createSupabaseServerClient(): Promise<SupabaseClient<Database>> {
+// React cache is scoped to a server render/request, never shared across users.
+// Auth context and page repositories must reuse one refresh/session client.
+export const createSupabaseServerClient = cache(async (): Promise<SupabaseClient<Database>> => {
   const cookieStore = await cookies();
   const { url, publishableKey } = getServerSupabasePublicConfig();
 
@@ -36,7 +39,7 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient<Datab
       },
     },
   });
-}
+});
 
 /** Commit cookies only after the registration lease is successfully finalized. */
 export async function createBufferedRegistrationClient() {

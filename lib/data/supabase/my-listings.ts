@@ -106,13 +106,34 @@ export async function listMyListings(
   const pageSize = normalizePageSize(options.pageSize, 12, MAX_MY_LISTINGS_PAGE_SIZE);
   const locale = options.locale ?? "ru";
   const filter = ownerListingFilter(normalizeOwnerListingTab(options.tab), new Date().toISOString());
-  const countRequest = client
+  const loadPage = (offset: number, rangeEnd: number, withCount = false) => {
+    const request = client
+      .from("listings")
+      .select(
+        "id, slug, title, price_minor, currency_code, status, created_at, updated_at, published_at, expires_at, deleted_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
+        withCount ? { count: "exact" } : undefined,
+      )
+      .eq("owner_id", userId)
+      .neq("status", "deleted")
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(offset, rangeEnd);
+    return filter ? request.or(filter) : request;
+  };
+  // The normal profile entry needs one count+rows request, not two serial
+  // round trips. Later pages retain count-first bounds for hostile offsets.
+  const firstPageResponse = page === 1 ? await loadPage(0, pageSize - 1, true) : null;
+  const countRequest = () => client
     .from("listings")
     .select("id", { count: "exact", head: true })
     .eq("owner_id", userId)
     .neq("status", "deleted")
     .is("deleted_at", null);
-  const countResponse = await (filter ? countRequest.or(filter) : countRequest);
+  const countResponse = firstPageResponse ?? await (() => {
+    const request = countRequest();
+    return filter ? request.or(filter) : request;
+  })();
   if (countResponse.error || countResponse.count === null) {
     throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: countResponse.error });
   }
@@ -121,18 +142,7 @@ export async function listMyListings(
     return { items: [], total: countResponse.count, nextCursor: null, page, totalPages: pagination.totalPages, state: pagination.outOfRange ? "out_of_range" : "empty" };
   }
   const offset = pagination.offset;
-  const pageRequest = client
-    .from("listings")
-    .select(
-      "id, slug, title, price_minor, currency_code, status, created_at, updated_at, published_at, expires_at, deleted_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
-    )
-    .eq("owner_id", userId)
-    .neq("status", "deleted")
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(offset, pagination.rangeEnd);
-  const response = await (filter ? pageRequest.or(filter) : pageRequest);
+  const response = firstPageResponse ?? await loadPage(offset, pagination.rangeEnd);
   if (response.error) {
     throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: response.error });
   }
@@ -147,7 +157,7 @@ export async function listMyListings(
       .in("listing_id", listingIds)
       .order("sort_order", { ascending: true })
       .order("id", { ascending: true }),
-    rejectionFeedback(client),
+    rows.some((row) => row.status === "rejected") ? rejectionFeedback(client) : Promise.resolve([]),
   ]);
   if (imagesResult.error) throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: imagesResult.error });
   const firstImage = new Map<string, string>();

@@ -45,7 +45,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   let initialDynamicFilters: Record<string, string> = {};
   try {
     const categoryIsLeaf = Boolean(category && getCategoryChildren(view, category).length === 0);
-    const attributePromise = categoryIsLeaf && category
+    const hasAttributeFilters = Object.keys(parsed.dynamicFilters).length > 0;
+    const attributePromise = categoryIsLeaf && category && hasAttributeFilters
       ? getCategoryAttributeReferences(category.id)
       : Promise.resolve(undefined);
     const list = (attributeFilters: Record<string, string>) => listingRepository.list({

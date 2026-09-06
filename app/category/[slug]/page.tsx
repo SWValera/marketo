@@ -72,7 +72,8 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   let initialDynamicFilters: Record<string, string> = {};
   try {
     const categoryIsLeaf = getCategoryChildren(view, filteredCategory).length === 0;
-    const attributePromise = categoryIsLeaf
+    const hasAttributeFilters = Object.keys(parsed.dynamicFilters).length > 0;
+    const attributePromise = categoryIsLeaf && hasAttributeFilters
       ? getCategoryAttributeReferences(filteredCategory.id)
       : Promise.resolve(undefined);
     const list = (attributeFilters: Record<string, string>) => listingRepository.list({
