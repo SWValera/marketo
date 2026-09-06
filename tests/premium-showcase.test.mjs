@@ -18,11 +18,22 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   assert.match(tabs, /fetchHomeListingPreview\(controller\.signal\)/);
 });
 
-test("showcase is a stable compact preview with no carousel controls or autoplay", async () => {
+test("compact showcase rotates every three seconds without visible carousel controls", async () => {
   const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
-  assert.doesNotMatch(source, /useShowcaseTimeline|rotationIndexAt|rotationFrameAt|autoplayPaused|toggleAutoplay|rotationOffsets|setInterval|marketo-showcase-offset|showcase-controls|aria-roledescription/);
-  assert.match(source, /const visible = items\.slice\(0, 3\)/);
-  assert.match(source, /Math\.max\(0, 3 - paidItems\.length\)/);
+  const timeline = await readFile(new URL("components/use-showcase-timeline.ts", root), "utf8");
+  const { SHOWCASE_ROTATION_MS, rotationFrameAt, showcaseWindow } = await import("../lib/showcase-rotation.ts");
+  assert.equal(SHOWCASE_ROTATION_MS, 3000);
+  assert.match(source, /useShowcaseTimeline\(items\.length < 2 \|\| viewAll\)/);
+  assert.match(source, /const visible = showcaseWindow\(items, timelineFrame\)/);
+  assert.match(timeline, /window\.setInterval\(listener, SHOWCASE_ROTATION_MS\)/);
+  assert.match(timeline, /prefers-reduced-motion: reduce/);
+  const cards = Array.from({ length: 15 }, (_, index) => index);
+  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(2999)), [0, 1, 2]);
+  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(3000)), [1, 2, 3]);
+  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(6000)), [2, 3, 4]);
+  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(45000)), [0, 1, 2]);
+  assert.doesNotMatch(source, /autoplayPaused|toggleAutoplay|rotationOffsets|setInterval|marketo-showcase-offset|showcase-controls|aria-roledescription|t\("showcase\.(?:previous|next|pause|resume)"\)/);
+  assert.match(source, /Math\.max\(0, 6 - paidItems\.length\)/);
   assert.match(source, /cityKey = selectedLocation === "all" \? "all-kazakhstan" : selectedLocation/);
   assert.doesNotMatch(source, /cityKey\s*=.*locale/);
   assert.match(source, /<div className="showcase-city-row">\s*<p className="showcase-city">[\s\S]*?\{cityLabel\}[\s\S]*?<\/p>\s*<button className="secondary-button showcase-view-all"/);

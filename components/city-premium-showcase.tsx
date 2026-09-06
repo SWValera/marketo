@@ -21,10 +21,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
+import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
+import { showcaseWindow } from "@/lib/showcase-rotation";
 
 type PaidPlacement = {
   id: string;
@@ -132,7 +134,7 @@ export function CityPremiumShowcase() {
   );
   const items = useMemo(() => {
     const paidItems = paid.map((placement) => ({ kind: "paid" as const, ...placement }));
-    const brandedCount = Math.max(0, 3 - paidItems.length);
+    const brandedCount = Math.max(0, 6 - paidItems.length);
     const offset = stableHash(cityKey) % brandDefinitions.length;
     const brandedItems = Array.from({ length: brandedCount }, (_, index) => {
       const definition = brandDefinitions[(offset + index) % brandDefinitions.length];
@@ -141,7 +143,8 @@ export function CityPremiumShowcase() {
     return [...paidItems, ...brandedItems];
   }, [paid, cityKey]);
 
-  const visible = items.slice(0, 3);
+  const timelineFrame = useShowcaseTimeline(items.length < 2 || viewAll);
+  const visible = showcaseWindow(items, timelineFrame);
   const displayed = viewAll ? paid.map((placement) => ({ kind: "paid" as const, ...placement })) : visible;
   const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
