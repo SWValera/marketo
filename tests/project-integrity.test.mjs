@@ -181,8 +181,8 @@ test("home search, City Premium Showcase and primary calls to action navigate to
   assert.match(home, /<CityPremiumShowcase \/>/);
   assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} \/>/);
   assert.match(showcase, /href=\{`\/listing\/\$\{item\.listingId\}-\$\{item\.slug\}`\}/);
-  assert.match(header, /<form className="header-search" action="\/search">/);
-  assert.match(header, /<input name="q"/);
+  assert.match(header, /<form(?=[^>]*\bclassName="header-search")(?=[^>]*\baction="\/search")(?=[^>]*\brole="search")[^>]*>/);
+  assert.match(header, /<input(?=[^>]*\bname="q")(?=[^>]*\btype="search")[^>]*>/);
   assert.match(header, /<button type="submit">/);
 });
 

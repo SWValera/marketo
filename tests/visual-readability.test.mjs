@@ -17,11 +17,64 @@ function declarations(selector, property, media = null) {
   return values;
 }
 
+function declarationAtWidth(selector, property, width) {
+  let value;
+  sheet.walkRules(selector, (rule) => {
+    if (rule.parent.type === "atrule") {
+      const bound = rule.parent.params.match(/^\(max-width: (\d+)px\)$/);
+      if (!bound || width > Number(bound[1])) return;
+    }
+    rule.walkDecls(property, (decl) => { value = decl.value; });
+  });
+  return value;
+}
+
+test("header search reserves its own row on phones, tablets and compact desktop widths", () => {
+  for (const width of [320, 360, 390, 640, 641, 726, 900, 901, 1180, 1181, 1440]) {
+    assert.equal(declarationAtWidth(".header-inner", "flex-wrap", width), "wrap", String(width));
+    assert.equal(declarationAtWidth(".header-search", "flex", width), "1 0 100%", String(width));
+    assert.equal(declarationAtWidth(".header-search", "width", width), "100%", String(width));
+    assert.equal(declarationAtWidth(".header-search", "max-width", width), "none", String(width));
+    assert.equal(declarationAtWidth(".header-search", "order", width), "3", String(width));
+    assert.equal(declarationAtWidth(".header-search", "min-height", width), "48px", String(width));
+    assert.equal(declarationAtWidth(".header-search", "height", width), undefined, String(width));
+  }
+  for (const width of [1441, 1920]) {
+    assert.equal(declarationAtWidth(".header-inner", "flex-wrap", width), "wrap");
+    assert.equal(declarationAtWidth(".header-search", "min-width", width), "min(100%, 20rem)");
+  }
+});
+
+test("header search keeps text, icon and submit button visible without styling hidden filters", async () => {
+  const input = '.header-search input[type="search"]';
+  assert.equal(declarations(input, "flex").at(-1), "1 1 0%");
+  assert.equal(declarations(input, "color").at(-1), "var(--ink)");
+  assert.equal(declarations(input, "caret-color").at(-1), "var(--ink)");
+  assert.equal(declarations(input, "font-size").at(-1), "var(--font-ui)");
+  assert.equal(declarations(".header-search > svg", "flex").at(-1), "0 0 18px");
+  assert.equal(declarations(".header-search button", "flex").at(-1), "0 0 auto");
+  assert.equal(declarations(".header-search input", "flex").length, 0);
+  assert.equal(declarations(".header-search:focus-within", "outline").at(-1), "2px solid var(--green)");
+  const source = await readFile(new URL("components/header.tsx", root), "utf8");
+  assert.match(source, /<form className="header-search" action="\/search" role="search">/);
+  assert.match(source, /<input type="search" name="q" aria-label=/);
+  assert.match(source, /type="hidden" name="category" value=\{categorySlug\}/);
+  assert.match(source, /type="hidden" name="city" value=\{storedLocation\}/);
+  assert.match(source, /<button type="submit">/);
+});
+
 test("shared text uses scalable readable sizes, with no legacy tiny pixel labels", () => {
   assert.equal(declarations(":root", "--font-ui").at(-1), "1rem");
   assert.equal(declarations("body", "font-size").at(-1), "var(--font-body)");
   assert.doesNotMatch(css, /font-size:\s*(?:[1-9]|1[0-5])px\b/);
   assert.equal(declarations("small", "font-size").at(-1), "var(--font-ui)");
+});
+
+test("compact profile pages do not leave an empty navigation frame for signed-out visitors", async () => {
+  assert.equal(declarations(".dashboard-sidebar-no-links", "display", "(max-width: 900px)").at(-1), "none");
+  assert.equal(declarations(".dashboard-sidebar-no-links", "display").length, 0);
+  const source = await readFile(new URL("components/dashboard-shell.tsx", root), "utf8");
+  assert.match(source, /dashboardLinks\.length \? "" : " dashboard-sidebar-no-links"/);
 });
 
 test("secondary controls center text and allow wrapped labels to grow", () => {

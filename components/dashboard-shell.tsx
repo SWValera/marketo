@@ -29,7 +29,7 @@ export async function DashboardShell({ title, description, active, children, aut
     <>
       <Header />
       <main id="main-content" tabIndex={-1} className="page-shell dashboard-page">
-        <aside className="dashboard-sidebar">
+        <aside className={`dashboard-sidebar${dashboardLinks.length ? "" : " dashboard-sidebar-no-links"}`}>
           {profile ? <div className="dashboard-user dashboard-user-authenticated">
             <span className="dashboard-avatar"><UserRound size={20} /></span>
             <div><strong>{profile.displayName}</strong><small>{t("account.sessionActive")}</small></div>

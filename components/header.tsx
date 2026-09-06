@@ -34,9 +34,9 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
 
         <LocationPicker compact className="city-button" />
 
-        <form className="header-search" action="/search">
+        <form className="header-search" action="/search" role="search">
           <Search size={18} aria-hidden="true" />
-          <input name="q" aria-label={t("header.searchAria")} placeholder={placeholder} />
+          <input type="search" name="q" aria-label={t("header.searchAria")} placeholder={placeholder} />
           {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
           {storedLocation !== "all" ? <input type="hidden" name="city" value={storedLocation} /> : null}
           <button type="submit">{t("common.find")}</button>

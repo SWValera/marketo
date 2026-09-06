@@ -12,7 +12,7 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   const showcasePosition = home.indexOf("<CityPremiumShowcase />");
   const tabsPosition = home.indexOf("<HomeMarketplaceTabs");
   assert.ok(headerPosition >= 0 && headerPosition < showcasePosition && showcasePosition < tabsPosition);
-  assert.match(header, /<form className="header-search" action="\/search">/);
+  assert.match(header, /<form(?=[^>]*\bclassName="header-search")(?=[^>]*\baction="\/search")(?=[^>]*\brole="search")[^>]*>/);
   assert.match(home, /catalog=\{catalogPanel\}/);
   assert.match(tabs, /active === "catalog" \? catalog : listingsPanel/);
   assert.match(tabs, /fetchHomeListingPreview\(controller\.signal\)/);
