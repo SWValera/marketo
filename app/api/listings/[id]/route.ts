@@ -59,6 +59,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       contactName: body.contactName,
       contactPhone: body.contactPhone,
       allowMessages: body.allowMessages,
+      allowPhone: body.allowPhone === true,
       rpcAttributes: prepared.value.rpcAttributes,
     });
     if (!updated) return NextResponse.json({ error: "draft_update_failed" }, { status: 500 });
@@ -80,4 +81,3 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "draft_update_failed" }, { status: 500 });
   }
 }
-

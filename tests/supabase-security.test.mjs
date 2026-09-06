@@ -12,6 +12,7 @@ import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
 import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 import { auditProfileLifecycle, auditRegistrationHandoff } from "./profile-lifecycle-db-audit.mjs";
+import { auditListingMessaging } from "./listing-messaging-db-audit.mjs";
 
 const root = new URL("../", import.meta.url);
 const execFileAsync = promisify(execFile);
@@ -1243,6 +1244,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
 
     let conversationId;
     await t.test("conversation RPC returns one buyer-seller-listing conversation", async () => {
+      await db.query("insert into public.listing_contacts(listing_id,contact_name,allow_messages) values($1,'Test seller',true) on conflict(listing_id) do update set allow_messages=true", [listings.activeOwner]);
       await asAuthenticated(db, users.buyer, async () => {
         const first = await db.query("select public.get_or_create_listing_conversation($1) as id", [listings.activeOwner]);
         const second = await db.query("select public.get_or_create_listing_conversation($1) as id", [listings.activeOwner]);
@@ -1366,14 +1368,15 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 19);
+      assert.equal(functions.rows.length, 23);
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
-      assert.ok(functions.rows.every((row) => row.anon_execute === false));
+      assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_listing_contact_options"]);
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
       assert.deepEqual(notClientCallable, ["enforce_listing_publication_period", "handle_new_auth_user", "touch_conversation_after_message", "archive_expired_listings", "registration_handoff"]);
     });
 
     await t.test("0028 owner lifecycle, calendar month, exact public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
+    await t.test("0029 two-party messages, idempotent retries, read state and private phone consent", () => auditListingMessaging(db, users, listings.activeOwner, conversationId));
     await t.test("0028 private PKCE mailbox capabilities, leases, cancellation and rate limits", () => auditRegistrationHandoff(db, users.owner));
     await closePGliteTestDatabase(db);
     currentDbClosed = true;

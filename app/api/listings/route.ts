@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_draft", details: prepared.errors }, { status: 400 });
     }
     const body = prepared.value.input;
-    const { data, error } = await client.rpc("create_listing_draft", {
+    const { data, error } = await client.rpc("save_listing_draft_with_contacts", {
       p_category_id: body.categoryId,
       p_settlement_id: body.settlementId,
       p_title: body.title,
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       p_contact_name: body.contactName,
       p_contact_phone_e164: body.contactPhone,
       p_allow_messages: body.allowMessages,
+      p_allow_phone: body.allowPhone === true,
       p_attributes: prepared.value.rpcAttributes,
     });
     if (error) {

@@ -31,6 +31,7 @@ export type PublishDraftInput = {
   contactName: string;
   contactPhone: string;
   allowMessages: boolean;
+  allowPhone?: boolean;
   attributes: PublishAttributeValues;
 };
 
@@ -69,6 +70,7 @@ const publishDraftPayloadSchema = z.object({
   contactName: z.string().max(PUBLISH_LIMITS.contactNameMax),
   contactPhone: z.string().max(PUBLISH_LIMITS.phoneMax),
   allowMessages: z.boolean().default(true),
+  allowPhone: z.boolean().default(false),
   attributes: z.record(
     z.string().regex(/^[a-z][a-z0-9_]{0,79}$/),
     attributeValueSchema,

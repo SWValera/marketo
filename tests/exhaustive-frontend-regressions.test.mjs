@@ -137,7 +137,7 @@ test("unsupported product actions are not exposed as working controls", async ()
   ]);
   assert.doesNotMatch(seller, /messages\/new\?seller=/);
   assert.doesNotMatch(actions, /messages\/new\?listing=/);
-  assert.match(newConversation, /messages\.startUnavailableTitle/);
+  assert.match(newConversation, /StartConversation listingId/);
   assert.doesNotMatch(newConversation, /getOrCreateListingConversation/);
   assert.doesNotMatch(help, /href="\/help"/);
 });

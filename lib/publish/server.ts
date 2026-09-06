@@ -203,6 +203,7 @@ export async function validateStoredListingForSubmit(client: MarketoSupabaseClie
     contactName: draft.contactName,
     contactPhone: draft.contactPhone,
     allowMessages: draft.allowMessages,
+    allowPhone: draft.allowPhone ?? false,
     attributes: draft.attributes,
   }, { requirePhotos: true, photoCount: draft.images.length });
   return prepared.success
@@ -213,4 +214,3 @@ export async function validateStoredListingForSubmit(client: MarketoSupabaseClie
 export function attributeValidationForResponse(attribute: ReferenceCategoryAttribute) {
   return getAttributeValidation(attribute);
 }
-

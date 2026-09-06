@@ -265,6 +265,29 @@ export type Database = {
         Args: { target_listing_id: string };
         Returns: string;
       };
+      get_listing_contact_options: {
+        Args: { target_listing_id: string };
+        Returns: Array<{ allow_messages: boolean; allow_phone: boolean; phone: string | null }>;
+      };
+      save_listing_draft_with_contacts: {
+        Args: Database["public"]["Functions"]["create_listing_draft"]["Args"] & {
+          p_listing_id?: string;
+          p_allow_phone: boolean;
+        };
+        Returns: Array<{ listing_id: string; listing_slug: string; listing_status: string }>;
+      };
+      send_listing_message: {
+        Args: { target_conversation_id: string; client_message_id: string; message_body: string };
+        Returns: Array<{ id: string; body: string; sender_id: string; created_at: string }>;
+      };
+      mark_listing_conversation_read: {
+        Args: { target_conversation_id: string; through_message_id: string };
+        Returns: undefined;
+      };
+      get_my_conversation_inbox: {
+        Args: { p_page?: number; p_page_size?: number };
+        Returns: Json;
+      };
       moderate_listing: {
         Args: { target_listing_id: string; decision: string; reason_code?: string | null; note?: string | null };
         Returns: undefined;

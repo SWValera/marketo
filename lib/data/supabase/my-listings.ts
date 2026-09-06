@@ -260,6 +260,7 @@ export async function getMyListingDraftBundle(
     contact_name: string;
     contact_phone_e164: string | null;
     allow_messages: boolean;
+    allow_phone: boolean;
   }>(row.listing_contacts);
   if (!category || !contact) throw new OwnerListingDataError("DETAIL_UNAVAILABLE");
 
@@ -307,6 +308,7 @@ export async function getMyListingDraftBundle(
     contactName: contact.contact_name,
     contactPhone: contact.contact_phone_e164 ?? "",
     allowMessages: contact.allow_messages,
+    allowPhone: contact.allow_phone === true,
     attributes,
     images: images
       .slice()
@@ -330,11 +332,12 @@ export async function updateMyListingDraft(
     contactName: string;
     contactPhone: string;
     allowMessages: boolean;
+    allowPhone?: boolean;
     rpcAttributes: Json;
   },
 ) {
-  const { data, error } = await client.rpc("update_listing_draft", {
-    target_listing_id: input.listingId,
+  const { data, error } = await client.rpc("save_listing_draft_with_contacts", {
+    p_listing_id: input.listingId,
     p_category_id: input.categoryId,
     p_settlement_id: input.settlementId,
     p_title: input.title,
@@ -344,6 +347,7 @@ export async function updateMyListingDraft(
     p_contact_name: input.contactName,
     p_contact_phone_e164: input.contactPhone,
     p_allow_messages: input.allowMessages,
+    p_allow_phone: input.allowPhone === true,
     p_attributes: input.rpcAttributes,
   });
   if (error) throw error;

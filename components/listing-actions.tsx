@@ -1,6 +1,7 @@
 "use client";
 
-import { Flag, Heart, Phone, Share2 } from "lucide-react";
+import { Flag, Heart, Share2 } from "lucide-react";
+import { ListingContacts } from "@/components/listing-contacts";
 import { type FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import {
   loadFavoriteStore,
@@ -20,9 +21,8 @@ type ListingActionsProps = {
   contactPhone?: string | null;
 };
 
-export function ListingActions({ listingId, listingSlug, title, contactPhone }: ListingActionsProps) {
+export function ListingActions({ listingId, listingSlug, title }: ListingActionsProps) {
   const { t } = useI18n();
-  const [phoneVisible, setPhoneVisible] = useState(false);
   const [status, setStatus] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [favoritePending, setFavoritePending] = useState(false);
@@ -48,13 +48,6 @@ export function ListingActions({ listingId, listingSlug, title, contactPhone }: 
       setStatus(t("listing.favoriteFailed"));
     } else {
       setStatus(t(result === "added" ? "listing.favoriteAdded" : "listing.favoriteRemoved"));
-    }
-  }
-
-  function revealPhone() {
-    if (contactPhone) {
-      setPhoneVisible(true);
-      setStatus("");
     }
   }
 
@@ -101,12 +94,7 @@ export function ListingActions({ listingId, listingSlug, title, contactPhone }: 
   }
 
   return <>
-    {contactPhone ? <div className="detail-actions">
-      {contactPhone ? phoneVisible
-        ? <a href={`tel:${contactPhone}`}><Phone size={19} /> {contactPhone}</a>
-        : <button type="button" onClick={revealPhone}><Phone size={19} /> {t("listing.showPhone")}</button>
-        : null}
-    </div> : null}
+    <ListingContacts key={listingId} listingId={listingId} />
     <div className="detail-secondary">
       <button type="button" aria-pressed={favorite} disabled={!favoriteStore.ready || favoritePending} onClick={() => void toggleFavorite()}><Heart size={18} fill={favorite ? "currentColor" : "none"} /> {favorite ? t("listing.removeFavorite") : t("listing.favorite")}</button>
       <button type="button" onClick={shareListing}><Share2 size={18} /> {t("listing.share")}</button>

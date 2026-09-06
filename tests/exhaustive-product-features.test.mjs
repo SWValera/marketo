@@ -41,15 +41,15 @@ test("chat pages list real conversations and the composer inserts text through t
   ]);
   assert.match(adapter, /listUserConversations/);
   assert.match(adapter, /getConversation/);
-  assert.match(adapter, /from\("messages"\)\.insert/);
-  assert.match(indexPage, /chats\.items\.map/);
+  assert.match(adapter, /rpc\("send_listing_message"/);
+  assert.match(indexPage, /ChatInbox/);
   assert.match(indexPage, /messages\.loadErrorTitle/);
-  assert.match(detailPage, /ChatComposer conversationId=\{conversation\.id\} currentUserId=\{authContext\.user\.id\}/);
+  assert.match(detailPage, /ConversationThread key=\{conversation\.id\} conversation=\{conversation\} currentUserId=\{authContext\.user\.id\}/);
   assert.match(composer, /sendTextMessage\(/);
-  assert.match(composer, /markConversationRead\(/);
+  assert.match(await source("components/conversation-thread.tsx"), /markConversationRead\(/);
   assert.doesNotMatch(composer, /type="file"|messages\.accountRequired/);
   assert.match(newPage, /authContext\.status === "anonymous"/);
-  assert.match(newPage, /messages\.startUnavailableTitle/);
+  assert.match(newPage, /StartConversation listingId/);
   assert.doesNotMatch(newPage, /getOrCreateListingConversation/);
 });
 
@@ -72,7 +72,7 @@ test("notifications distinguish auth, failure, empty and real data and support u
 
 test("listing actions expose only supported phone data and submit authenticated reports", async () => {
   const actions = await source("components/listing-actions.tsx");
-  assert.match(actions, /\{contactPhone \? phoneVisible/);
+  assert.match(actions, /ListingContacts key=\{listingId\} listingId=\{listingId\}/);
   assert.doesNotMatch(actions, /phoneUnavailable/);
   assert.match(actions, /createReport\(client/);
   assert.match(actions, /reporterId: userResult\.data\.user\.id/);

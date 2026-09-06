@@ -14,6 +14,7 @@ export type PublishRecoveryFields = {
   contactName: string;
   contactPhone: string;
   allowMessages: boolean;
+  allowPhone?: boolean;
 };
 
 export type PublishRecoveryDraft = {
@@ -46,6 +47,7 @@ const recoverySchema = z.object({
     contactName: z.string().max(80),
     contactPhone: z.string().max(24),
     allowMessages: z.boolean(),
+    allowPhone: z.boolean().optional(),
   }).strict(),
   serverListingId: z.string().uuid().optional(),
 }).strict();

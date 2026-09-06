@@ -80,7 +80,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 28);
+    assert.equal(names.length, 29);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -96,7 +96,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       where procedure.prosecdef
         and namespace.nspname in ('public', 'private')
     `);
-    assert.equal(elevatedFunctions.rows.length, 19);
+    assert.equal(elevatedFunctions.rows.length, 23);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -150,6 +150,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
     `);
     assert.deepEqual(anonymousRpcAllowlist.rows, [
       { proname: "get_city_premium_placements" },
+      { proname: "get_listing_contact_options" },
       { proname: "search_catalog_listing_cards" },
     ]);
     const anonymousPrivateRpcCount = await db.query(`

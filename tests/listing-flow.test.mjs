@@ -518,7 +518,7 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(loader, /isPublishLoadRetryable\(state\.reason\)/);
   assert.match(loader, /key=\{state\.draft\?\.id \?\? "create"\}/);
   assert.doesNotMatch(publishPage, /getCategoryReferences|getMyListingDraftBundle/);
-  assert.match(draftRoute, /create_listing_draft/);
+  assert.match(draftRoute, /save_listing_draft_with_contacts/);
   for (const status of [401, 404, 409, 503]) assert.match(draftReadRoute, new RegExp(`status: ${status}`));
   assert.match(imageRoute, /validateListingImage\(file\)/);
   assert.doesNotMatch(imageRoute, /normalizeListingImage|getListingImageProcessor|media_processing_unavailable/);

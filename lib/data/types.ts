@@ -93,6 +93,7 @@ export type OwnerDraftBundle = {
   contactName: string;
   contactPhone: string;
   allowMessages: boolean;
+  allowPhone?: boolean;
   attributes: import("@/lib/publish/contract").PublishAttributeValues;
   images: OwnerDraftImage[];
   rejectionReasonCode: string | null;
@@ -127,6 +128,9 @@ export type ChatSummary = {
 };
 
 export type Conversation = ChatSummary & {
+  peerId?: string;
+  hasOlderMessages?: boolean;
+  canSend?: boolean;
   messages: Array<{ id: string; body: string; sentAt: string; own: boolean; read: boolean }>;
 };
 

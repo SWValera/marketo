@@ -166,6 +166,7 @@ export function PublishForm({
   const [fieldErrors, setFieldErrors] = useState<PublishFieldErrors>({});
   const [contactName, setContactName] = useState(initialDraft?.contactName ?? profileDefaults.displayName);
   const [contactPhone, setContactPhone] = useState(initialDraft?.contactPhone ?? profileDefaults.contactPhone);
+  const [allowPhone, setAllowPhone] = useState(initialDraft?.allowPhone === true);
   const [allowMessages, setAllowMessages] = useState(initialDraft?.allowMessages ?? true);
   const [recoveryCandidate, setRecoveryCandidate] = useState<PublishRecoveryDraft | null>(null);
   const [recoveryServerDraft, setRecoveryServerDraft] = useState<OwnerDraftBundle | null>(null);
@@ -260,7 +261,8 @@ export function PublishForm({
     contactName,
     contactPhone,
     allowMessages,
-  }), [allowMessages, attributes, categorySlug, cityId, contactName, contactPhone, description, priceDigits, title]);
+    allowPhone,
+  }), [allowMessages, allowPhone, attributes, categorySlug, cityId, contactName, contactPhone, description, priceDigits, title]);
 
   useEffect(() => {
     if (!recoveryReady || recoveryCandidate || submitted) return;
@@ -346,6 +348,7 @@ export function PublishForm({
       contactName,
       contactPhone,
       allowMessages,
+      allowPhone,
       attributes,
     };
   }
@@ -478,6 +481,7 @@ export function PublishForm({
       setContactName(server.contactName);
       setContactPhone(server.contactPhone);
       setAllowMessages(server.allowMessages);
+      setAllowPhone(server.allowPhone === true);
     }
     const fields = recoveryCandidate.fields;
     setCategorySlug(fields.categorySlug);
@@ -489,6 +493,7 @@ export function PublishForm({
     setContactName(fields.contactName);
     setContactPhone(fields.contactPhone);
     setAllowMessages(fields.allowMessages);
+    setAllowPhone(fields.allowPhone === true);
     setRecoveryCandidate(null);
     setRecoveryNotice(t("publish.recoveryRestored"));
   }
@@ -519,6 +524,7 @@ export function PublishForm({
     setContactName(profileDefaults.displayName);
     setContactPhone(profileDefaults.contactPhone);
     setAllowMessages(true);
+    setAllowPhone(false);
     setGlobalError("");
     setFieldErrors({});
   }
@@ -804,6 +810,7 @@ export function PublishForm({
               <label className="form-field" ref={(node) => setFieldRef("contactName", node)}><span>{t("profile.firstName")} <b>*</b></span><input value={contactName} onChange={(event) => { setContactName(event.target.value); clearFieldError("contactName"); }} autoComplete="name" placeholder={t("publish.contactNamePlaceholder")} maxLength={80} aria-invalid={Boolean(fieldErrors.contactName)} />{fieldError("contactName")}</label>
               <label className="form-field" ref={(node) => setFieldRef("contactPhone", node)}><span>{t("profile.phone")} <b>*</b></span><input inputMode="tel" value={contactPhone} onChange={(event) => { setContactPhone(event.target.value); clearFieldError("contactPhone"); }} autoComplete="tel" placeholder="+7 700 000 00 00" maxLength={24} aria-invalid={Boolean(fieldErrors.contactPhone)} />{fieldError("contactPhone")}</label>
               <label className="option-row form-field-wide"><input type="checkbox" checked={allowMessages} onChange={(event) => setAllowMessages(event.target.checked)} /><span><strong>{t("publish.allowMessages")}</strong><small>{t("publish.allowMessagesNote")}</small></span></label>
+              <label className="option-row form-field-wide"><input type="checkbox" checked={allowPhone} onChange={(event) => setAllowPhone(event.target.checked)} /><span><strong>{t("publish.allowPhone")}</strong><small>{t("publish.allowPhoneNote")}</small></span></label>
             </div>
             <div className="publish-review"><strong>{t("publish.beforeSend")}</strong><p>{summary.length ? summary.join(" · ") : t("publish.review")}</p></div>
           </div>}

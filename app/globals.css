@@ -1228,3 +1228,22 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 .navigation-status { position: absolute; top: 0.75rem; left: 50%; transform: translateX(-50%); padding: 0.5rem 1rem; border: 1px solid #86c89c; border-radius: 999px; background: #fff; color: #14532d; box-shadow: 0 3px 12px #0002; font-size: 1rem; font-weight: 600; }
 @keyframes navigation-progress { from { transform: scaleX(0.15); } to { transform: scaleX(0.9); } }
 @media (prefers-reduced-motion: reduce) { .navigation-progress { animation: none; } }
+.listing-contact-actions { display: grid; gap: 12px; margin-block: 18px; }
+.listing-contact-actions > a { width: 100%; min-height: 52px; text-align: center; justify-content: center; gap: 10px; }
+.call-seller small { display: block; font-size: 1rem; font-weight: 600; margin-top: 3px; }
+.contact-status, .chat-connection-status { font-size: 1rem; line-height: 1.5; padding: 12px; border-radius: 12px; background: #f1f7f3; }
+.chat-live-thread { display: block; height: min(560px, 55dvh); min-height: 260px; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
+.chat-message-log { display: flex; flex-direction: column; gap: 12px; }
+.chat-message-log .message-bubble { flex: none; max-width: 88%; width: fit-content; }
+.chat-message-log .message-bubble.outgoing { align-self: flex-end; }
+.chat-message-log .message-bubble.incoming { align-self: flex-start; }
+.chat-message-log .message-bubble p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1rem; line-height: 1.5; }
+.chat-message-log time { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .875rem; }
+.chat-history-button { margin: 0 auto 16px; min-height: 44px; }
+.chat-jump-button { display: flex; justify-content: center; gap: 8px; padding: 10px; border: 0; color: var(--green-dark); background: #eff8f2; cursor: pointer; font-size: 1rem; }
+.conversation-standalone .chat-composer { position: static; align-items: center; }
+.conversation-standalone .chat-composer textarea { min-width: 0; min-height: 52px; max-height: 180px; resize: vertical; font-size: 1rem; line-height: 1.5; }
+.conversation-standalone .send-button { flex: 0 0 48px; min-height: 48px; }
+.conversation-standalone .send-button:disabled { opacity: .5; cursor: not-allowed; }
+.chat-index-list .chat-row-copy { min-width: 0; }
+.chat-index-list .chat-row-copy small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

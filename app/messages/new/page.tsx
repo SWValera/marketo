@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StartConversation } from "@/components/start-conversation";
 import { AppLink as Link } from "@/components/app-link";
 import { AlertTriangle, MessageCircle } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -22,6 +23,6 @@ export default async function NewConversationPage({ searchParams }: { searchPara
     {authContext.status === "anonymous" ? <section className="state-card compact-state"><h2>{t("messages.signInTitle")}</h2><p>{t("messages.signInNote")}</p><Link className="primary-button" href={`/login?next=${encodeURIComponent(next)}`}>{t("messages.signIn")}</Link></section>
       : authContext.status === "error" ? <EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={next} actionLabel={t("common.retry")} />
         : !validListingId ? <EmptyState icon={<MessageCircle size={30} />} title={t("messages.listingRequiredTitle")} description={t("messages.listingRequiredNote")} actionHref="/search" actionLabel={t("messages.findListing")} />
-          : <EmptyState icon={<MessageCircle size={30} />} title={t("messages.startUnavailableTitle")} description={t("messages.startUnavailableNote")} actionHref={`/listing/${validListingId}`} actionLabel={t("messages.returnToListing")} />}
+          : <section className="state-card compact-state"><h2>{t("messages.start")}</h2><p>{t("messages.signInNote")}</p><StartConversation listingId={validListingId} /></section>}
   </main><MobileNav /></>;
 }
