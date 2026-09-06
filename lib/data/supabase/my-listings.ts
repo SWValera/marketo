@@ -11,6 +11,7 @@ import type { Locale } from "@/lib/i18n/messages";
 import { protectedMediaUrl, publicMediaUrl } from "@/lib/media/public-url";
 import type { Json } from "@/lib/supabase/database.types";
 import { normalizePageSize, normalizePositivePage, pageWindow } from "../pagination.ts";
+import { normalizeOwnerListingTab, ownerListingFilter } from "@/lib/listings/owner-filters";
 
 const MAX_MY_LISTINGS_PAGE_SIZE = 50;
 
@@ -54,6 +55,8 @@ function priceParts(value: unknown, currencyCode: string, locale: Locale) {
 
 function dateLabel(value: string, locale: Locale) {
   return new Intl.DateTimeFormat(localeTag(locale), {
+    timeZone: "Asia/Almaty",
+    timeZoneName: "short",
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -88,6 +91,7 @@ type MyListingRow = {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  expires_at: string | null;
   deleted_at: string | null;
   categories: unknown;
   settlements: unknown;
@@ -95,18 +99,20 @@ type MyListingRow = {
 
 export async function listMyListings(
   client: MarketoSupabaseClient,
-  options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string } = {},
+  options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string; tab?: string } = {},
 ): Promise<NumberedPageResult<MyListingSummary>> {
   const userId = await currentUserId(client, options.authenticatedUserId);
   const page = normalizePositivePage(options.page);
   const pageSize = normalizePageSize(options.pageSize, 12, MAX_MY_LISTINGS_PAGE_SIZE);
   const locale = options.locale ?? "ru";
-  const countResponse = await client
+  const filter = ownerListingFilter(normalizeOwnerListingTab(options.tab), new Date().toISOString());
+  const countRequest = client
     .from("listings")
     .select("id", { count: "exact", head: true })
     .eq("owner_id", userId)
     .neq("status", "deleted")
     .is("deleted_at", null);
+  const countResponse = await (filter ? countRequest.or(filter) : countRequest);
   if (countResponse.error || countResponse.count === null) {
     throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: countResponse.error });
   }
@@ -115,10 +121,10 @@ export async function listMyListings(
     return { items: [], total: countResponse.count, nextCursor: null, page, totalPages: pagination.totalPages, state: pagination.outOfRange ? "out_of_range" : "empty" };
   }
   const offset = pagination.offset;
-  const response = await client
+  const pageRequest = client
     .from("listings")
     .select(
-      "id, slug, title, price_minor, currency_code, status, created_at, updated_at, published_at, deleted_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
+      "id, slug, title, price_minor, currency_code, status, created_at, updated_at, published_at, expires_at, deleted_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
     )
     .eq("owner_id", userId)
     .neq("status", "deleted")
@@ -126,6 +132,7 @@ export async function listMyListings(
     .order("updated_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, pagination.rangeEnd);
+  const response = await (filter ? pageRequest.or(filter) : pageRequest);
   if (response.error) {
     throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: response.error });
   }
@@ -155,8 +162,9 @@ export async function listMyListings(
       const category = singleRelation<{ name_ru: string; name_kk: string }>(row.categories);
       const settlement = singleRelation<{ name_ru: string; name_kk: string }>(row.settlements);
       const storageKey = firstImage.get(row.id) ?? null;
-      const isPublic = row.status === "active" && Boolean(row.published_at) && !row.deleted_at;
-      const safeStatus = row.status as MyListingSummary["status"];
+      const termEnded = row.status === "active" && (!row.expires_at || Date.parse(row.expires_at) <= Date.now());
+      const isPublic = row.status === "active" && !termEnded && Boolean(row.published_at) && !row.deleted_at;
+      const safeStatus = (termEnded ? "archived" : row.status) as MyListingSummary["status"];
       const safeFeedback = safeStatus === "rejected" ? feedbackByListing.get(row.id) : undefined;
       return {
         id: row.id,
@@ -172,6 +180,8 @@ export async function listMyListings(
         updatedAt: row.updated_at,
         updatedLabel: dateLabel(row.updated_at, locale),
         publishedAt: row.published_at,
+        expiresAt: row.expires_at,
+        expiresLabel: row.expires_at ? dateLabel(row.expires_at, locale) : null,
         imageUrl: isPublic ? publicMediaUrl(storageKey) : protectedMediaUrl(storageKey),
         rejectionReasonCode: safeFeedback?.reason_code ?? null,
         rejectedAt: safeFeedback?.rejected_at ?? null,

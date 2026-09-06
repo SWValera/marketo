@@ -20,6 +20,7 @@ export type ListingSummary = {
   priceAmount: number | null;
   locationLabel: string;
   publishedLabel: string;
+  expiresAt?: string | null;
   imageUrl: string | null;
   categorySlug: string;
   cityId: string;
@@ -65,6 +66,8 @@ export type MyListingSummary = {
   updatedAt: string;
   updatedLabel: string;
   publishedAt: string | null;
+  expiresAt?: string | null;
+  expiresLabel?: string | null;
   imageUrl: string | null;
   rejectionReasonCode: string | null;
   rejectedAt: string | null;

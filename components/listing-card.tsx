@@ -14,9 +14,11 @@ import {
 import type { ListingSummary } from "@/lib/data/types";
 import { useI18n } from "@/components/i18n-provider";
 import { createIntentPrefetchController } from "@/lib/navigation/intent-prefetch";
+import { usePublicationDeadline } from "@/components/use-publication-deadline";
 
 export function ListingCard({ listing }: { listing: ListingSummary }) {
   const { t } = useI18n();
+  const expired = usePublicationDeadline(listing.expiresAt);
   const router = useRouter();
   const pathname = usePathname();
   const favoriteStore = useSyncExternalStore(subscribeFavoriteStore, readFavoriteStore, readServerFavoriteStore);
@@ -60,6 +62,7 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
     if (pathname === "/favorites" && result === "removed") router.refresh();
   }
 
+  if (expired) return null;
   return (
     <article className="listing-card">
       <Link href={href} className="listing-image-wrap" aria-label={listing.title} {...intentPrefetchProps}>

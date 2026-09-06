@@ -116,7 +116,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
     "x-content-type-options": "nosniff",
   });
   if (isPublic) {
-    headers.set("cache-control", "public, max-age=3600, s-maxage=3600");
+    headers.set("cache-control", "private, no-store, max-age=0");
   } else {
     headers.set("cache-control", "private, no-store, max-age=0");
     headers.set("vary", "Cookie, Authorization");

@@ -21,6 +21,8 @@ import type { MyListingSummary } from "@/lib/data/types";
 import { getServerI18n } from "@/lib/i18n/server";
 import { MODERATION_REJECTION_REASONS } from "@/lib/moderation/policy";
 import { normalizePositivePage } from "@/lib/data/pagination";
+import { normalizeOwnerListingTab, ownerListingTabs, ownerProfileHref } from "@/lib/listings/owner-filters";
+import { PublicationRefresh } from "@/components/publication-refresh";
 
 export const metadata: Metadata = {
   title: "Профиль",
@@ -46,7 +48,7 @@ function logOwnerListingReadFailure(error: unknown) {
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; registered?: string; tab?: string }>;
 }) {
   const [{ t, locale }, params, authContext] = await Promise.all([
     getServerI18n(),
@@ -54,6 +56,7 @@ export default async function ProfilePage({
     getCurrentAuthContext(),
   ]);
   const page = normalizePositivePage(params.page);
+  const tab = normalizeOwnerListingTab(params.tab);
 
   if (authContext.status === "anonymous") {
     return <DashboardShell
@@ -104,6 +107,7 @@ export default async function ProfilePage({
       pageSize: PAGE_SIZE,
       locale,
       authenticatedUserId: authContext.user.id,
+      tab,
     });
   } catch (error) {
     logOwnerListingReadFailure(error);
@@ -122,6 +126,7 @@ export default async function ProfilePage({
     authContext={authContext}
     fallback="/"
   >
+    {params.registered === "success" ? <p className="auth-feedback is-success" role="status">{t("auth.registeredSuccess")}</p> : null}
     <section className="dashboard-card profile-hero">
       <span className="profile-avatar" aria-hidden="true">
         {safeInitial(authContext.profile.displayName)}
@@ -146,11 +151,16 @@ export default async function ProfilePage({
         <Link className="primary-action" href="/publish" prefetch={false}><Plus size={17} />{t("profile.createListing")}</Link>
       </div>
 
+      <p>{t("profile.publicationTermNote")}</p>
+      <nav className="profile-listing-tabs" aria-label={t("profile.myListings")}>
+        {ownerListingTabs.map((value) => <Link key={value} className="secondary-button" href={ownerProfileHref(value)} aria-current={tab === value ? "page" : undefined}>{t(`profile.tab.${value}`)}</Link>)}
+      </nav>
+      <PublicationRefresh expiresAt={listings?.items.filter((item) => item.status === "active" && item.expiresAt).map((item) => item.expiresAt!).sort()[0] ?? null} />
       {!listings ? <EmptyState
         icon={<AlertTriangle size={30} />}
         title={t("profile.listingsLoadErrorTitle")}
         description={t("profile.listingsLoadErrorNote")}
-        actionHref={page === 1 ? "/profile" : `/profile?page=${page}`}
+        actionHref={ownerProfileHref(tab, page)}
         actionLabel={t("common.retry")}
       /> : listings.state === "empty" ? <EmptyState
         title={t("profile.emptyListings")}
@@ -161,7 +171,7 @@ export default async function ProfilePage({
       /> : listings.state === "out_of_range" ? <EmptyState
         title={t("profile.pageEmptyTitle")}
         description={t("profile.pageEmptyNote")}
-        actionHref="/profile"
+        actionHref={ownerProfileHref(tab)}
         actionLabel={t("profile.firstPage")}
       /> : <div className="owner-listings-shell">
         <div className="owner-listing-grid">
@@ -177,6 +187,7 @@ export default async function ProfilePage({
               <strong className="owner-listing-price">{listing.priceLabel}</strong>
               <p>{listing.categoryLabel} · {listing.cityLabel}</p>
               <small>{t("profile.listingUpdated", { date: listing.updatedLabel })}</small>
+              {listing.status === "active" && listing.expiresLabel ? <small>{t("profile.expiresOn", { date: listing.expiresLabel })}</small> : null}
               {listing.status === "rejected" ? <div className="owner-listing-rejection" role="status">
                 <strong>{t("profile.rejectionReason")}</strong>
                 <span>{rejectionLabel(listing.rejectionReasonCode)}</span>
@@ -187,10 +198,10 @@ export default async function ProfilePage({
         </div>
         {listings.page > 1 || listings.nextCursor ? <nav className="owner-listing-pagination" aria-label={t("profile.myListings")}>
           {listings.page > 1
-            ? <Link href={listings.page === 2 ? "/profile" : `/profile?page=${listings.page - 1}`}><ChevronLeft size={17} />{t("profile.previousPage")}</Link>
+            ? <Link href={ownerProfileHref(tab, listings.page - 1)}><ChevronLeft size={17} />{t("profile.previousPage")}</Link>
             : <span />}
           {listings.nextCursor
-            ? <Link href={`/profile?page=${listings.nextCursor}`}>{t("profile.nextPage")}<ChevronRight size={17} /></Link>
+            ? <Link href={ownerProfileHref(tab, listings.nextCursor)}>{t("profile.nextPage")}<ChevronRight size={17} /></Link>
             : null}
         </nav> : null}
       </div>}

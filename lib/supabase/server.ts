@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/database.types";
@@ -36,4 +36,19 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient<Datab
       },
     },
   });
+}
+
+/** Commit cookies only after the registration lease is successfully finalized. */
+export async function createBufferedRegistrationClient() {
+  const cookieStore = await cookies();
+  const { url, publishableKey } = getServerSupabasePublicConfig();
+  const pending = new Map<string, { name: string; value: string; options: CookieOptions }>();
+  const client = createServerClient<Database>(url, publishableKey, {
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(12000) }) },
+    cookies: {
+      getAll: () => cookieStore.getAll(),
+      setAll: (values) => { for (const value of values) pending.set(value.name, value); },
+    },
+  });
+  return { client, commit: () => { for (const value of pending.values()) cookieStore.set(value.name, value.value, value.options); } };
 }

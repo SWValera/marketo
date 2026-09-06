@@ -53,6 +53,7 @@ type FavoriteListingRow = {
   price_minor: number | string | null;
   currency_code: string;
   published_at: string | null;
+  expires_at: string | null;
   promoted_until: string | null;
   categories: unknown;
   settlements: unknown;
@@ -76,7 +77,11 @@ export async function listFavoriteListings(
   const countResult = await client
     .from("favorites")
     .select("listing_id, listings!inner(id)", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("listings.status", "active")
+    .not("listings.published_at", "is", null)
+    .is("listings.deleted_at", null)
+    .gt("listings.expires_at", new Date().toISOString());
   if (countResult.error || countResult.count === null) {
     throw new FavoriteDataError("LIST_UNAVAILABLE", { cause: countResult.error });
   }
@@ -89,6 +94,10 @@ export async function listFavoriteListings(
     .from("favorites")
     .select("listing_id, created_at, listings!inner(id)")
     .eq("user_id", userId)
+    .eq("listings.status", "active")
+    .not("listings.published_at", "is", null)
+    .is("listings.deleted_at", null)
+    .gt("listings.expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .order("listing_id", { ascending: false })
     .range(offset, window.rangeEnd);
@@ -98,9 +107,11 @@ export async function listFavoriteListings(
 
   const listingsResult = await client
     .from("listings")
-    .select("id, slug, title, price_minor, currency_code, published_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
+    .select("id, slug, title, price_minor, currency_code, published_at, expires_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
     .in("id", listingIds)
     .eq("status", "active")
+    .not("published_at", "is", null)
+    .gt("expires_at", new Date().toISOString())
     .is("deleted_at", null);
   if (listingsResult.error) throw new FavoriteDataError("LIST_UNAVAILABLE", { cause: listingsResult.error });
   const rowsById = new Map(
@@ -125,6 +136,7 @@ export async function listFavoriteListings(
         ? settlement.name_kk ?? settlement.name_ru ?? ""
         : settlement.name_ru ?? settlement.name_kk ?? "",
       publishedLabel: dateLabel(row.published_at, locale),
+      expiresAt: row.expires_at,
       imageUrl: publicMediaUrl(images[0]?.storage_key ?? null),
       categorySlug: category.slug,
       cityId: settlement.id,

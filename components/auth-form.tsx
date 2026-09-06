@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/events";
 import { authCallbackUrl, safeInternalPath } from "@/lib/auth/redirect";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { RegistrationWaiter } from "@/components/registration-waiter";
 
 export type AuthMode = "login" | "register" | "recover" | "update-password";
 type PendingFlow = "signup" | "recovery";
@@ -61,6 +62,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [handoffRevision, setHandoffRevision] = useState(0);
   const destination = safeInternalPath(next);
 
   useEffect(() => {
@@ -83,11 +85,8 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
     if (initialMode === "update-password") publishBrowserAuthEvent("recovery-ready");
     const unsubscribe = subscribeToBrowserAuthEvents((event) => {
       if (event.type === "signup-confirmed") {
-        setPendingFlow(null);
-        setMode("login");
-        clearPendingFlow();
-        setError("");
-        setMessage(t("auth.confirmationDetected"));
+        // A browser event is not proof of authentication. Recheck the server.
+        setHandoffRevision((value) => value + 1);
       } else if (event.type === "recovery-ready") {
         setMessage(t("auth.recoveryReadyOtherTab"));
       } else if (event.type === "password-updated") {
@@ -105,6 +104,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
   }, [initialMode, t]);
 
   function selectMode(value: Exclude<AuthMode, "update-password">) {
+    void fetch("/api/auth/registration/cancel", { method: "POST" }).catch(() => {});
     setMode(value);
     setPendingFlow(null);
     clearPendingFlow();
@@ -133,6 +133,13 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
     if (result.error) throw result.error;
     clearPendingFlow();
     router.replace(destination);
+  }
+
+  async function registrationCallback() {
+    const result = await fetch("/api/auth/registration/start", { method: "POST", cache: "no-store" });
+    if (!result.ok) throw { status: result.status };
+    const body = await result.json() as { callback: string };
+    return body.callback;
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -166,17 +173,21 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       }
       if (mode === "register") {
         const cleanEmail = normalizedEmail(email);
+        const callback = await registrationCallback();
         const result = await client.auth.signUp({
           email: cleanEmail,
           password,
           options: {
-            emailRedirectTo: authCallbackUrl(window.location.origin, destination, "signup"),
+            emailRedirectTo: callback,
             data: { display_name: displayName.trim(), language: locale },
           },
         });
+        setPassword("");
+        setConfirmPassword("");
         if (result.error) throw result.error;
         if (result.data.session) {
-          router.replace(destination);
+          clearPendingFlow();
+          router.replace("/profile?registered=success");
           return;
         }
         rememberPendingAuth(cleanEmail, "signup");
@@ -222,12 +233,14 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
     try {
       const client = getSupabaseBrowserClient();
       if (pendingFlow === "signup") {
+        const callback = await registrationCallback();
         const result = await client.auth.resend({
           type: "signup",
           email: normalizedEmail(email),
-          options: { emailRedirectTo: authCallbackUrl(window.location.origin, destination, "signup") },
+          options: { emailRedirectTo: callback },
         });
         if (result.error) throw result.error;
+        setHandoffRevision((value) => value + 1);
       } else {
         const result = await client.auth.resetPasswordForEmail(normalizedEmail(email), {
           redirectTo: authCallbackUrl(window.location.origin, "/login?password_reset=success", "recovery"),
@@ -244,22 +257,8 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
 
   async function confirmedAndSignIn() {
     if (pendingFlow !== "signup") return;
-    if (!password) {
-      setPendingFlow(null);
-      setMode("login");
-      clearPendingFlow();
-      setMessage(t("auth.enterPasswordAfterConfirmation"));
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      await signIn();
-    } catch (caught) {
-      setError(t(authErrorKey(caught as { message?: string; status?: number })));
-    } finally {
-      setLoading(false);
-    }
+    selectMode("login");
+    setMessage(t("auth.enterPasswordAfterConfirmation"));
   }
 
   return <form className="auth-form" onSubmit={(event) => void submit(event)} noValidate>
@@ -272,6 +271,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       <h2>{t("auth.checkEmailTitle")}</h2>
       <p>{t(pendingFlow === "signup" ? "auth.pendingSignupNote" : "auth.pendingRecoveryNote", { email: normalizedEmail(email) })}</p>
       <p className="auth-device-note">{t("auth.crossDeviceNote")}</p>
+      {pendingFlow === "signup" && !resending ? <RegistrationWaiter key={handoffRevision} /> : null}
       {error ? <div id="auth-status" className="auth-feedback is-error" role="alert">{error}</div> : null}
       {message ? <div id="auth-status" className="auth-feedback is-success" role="status">{message}</div> : null}
       <div className="auth-pending-actions">

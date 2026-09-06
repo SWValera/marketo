@@ -32,7 +32,12 @@ Subject:
 Подтвердите регистрацию в Marketo
 ```
 
-Body:
+Body: use the reviewed file `supabase/templates/confirmation.html` for the RU
+template. It must use `{{ .ConfirmationURL }}`, not a custom TokenHash link:
+the standard Supabase confirmation redirect preserves the PKCE code and bridge.
+Disable mail-provider link tracking. Keep email confirmation enabled.
+
+Minimal body:
 
 ```html
 <h2>Подтвердите email</h2>
@@ -116,15 +121,25 @@ Body:
 - The callback accepts a Supabase `code` or reviewed `token_hash` + `type`.
 - `next` is reduced to a same-origin internal path; `//host`, external URLs and
   backslashes are rejected.
-- Successful signup opens `/auth/result`, notifies the original same-origin tab
-  through BroadcastChannel/storage event and shows return/close actions.
+- Signup first creates a one-hour private handoff. `/auth/callback?flow=signup&bridge=...`
+  deposits a short-lived PKCE code and redirects to a clean, no-referrer result page.
+- The original browser checks `/api/auth/registration/complete` every four seconds
+  while visible, and on focus/online. It exchanges the code using its own verifier,
+  sets session cookies only after finalizing the lease, then opens
+  `/profile?registered=success`. Broadcast events alone never prove authentication.
 - Successful recovery opens `/auth/update-password`, requires the recovery
   session, updates the password, signs out locally and returns to normal login.
 - Invalid and expired links show separate user-safe messages and no raw SQL or
   provider error.
-- Confirmation on another device does not transfer a session to the original
-  device; the original screen keeps the manual “confirmed — sign in” path.
-- No infinite polling, automatic password loop or production secret is used.
+- Another device can confirm the email but cannot redeem the original browser's
+  code. Return to the original PWA within five minutes after confirmation. Mobile
+  OS suspension/offline mode cannot receive instantaneous updates; focus resumes
+  checks. Expired attempts fall back to ordinary password login.
+- Polling is bounded to one hour. Passwords are cleared after signUp and never
+  persisted. The runtime server secret accesses only the service-only handoff RPC;
+  it is never sent to browsers. This does not use admin impersonation/magic links.
+- Migration 0028 must be applied before deploying this frontend. A missing RPC
+  fails registration closed, rather than silently losing the cross-device flow.
 
 ## 8. Required external verification
 

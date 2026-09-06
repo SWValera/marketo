@@ -1110,6 +1110,9 @@ select {
 .owner-listing-action-error { margin: 8px 0 0; color: var(--danger); font-size: 10px; line-height: 1.4; }
 .owner-listing-pagination { display: flex; justify-content: space-between; gap: 12px; margin-top: 15px; }
 .owner-listing-pagination a { min-height: 42px; display: inline-flex; align-items: center; gap: 5px; padding: 0 13px; border: 1px solid var(--border); border-radius: 11px; background: #fff; color: var(--primary-strong); font-size: 12px; font-weight: 760; }
+.profile-listing-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.profile-listing-tabs [aria-current="page"] { background: var(--primary-strong); color: white; border-color: var(--primary-strong); }
+.owner-listing-copy > small { display: block; }
 
 @media (max-width: 720px) {
   .owner-listing-grid { grid-template-columns: 1fr; }

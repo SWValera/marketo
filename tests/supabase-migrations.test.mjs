@@ -80,7 +80,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 27);
+    assert.equal(names.length, 28);
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -96,7 +96,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       where procedure.prosecdef
         and namespace.nspname in ('public', 'private')
     `);
-    assert.equal(elevatedFunctions.rows.length, 17);
+    assert.equal(elevatedFunctions.rows.length, 19);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -271,6 +271,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       "listing_images_anon_active_read",
       "listing_images_authenticated_read",
       "listings_anon_active_read",
+      "listings_anon_publication_term",
+      "listings_authenticated_publication_term",
       "listings_authenticated_read",
       "profiles_anon_public_read",
       "profiles_authenticated_read",
@@ -1009,7 +1011,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
     );
     await db.exec("reset role;");
     await db.query("insert into public.listing_images (listing_id, storage_key) values ($1, 'tests/vehicle.webp')", [vehicleListingId]);
-    await db.query("update public.listings set status = 'active', published_at = now() where id = $1", [vehicleListingId]);
+    await db.query("update public.listings set status = 'pending' where id = $1", [vehicleListingId]);
+    await db.query("update public.listings set status = 'active' where id = $1", [vehicleListingId]);
     await db.exec("set role anon;");
     const filteredVehicle = await db.query(`
       select id

@@ -127,6 +127,7 @@ type SellerListingCardRow = {
   category_id: string;
   settlement_id: string;
   published_at: string;
+  expires_at: string | null;
   promoted_until: string | null;
   categories: { slug: string } | null;
   settlements: { id: string; name_ru: string; name_kk: string } | null;
@@ -136,7 +137,7 @@ type SellerListingCardRow = {
 const MAX_SELLER_LISTINGS_PAGE_SIZE = 60;
 const MAX_SELLER_LISTING_PAGE_RETRIES = 1;
 const SELLER_LISTING_CARD_COLUMNS =
-  "id, slug, title, price_minor, currency_code, category_id, settlement_id, published_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)";
+  "id, slug, title, price_minor, currency_code, category_id, settlement_id, published_at, expires_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)";
 
 export type SellerListingsPageInput = number | string | string[] | undefined;
 
@@ -170,6 +171,7 @@ async function countPublishedListingsBySeller(client: MarketoSupabaseClient, sel
     .eq("owner_id", sellerId)
     .eq("status", "active")
     .not("published_at", "is", null)
+    .gt("expires_at", new Date().toISOString())
     .is("deleted_at", null);
   if (response.error) throw response.error;
   if (!Number.isSafeInteger(response.count) || (response.count ?? -1) < 0) {
@@ -190,6 +192,7 @@ function requestPublishedListingsBySeller(
     .eq("owner_id", sellerId)
     .eq("status", "active")
     .not("published_at", "is", null)
+    .gt("expires_at", new Date().toISOString())
     .is("deleted_at", null)
     .order("published_at", { ascending: false })
     .order("id", { ascending: false })
@@ -293,6 +296,7 @@ export async function listPublishedListingCardsBySeller(
         location_name_ru: row.settlements?.name_ru ?? null,
         location_name_kk: row.settlements?.name_kk ?? null,
         published_at: row.published_at,
+        expires_at: row.expires_at ?? null,
         promoted: Boolean(row.promoted_until && new Date(row.promoted_until) > new Date()),
         primary_image_storage_key: row.listing_images[0]?.storage_key ?? null,
       };

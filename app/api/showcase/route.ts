@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       locationRu: placement.location_name_ru,
       locationKk: placement.location_name_kk,
       imageUrl: publicMediaUrl(placement.primary_image_storage_key),
+      expiresAt: placement.ends_at,
     })),
-  }, { headers: { "cache-control": "public, max-age=30, stale-while-revalidate=30" } });
+  }, { headers: { "cache-control": "no-store" } });
 }
-

@@ -48,6 +48,7 @@ type CatalogListingCardRow = {
   location_name_ru: string | null;
   location_name_kk: string | null;
   published_at: string | null;
+  expires_at: string | null;
   promoted: boolean | null;
   primary_image_storage_key: string | null;
 };
@@ -113,6 +114,7 @@ export type Database = {
       };
     };
     Functions: {
+      owner_listing_transition: { Args: { target_listing_id: string; requested_action: string }; Returns: string };
       get_my_profile: {
         Args: Record<PropertyKey, never>;
         Returns: Array<{

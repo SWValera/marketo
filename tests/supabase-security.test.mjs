@@ -11,6 +11,7 @@ import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
 import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
+import { auditProfileLifecycle, auditRegistrationHandoff } from "./profile-lifecycle-db-audit.mjs";
 
 const root = new URL("../", import.meta.url);
 const execFileAsync = promisify(execFile);
@@ -1092,16 +1093,16 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       created.sold = soldCandidate.rows[0].id;
 
       await asAuthenticated(db, users.buyer, async () => {
-        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.pending]), /cannot be archived|permission denied/i);
-        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /cannot be marked sold|permission denied/i);
+        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.pending]), /listing unavailable|permission denied/i);
+        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /listing unavailable|permission denied/i);
       });
       await asAuthenticated(db, users.owner, async () => {
         for (const status of ["draft", "pending", "active", "rejected"]) {
           await db.query("select public.archive_own_listing($1)", [created[status]]);
         }
         await db.query("select public.mark_own_listing_sold($1)", [created.sold]);
-        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.draft]), /cannot be archived/i);
-        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /cannot be marked sold/i);
+        await assert.rejects(db.query("select public.archive_own_listing($1)", [created.draft]), /listing state changed/i);
+        await assert.rejects(db.query("select public.mark_own_listing_sold($1)", [created.sold]), /listing state changed/i);
       });
       const states = await db.query(
         "select id, status from public.listings where id = any($1::uuid[]) order by id",
@@ -1365,15 +1366,21 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 17);
+      assert.equal(functions.rows.length, 19);
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
       assert.ok(functions.rows.every((row) => row.anon_execute === false));
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
-      assert.deepEqual(notClientCallable, ["handle_new_auth_user", "touch_conversation_after_message"]);
+      assert.deepEqual(notClientCallable, ["enforce_listing_publication_period", "handle_new_auth_user", "touch_conversation_after_message", "archive_expired_listings", "registration_handoff"]);
     });
 
+    await t.test("0028 owner lifecycle, calendar month, exact public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
+    await t.test("0028 private PKCE mailbox capabilities, leases, cancellation and rate limits", () => auditRegistrationHandoff(db, users.owner));
     await closePGliteTestDatabase(db);
     currentDbClosed = true;
+    if (process.env.MARKETO_DB_AUDIT_SCOPE === "current") {
+      console.log("Current-schema audit selected; immutable 0025 replay cases are not selected.");
+      return;
+    }
     {
       const db = await createDatabaseThrough0025();
       try {

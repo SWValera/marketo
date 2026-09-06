@@ -152,6 +152,7 @@ function mapCatalogListingSummary(
     priceAmount: price.amount,
     locationLabel: locale === "kk" ? row.location_name_kk ?? row.location_name_ru ?? "" : row.location_name_ru ?? row.location_name_kk ?? "",
     publishedLabel: dateLabel(row.published_at, locale),
+    expiresAt: row.expires_at,
     imageUrl: publicMediaUrl(row.primary_image_storage_key),
     categorySlug: row.category_slug,
     cityId: row.settlement_id,
@@ -203,6 +204,7 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
     locationLabel: locale === "kk" ? settlement.name_kk ?? settlement.name_ru ?? "" : settlement.name_ru ?? settlement.name_kk ?? "",
     publishedLabel: dateLabel(row.published_at, locale),
     imageUrl: publicMediaUrl(images[0]?.storage_key ?? null),
+    expiresAt: row.expires_at,
     categorySlug: category.slug,
     cityId: settlement.id,
     promoted: Boolean(row.promoted_until && new Date(row.promoted_until) > new Date()),
@@ -248,7 +250,7 @@ export const listingRepository = {
     if (context.status !== "authenticated") throw new FavoriteDataError("AUTHENTICATION_REQUIRED");
     return listFavoriteListings(await createSupabaseServerClient(), context.user.id, options);
   },
-  async mine(options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string } = {}): Promise<NumberedPageResult<MyListingSummary>> {
+  async mine(options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string; tab?: string } = {}): Promise<NumberedPageResult<MyListingSummary>> {
     return listMyListings(await createSupabaseServerClient(), options);
   },
   async findBySlug(slug: string, locale: Locale = "ru"): Promise<ListingDetail | null> {
@@ -276,6 +278,7 @@ export const listingRepository = {
           priceAmount: price.amount,
           locationLabel: locale === "kk" ? row.location_name_kk ?? row.location_name_ru ?? "" : row.location_name_ru ?? row.location_name_kk ?? "",
           publishedLabel: dateLabel(row.published_at, locale),
+          expiresAt: row.expires_at,
           imageUrl: publicMediaUrl(row.primary_image_storage_key),
           categorySlug: row.category_slug,
           cityId: row.settlement_id,

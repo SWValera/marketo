@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { safeInternalPath } from "@/lib/auth/redirect";
 import { classifyAuthCallbackError } from "@/lib/auth/callback-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { depositRegistrationCode } from "@/lib/auth/registration-handoff";
 
 const otpTypes = new Set<EmailOtpType>(["email", "recovery", "invite", "signup", "magiclink", "email_change"]);
 
@@ -13,6 +14,13 @@ export async function GET(request: Request) {
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const rawType = requestUrl.searchParams.get("type") as EmailOtpType | null;
   const recoveryFlow = requestUrl.searchParams.get("flow") === "recovery" || rawType === "recovery";
+  const bridge = requestUrl.searchParams.get("bridge");
+  if (bridge && !recoveryFlow) {
+    let received = false;
+    try { received = Boolean(code && await depositRegistrationCode(bridge, code)); } catch { /* no callback secrets in logs */ }
+    const target = new URL(received ? "/auth/registration-confirmed" : "/login?mode=register&auth_error=expired", requestUrl.origin);
+    return NextResponse.redirect(target, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } });
+  }
   const client = await createSupabaseServerClient();
   let error: { message: string; code?: string } | null = null;
 

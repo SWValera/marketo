@@ -232,6 +232,8 @@ globalThis.fetch = async (input, init) => {
 };
 
 globalThis.__MARKETO_CLOUDFLARE_ENV__ = {
+  NEXT_PUBLIC_SUPABASE_URL: "https://reference-test.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_reference_test",
   MARKETO_MEDIA: {
     async get(storageKey) {
       mediaGetRequests.push(storageKey);
@@ -440,6 +442,9 @@ test("owner mutations reject cross-origin requests before Auth and allow same-or
     { pathname: `/api/listings/${ids.country}/submit`, method: "POST" },
     { pathname: `/api/listings/${ids.country}/archive`, method: "POST" },
     { pathname: `/api/listings/${ids.country}/sold`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/edit`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/restore`, method: "POST" },
+    { pathname: `/api/listings/${ids.country}/delete`, method: "POST" },
     { pathname: `/api/listings/${ids.country}/images`, method: "POST" },
   ];
   for (const route of routes) {

@@ -34,6 +34,7 @@ const expectedMigrations = [
   "0025_security_boundary_repair.sql",
   "0026_catalog_navigation_ux.sql",
   "0027_conditional_required_attributes.sql",
+  "0028_profile_lifecycle_registration.sql",
 ];
 
 const immutableMigrationHashes = {

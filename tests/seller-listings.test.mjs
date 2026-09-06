@@ -52,6 +52,7 @@ function createQueryClient(rows, {
         },
         eq(...args) { calls.push({ query, method: "eq", args }); return this; },
         not(...args) { calls.push({ query, method: "not", args }); return this; },
+        gt(...args) { calls.push({ query, method: "gt", args }); return this; },
         is(...args) { calls.push({ query, method: "is", args }); return this; },
         order(...args) { calls.push({ query, method: "order", args }); return this; },
         limit(...args) { calls.push({ query, method: "limit", args }); return this; },

@@ -43,6 +43,7 @@ type PaidPlacement = {
   locationRu: string;
   locationKk: string;
   imageUrl: string | null;
+  expiresAt?: string;
 };
 
 const paidPlacementCache = createSingleFlightTtlCache<string, PaidPlacement[]>({
@@ -156,6 +157,22 @@ export function CityPremiumShowcase() {
   const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
   const [autoplayPaused, setAutoplayPaused] = useState(false);
+  const [deadlineNow, setDeadlineNow] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      clearTimeout(timer);
+      setDeadlineNow(Date.now());
+      const next = paidState.items.map((item) => Date.parse(item.expiresAt ?? "")).filter((date) => date > Date.now()).sort((a,b) => a-b)[0];
+      if (next) timer = setTimeout(check, Math.min(next - Date.now(), 2147483647));
+    };
+    let active = true;
+    queueMicrotask(() => { if (active) check(); });
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => { active = false; clearTimeout(timer); window.removeEventListener("focus", check); document.removeEventListener("visibilitychange", check); };
+  }, [paidState]);
 
   useEffect(() => {
     if (selectedLocation === "all") return;
@@ -172,8 +189,8 @@ export function CityPremiumShowcase() {
   }, [paidRetry, selectedLocation]);
 
   const paid = useMemo(
-    () => paidState.city === selectedLocation && paidState.status === "ready" ? paidState.items : [],
-    [paidState, selectedLocation],
+    () => paidState.city === selectedLocation && paidState.status === "ready" ? paidState.items.filter((item) => !item.expiresAt || Date.parse(item.expiresAt) > deadlineNow) : [],
+    [paidState, selectedLocation, deadlineNow],
   );
   const items = useMemo(() => {
     const paidItems = paid.map((placement) => ({ kind: "paid" as const, ...placement }));
