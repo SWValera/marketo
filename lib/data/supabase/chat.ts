@@ -15,8 +15,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 function safeDisplayName(value: string | null | undefined, locale: Locale) {
   return value?.trim() || (locale === "kk" ? "Пайдаланушы" : "Пользователь");
 }
-export async function getOrCreateListingConversation(client: MarketoSupabaseClient, listingId: string) {
-  const { data, error } = await client.rpc("get_or_create_listing_conversation", { target_listing_id: listingId });
+export async function getOrCreateListingConversation(client: MarketoSupabaseClient, listingId: string, signal?: AbortSignal) {
+  const deadline = AbortSignal.timeout(12000);
+  const { data, error } = await client.rpc("get_or_create_listing_conversation", { target_listing_id: listingId })
+    .abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline);
   if (error || !data || !UUID.test(data)) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
   return data;
 }
@@ -70,21 +72,21 @@ export async function getConversation(client: MarketoSupabaseClient, conversatio
   if (conversationResult.error) throw new ChatDataError("DETAIL_UNAVAILABLE", { cause: conversationResult.error });
   const row = conversationResult.data;
   if (!row) return null;
+  if (row.participant_low_id !== userId && row.participant_high_id !== userId) return null;
   const peerId = row.participant_low_id === userId ? row.participant_high_id
     : row.participant_high_id === userId ? row.participant_low_id : null;
-  if (!peerId) return null;
   const [profile, listing, page, marker] = await Promise.all([
-    client.from("profiles").select("id, display_name, avatar_path").eq("id", peerId).maybeSingle(),
+    peerId ? client.from("profiles").select("id, display_name, avatar_path").eq("id", peerId).maybeSingle() : Promise.resolve({data:null,error:null}),
     row.listing_id ? client.from("listings").select("id, title").eq("id", row.listing_id).maybeSingle() : Promise.resolve({data:null,error:null}),
     readMessagePage(client, conversationId),
-    client.from("conversation_participants").select("last_read_at").eq("conversation_id", conversationId).eq("user_id", peerId).maybeSingle(),
+    peerId ? client.from("conversation_participants").select("last_read_at").eq("conversation_id", conversationId).eq("user_id", peerId).maybeSingle() : Promise.resolve({data:null,error:null}),
   ]);
   if (profile.error || listing.error || marker.error) throw new ChatDataError("DETAIL_UNAVAILABLE", { cause: profile.error ?? listing.error ?? marker.error });
   const readAt = marker.data?.last_read_at;
   const latest = page.rows.at(-1);
   return {
-    id: row.id, peerId, canSend: row.status === "active", hasOlderMessages: page.hasMore,
-    peerName: safeDisplayName(profile.data?.display_name, locale), peerAvatarUrl: publicMediaUrl(profile.data?.avatar_path ?? null),
+    id: row.id, peerId: peerId ?? undefined, canSend: row.status === "active" && Boolean(peerId && profile.data), hasOlderMessages: page.hasMore,
+    peerName: peerId ? safeDisplayName(profile.data?.display_name, locale) : (locale === "kk" ? "Пайдаланушы жойылған" : "Пользователь удалён"), peerAvatarUrl: publicMediaUrl(profile.data?.avatar_path ?? null),
     listingId: row.listing_id, listingTitle: listing.data?.title ?? null,
     lastMessage: latest?.body ?? null, lastMessageAt: latest?.created_at ?? row.last_message_at, unreadCount: null,
     messages: page.rows.map(message => ({ id:message.id, body:message.body, sentAt:message.created_at,

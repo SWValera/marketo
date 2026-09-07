@@ -10,6 +10,7 @@ function needsDocumentNavigation(href: string) {
   const pathname = href.split(/[?#]/, 1)[0];
   return pathname === "/publish"
     || pathname === "/profile/edit"
+    || pathname === "/profile/delete"
     || pathname === "/login"
     || pathname === "/admin"
     || pathname.startsWith("/admin/");

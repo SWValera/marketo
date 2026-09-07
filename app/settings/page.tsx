@@ -33,6 +33,7 @@ export default async function SettingsPage() {
         <Link className="secondary-button" href="/profile/edit"><PenLine size={16} />{t("settings.editProfile")}</Link>
         <Link className="secondary-button" href="/login?mode=recover&next=/settings"><KeyRound size={16} />{t("settings.resetPassword")}</Link>
         <LogoutButton />
+        <Link className="account-delete-link" href="/profile/delete">{t("accountDelete.title")}</Link>
       </div>
     </section>
     <section className="dashboard-card settings-security" aria-labelledby="settings-security-title">

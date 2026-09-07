@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
+import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
+import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 
 const root = new URL("../", import.meta.url);
+const execFileAsync = promisify(execFile);
 const ownerId = "61000000-0000-4000-8000-000000000001";
 const buyerId = "62000000-0000-4000-8000-000000000002";
 
@@ -44,7 +51,21 @@ test("Premium commercial accounts, orders and analytics are owner-scoped by RLS"
     for (const migration of migrations) {
       await db.exec(await readFile(new URL(`supabase/migrations/${migration}`, root), "utf8"));
     }
-    await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+    // Historical migrations also changed catalog sort orders. Apply the current
+    // release before the bootstrap seed, matching the other database suites.
+    const releaseDirectory=await mkdtemp(join(fileURLToPath(new URL('artifacts/',root)),'premium-fixture-'));
+    const releasePath=join(releaseDirectory,`${CATEGORY_REFERENCE_VERSION}.sql`);
+    try {
+      await execFileAsync(process.execPath,[
+        fileURLToPath(new URL('scripts/generate-catalog-completeness-migration.mjs',root)),
+        '--release-id',CATEGORY_REFERENCE_VERSION,'--output',releasePath,
+      ],{cwd:fileURLToPath(root),env:prepareNodeRuntimeEnvironment(process.env)});
+      await db.exec(await readFile(releasePath,'utf8'));
+      await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
+    } finally {
+      await rm(releasePath,{force:true});
+      await rmdir(releaseDirectory);
+    }
     await db.query(
       "insert into auth.users (id, raw_user_meta_data) values ($1, '{\"display_name\":\"Owner\"}'::jsonb), ($2, '{\"display_name\":\"Buyer\"}'::jsonb)",
       [ownerId, buyerId],

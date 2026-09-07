@@ -76,8 +76,10 @@ export function ListingPhoneButton({ listingId }: { listingId: string }) {
   return <div className="listing-phone-control">
     {phone ? <a className="secondary-button call-seller" href={"tel:" + phone}><Phone size={20} /><span>{t("listing.call")}<small>{phone}</small></span></a>
       : <button className="secondary-button" type="button" disabled={busy || retryAt > 0} onClick={reveal}><Phone size={20} />{busy ? t("listing.phoneLoading") : t("listing.call")}</button>}
+    <div className={`listing-phone-feedback${busy || error || phone ? " is-visible" : ""}`}>
     <div className="listing-phone-challenge" ref={challenge} />
     {error ? <p className="contact-status" role="status">{message} {retryAt ? t("listing.phoneRetryAt",{time:new Date(retryAt).toLocaleTimeString()}) : null}</p>
       : <p className="contact-status" role="status">{phone ? t("listing.phoneReady") : t("listing.phoneProtected")}</p>}
+    </div>
   </div>;
 }

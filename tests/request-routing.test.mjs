@@ -82,7 +82,15 @@ test("protected, auth, and owner-listing reads refresh the session, including RS
   assert.equal(needsSupabaseSessionRefresh("/api/mediax/photo.jpg", "GET"), false);
 });
 
-test("all mutation methods refresh the session while safe public methods do not", () => {
+test("only the exact verified guest phone endpoint bypasses Auth for GET and POST", () => {
+  const base = "/api/listings/10000000-0000-4000-8000-000000000001/phone";
+  for (const method of ["GET", "POST"]) assert.equal(needsSupabaseSessionRefresh(base, method), false);
+  for (const path of [base + "/edit", base + ".rsc", base.replace("/phone", "/images"), base.replace("/phone", ""), "/api/listings/not-a-uuid/phone"])
+    for (const method of ["GET", "POST"]) assert.equal(needsSupabaseSessionRefresh(path, method), true, path);
+  assert.equal(needsSupabaseSessionRefresh(base, "DELETE"), true);
+});
+
+test("all other mutation methods refresh the session while safe public methods do not", () => {
   for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
     assert.equal(classifyRequestRouting("/api/listings", method), "refresh-session", method);
     assert.equal(classifyRequestRouting("/search", method), "refresh-session", method);

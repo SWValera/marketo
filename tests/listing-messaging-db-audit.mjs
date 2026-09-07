@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-export async function auditListingMessaging(db, users, listingId, conversationId) {
+export async function auditListingMessaging(db, users, listingId, conversationId, { protectedPhones = false } = {}) {
   const stranger = "99000000-0000-4000-8000-000000000009";
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,'{}')", [stranger]);
   const as = async (role, id, sql, args=[]) => {
@@ -14,7 +14,8 @@ export async function auditListingMessaging(db, users, listingId, conversationId
   assert.deepEqual((await options()).rows, [{allow_messages:true,allow_phone:false,phone:null}]);
   await assert.rejects(as("anon",null,"select * from public.listing_contacts"),/permission denied/);
   await db.query("update public.listing_contacts set allow_phone=true where listing_id=$1",[listingId]);
-  assert.equal((await options()).rows[0].phone,"+77001112233");
+  assert.equal((await options()).rows[0].phone,protectedPhones ? null : "+77001112233",
+    "The legacy options RPC must keep phones private once release 0030 is installed");
   await assert.rejects(call(users.owner,"select public.get_or_create_listing_conversation($1)",[listingId]),/yourself/);
   await assert.rejects(as("anon",null,"select public.get_or_create_listing_conversation($1)",[listingId]),/permission denied/);
   await assert.rejects(call(users.suspended,"select public.get_or_create_listing_conversation($1)",[listingId]),/active profile/);

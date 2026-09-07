@@ -24,6 +24,7 @@ import { MODERATION_REJECTION_REASONS } from "@/lib/moderation/policy";
 import { normalizePositivePage } from "@/lib/data/pagination";
 import { normalizeOwnerListingTab, ownerListingTabs, ownerProfileHref } from "@/lib/listings/owner-filters";
 import { PublicationRefresh } from "@/components/publication-refresh";
+import { LogoutButton } from "@/components/logout-button";
 
 export const metadata: Metadata = {
   title: "Профиль",
@@ -140,7 +141,11 @@ export default async function ProfilePage({
         </div>
         <p>{authContext.user.email}</p>
       </div>
-      <Link className="secondary-button" href="/profile/edit"><PenLine size={16} />{t("common.edit")}</Link>
+      <div className="profile-account-actions">
+        <Link className="secondary-button" href="/profile/edit"><PenLine size={16} />{t("common.edit")}</Link>
+        <LogoutButton />
+        <Link className="account-delete-link" href="/profile/delete">{t("accountDelete.title")}</Link>
+      </div>
     </section>
 
     <section className="dashboard-section" aria-labelledby="my-listings-title">

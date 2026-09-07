@@ -101,6 +101,10 @@ export function needsSupabaseSessionRefresh(pathname: string, method: string) {
   const clean = normalizeRscPathname(pathname);
   const normalizedMethod = method.toUpperCase();
 
+  // This exact guest endpoint authenticates its own signed session + Turnstile.
+  // Do not refresh Supabase Auth, or widen the bypass to owner listing routes.
+  if ((normalizedMethod === "GET" || normalizedMethod === "POST")
+    && /^\/api\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/phone$/i.test(cleanPathname(pathname))) return false;
   if (!SAFE_METHODS.has(normalizedMethod)) return true;
   if (DOCUMENT_READ_METHODS.has(normalizedMethod) && PUBLIC_SESSION_CONTEXT_PATHS.has(clean)) return true;
   if (matchesPath(clean, "/auth") || matchesPath(clean, "/login")) return true;

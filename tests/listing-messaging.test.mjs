@@ -65,6 +65,19 @@ test("phone consent defaults off, and private profile numbers are never a fallba
   assert.doesNotMatch(contact,/profile_private|contact_phone_e164/);
   assert.match(await source("lib/publish/contract.ts"),/allowPhone: z.boolean\(\).default\(false\)/);
 });
+
+test("deleted peer retains closed history but never gives an outsider access",async()=>{
+  for(const locale of ['ru','kk'])for(const [low,high] of [[id,null],[null,id],[null,next]]){
+    const calls=[],result={conversations:{data:{id,listing_id:null,participant_low_id:low,participant_high_id:high,status:'closed'},error:null},
+      messages:{data:[{id:next,body:'Synthetic history',sender_id:null,created_at:'2026-09-06T10:00:00Z'}],error:null}};
+    const client={from:table=>{calls.push(table);const q={};for(const method of ['select','eq','is','order','limit'])q[method]=()=>q;
+      q.maybeSingle=()=>Promise.resolve(result[table]);q.then=(a,b)=>Promise.resolve(result[table]).then(a,b);return q;}};
+    const actual=await adapter.getConversation(client,next,id,locale);
+    if(high===next){assert.equal(actual,null);assert.deepEqual(calls,['conversations']);continue;}
+    assert.equal(actual.canSend,false);assert.equal(actual.peerId,undefined);assert.equal(actual.peerName,locale==='ru'?'Пользователь удалён':'Пайдаланушы жойылған');
+    assert.equal(actual.messages[0].body,'Synthetic history');assert.deepEqual(calls,['conversations','messages']);
+  }
+});
 test("chat refresh stays local, pauses hidden tabs, protects repeated send and preserves failures",async()=>{
   const composer=await source("components/chat-composer.tsx"), poll=await source("components/use-chat-polling.ts");
   assert.match(composer,/if \(flight.current \|\| disabled\) return/);
