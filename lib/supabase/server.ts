@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { cache } from "react";
+import { fetchWithDeadline } from "@/lib/http/fetch-deadline";
 import type { Database } from "@/lib/supabase/database.types";
 import { getServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
@@ -12,6 +13,7 @@ import { getServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 export function createSupabasePublicServerClient(): SupabaseClient<Database> {
   const { url, publishableKey } = getServerSupabasePublicConfig();
   return createClient<Database>(url, publishableKey, {
+    global: { fetch: fetchWithDeadline },
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
@@ -27,6 +29,7 @@ export const createSupabaseServerClient = cache(async (): Promise<SupabaseClient
   const { url, publishableKey } = getServerSupabasePublicConfig();
 
   return createServerClient<Database>(url, publishableKey, {
+    global: { fetch: fetchWithDeadline },
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (cookiesToSet) => {

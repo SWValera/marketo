@@ -1,6 +1,7 @@
 "use client";
 
 import { createSingleFlightTtlLoader } from "@/lib/reference-data/cache";
+import { fetchWithDeadline } from "@/lib/http/fetch-deadline";
 import {
   CATEGORY_REFERENCE_VERSION,
   GEOGRAPHY_REFERENCE_VERSION,
@@ -14,7 +15,7 @@ import type {
 const BROWSER_REFERENCE_TTL_MS = 5 * 60 * 1000;
 
 async function requestCategoryReferences(): Promise<ReferenceDataEnvelope<CategoryReferenceData>> {
-  const response = await fetch(`/api/reference/categories?v=${encodeURIComponent(CATEGORY_REFERENCE_VERSION)}`, {
+  const response = await fetchWithDeadline(`/api/reference/categories?v=${encodeURIComponent(CATEGORY_REFERENCE_VERSION)}`, {
     headers: { accept: "application/json" },
     cache: "force-cache",
   });
@@ -25,7 +26,7 @@ async function requestCategoryReferences(): Promise<ReferenceDataEnvelope<Catego
 }
 
 async function requestGeographyReferences(): Promise<ReferenceDataEnvelope<GeographyReferenceData>> {
-  const response = await fetch(`/api/reference/geography?v=${encodeURIComponent(GEOGRAPHY_REFERENCE_VERSION)}`, {
+  const response = await fetchWithDeadline(`/api/reference/geography?v=${encodeURIComponent(GEOGRAPHY_REFERENCE_VERSION)}`, {
     headers: { accept: "application/json" },
     cache: "force-cache",
   });

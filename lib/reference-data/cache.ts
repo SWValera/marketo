@@ -6,11 +6,13 @@ type CacheEntry<T> = {
 export function createSingleFlightTtlCache<Key, Value>({
   maxEntries,
   maxInFlight = maxEntries,
+  shareInFlight = true,
   ttlMilliseconds,
   now = Date.now,
 }: {
   maxEntries: number;
   maxInFlight?: number;
+  shareInFlight?: boolean;
   ttlMilliseconds: (value: Value) => number;
   now?: () => number;
 }) {
@@ -50,6 +52,17 @@ export function createSingleFlightTtlCache<Key, Value>({
     getOrLoad(key: Key, load: () => Promise<Value>) {
       const cached = read(key);
       if (cached !== undefined) return Promise.resolve(cached);
+
+      // Workers I/O belongs to the request that started it. Never retain its
+      // pending Promise across requests: an abandoned response can strand it.
+      // Server callers share only completed public values; React cache handles
+      // deduplication within a render. Browser callers may still single-flight.
+      if (!shareInFlight) {
+        return Promise.resolve().then(load).then((value) => {
+          if (ttlMilliseconds(value) > 0) write(key, value);
+          return value;
+        });
+      }
 
       const pending = inFlight.get(key);
       if (pending) return pending;

@@ -119,8 +119,8 @@ test("category navigation preserves city without duplicate prefetch and keeps th
   assert.doesNotMatch(directoryPage, /getCategoryReferences/);
 
   const browserReferences = await source("lib/reference-data/browser.ts");
-  assert.match(browserReferences, /fetch\(`\/api\/reference\/categories\?v=/);
-  assert.match(browserReferences, /fetch\(`\/api\/reference\/geography\?v=/);
+  assert.match(browserReferences, /fetchWithDeadline\(`\/api\/reference\/categories\?v=/);
+  assert.match(browserReferences, /fetchWithDeadline\(`\/api\/reference\/geography\?v=/);
   assert.doesNotMatch(browserReferences, /getSupabaseBrowserClient|listActiveCategories|listSelectableSettlements/);
 
   const categoryRoute = await source("app/api/reference/categories/route.ts");

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   getCategoryAttributes,
   listActiveCategories,
@@ -27,7 +28,6 @@ import { createSupabasePublicServerClient } from "@/lib/supabase/server";
 import { tryGetServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
 const REFERENCE_CACHE_TTL_MS = 5 * 60 * 1000;
-const REFERENCE_ERROR_CACHE_TTL_MS = 10 * 1000;
 const ATTRIBUTE_CACHE_MAX_ENTRIES = 128;
 const OPTION_CACHE_MAX_ENTRIES = 256;
 
@@ -44,14 +44,16 @@ function ready<T>(data: T): ReferenceDataEnvelope<T> {
 }
 
 function envelopeTtl<T>(value: ReferenceDataEnvelope<T>) {
-  return value.status === "ready" ? REFERENCE_CACHE_TTL_MS : REFERENCE_ERROR_CACHE_TTL_MS;
+  return value.status === "ready" ? REFERENCE_CACHE_TTL_MS : 0;
 }
 
 const geographyCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<GeographyReferenceData>>({
+  shareInFlight: false,
   maxEntries: 1,
   ttlMilliseconds: envelopeTtl,
 });
 const categoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<CategoryReferenceData>>({
+  shareInFlight: false,
   maxEntries: 1,
   ttlMilliseconds: envelopeTtl,
 });
@@ -60,19 +62,22 @@ type HomeCategoryReferenceData = {
 };
 const EMPTY_HOME_CATEGORIES: HomeCategoryReferenceData = { categories: [] };
 const homeCategoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<HomeCategoryReferenceData>>({
+  shareInFlight: false,
   maxEntries: 1,
   ttlMilliseconds: envelopeTtl,
 });
 const attributeCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<CategoryAttributeReferenceData>>({
+  shareInFlight: false,
   maxEntries: ATTRIBUTE_CACHE_MAX_ENTRIES,
   ttlMilliseconds: envelopeTtl,
 });
 const optionCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<ReferenceAttributeOption[]>>({
+  shareInFlight: false,
   maxEntries: OPTION_CACHE_MAX_ENTRIES,
   ttlMilliseconds: envelopeTtl,
 });
 
-export async function getGeographyReferences(): Promise<ReferenceDataEnvelope<GeographyReferenceData>> {
+export const getGeographyReferences = cache(async (): Promise<ReferenceDataEnvelope<GeographyReferenceData>> => {
   return geographyCache.getOrLoad("geography", async () => {
     if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_GEOGRAPHY);
     try {
@@ -87,9 +92,9 @@ export async function getGeographyReferences(): Promise<ReferenceDataEnvelope<Ge
       return failed(EMPTY_GEOGRAPHY);
     }
   });
-}
+});
 
-export async function getCategoryReferences(): Promise<ReferenceDataEnvelope<CategoryReferenceData>> {
+export const getCategoryReferences = cache(async (): Promise<ReferenceDataEnvelope<CategoryReferenceData>> => {
   return categoryCache.getOrLoad("categories", async () => {
     if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_CATEGORIES);
     try {
@@ -99,9 +104,9 @@ export async function getCategoryReferences(): Promise<ReferenceDataEnvelope<Cat
       return failed(EMPTY_CATEGORIES);
     }
   });
-}
+});
 
-export async function getHomeCategoryReferences(): Promise<ReferenceDataEnvelope<HomeCategoryReferenceData>> {
+export const getHomeCategoryReferences = cache(async (): Promise<ReferenceDataEnvelope<HomeCategoryReferenceData>> => {
   return homeCategoryCache.getOrLoad("home-categories", async () => {
     if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_HOME_CATEGORIES);
     try {
@@ -117,11 +122,11 @@ export async function getHomeCategoryReferences(): Promise<ReferenceDataEnvelope
       return failed(EMPTY_HOME_CATEGORIES);
     }
   });
-}
+});
 
-export async function getCategoryAttributeReferences(
+export const getCategoryAttributeReferences = cache(async (
   categoryId: string,
-): Promise<ReferenceDataEnvelope<CategoryAttributeReferenceData>> {
+): Promise<ReferenceDataEnvelope<CategoryAttributeReferenceData>> => {
   return attributeCache.getOrLoad(categoryId, async () => {
     if (!tryGetServerSupabasePublicConfig()) return unavailable(emptyCategoryAttributes(categoryId));
     try {
@@ -171,13 +176,13 @@ export async function getCategoryAttributeReferences(
       return failed(emptyCategoryAttributes(categoryId));
     }
   });
-}
+});
 
-export async function getCategoryAttributeOptionReferences(
+export const getCategoryAttributeOptionReferences = cache(async (
   attributeId: string,
   parentOptionId?: string,
   query = "",
-): Promise<ReferenceDataEnvelope<ReferenceAttributeOption[]>> {
+): Promise<ReferenceDataEnvelope<ReferenceAttributeOption[]>> => {
   const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase("ru");
   const cacheKey = `${attributeId}:${parentOptionId ?? "root"}:${normalizedQuery}`;
   return optionCache.getOrLoad(cacheKey, async () => {
@@ -200,4 +205,4 @@ export async function getCategoryAttributeOptionReferences(
       return failed([]);
     }
   });
-}
+});

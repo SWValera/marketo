@@ -1,4 +1,4 @@
-const CACHE_NAME = "marketo-static-v9";
+const CACHE_NAME = "marketo-static-v10";
 const CACHE_PREFIX = "marketo-static-";
 // HTML and authenticated pages are deliberately never cached. Only the
 // self-contained offline document, immutable/static assets and explicitly
@@ -7,6 +7,28 @@ const CACHE_PREFIX = "marketo-static-";
 // so it cannot retain a stale locale or render a broken offline shell.
 const OFFLINE_URL = "/offline.html";
 const APP_SHELL = [OFFLINE_URL];
+// CacheStorage is optional: a blocked/quota-limited store must not block JS.
+function optionalCache(work, milliseconds = 120) {
+  let timer;
+  return Promise.race([
+    Promise.resolve().then(work),
+    new Promise((resolve) => { timer = setTimeout(resolve, milliseconds); }),
+  ]).catch(() => undefined).finally(() => clearTimeout(timer));
+}
+const openCache = () => optionalCache(() => caches.open(CACHE_NAME));
+function network(request) {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  if (request.signal?.aborted) onAbort();
+  else request.signal?.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(onAbort, 15000);
+  // Bound connection/header waiting only. Never truncate a streamed document
+  // after its headers; the server bounds its own data requests independently.
+  return fetch(request, { signal: controller.signal }).finally(() => {
+    clearTimeout(timer);
+    request.signal?.removeEventListener("abort", onAbort);
+  });
+}
 const PUBLIC_REFERENCE_PATHS = new Set([
   "/api/reference/categories",
   "/api/reference/geography",
@@ -21,7 +43,10 @@ function publicReferenceVersion(url) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(optionalCache(async () => {
+    const cache = await openCache();
+    if (cache) await cache.addAll(APP_SHELL);
+  }, 5000));
 });
 
 self.addEventListener("message", (event) => {
@@ -32,10 +57,10 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
+    optionalCache(() => caches.keys()
       .then((keys) => Promise.all(keys
         .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-        .map((key) => caches.delete(key))))
+        .map((key) => caches.delete(key)))))
       .then(() => self.clients.claim()),
   );
 });
@@ -48,17 +73,17 @@ self.addEventListener("fetch", (event) => {
   const referenceVersion = publicReferenceVersion(url);
   if (referenceVersion) {
     const result = (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request).catch(() => undefined);
+      const cache = await openCache();
+      const cached = cache && await optionalCache(() => cache.match(request));
       if (cached) return { response: cached, cacheWrite: Promise.resolve() };
 
-      const response = await fetch(request);
+      const response = await network(request);
       let cacheWrite = Promise.resolve();
       const responseVersion = response.headers?.get("x-marketo-reference-version");
       const contentType = response.headers?.get("content-type") ?? "";
-      if (response.ok && responseVersion === referenceVersion && contentType.includes("application/json")) {
+      if (cache && response.ok && responseVersion === referenceVersion && contentType.includes("application/json")) {
         try {
-          cacheWrite = cache.put(request, response.clone()).catch(() => undefined);
+          cacheWrite = optionalCache(() => cache.put(request, response.clone()));
         } catch {
           // A cache copy is optional; the successful public response remains authoritative.
         }
@@ -74,25 +99,25 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(async () => {
-      const cache = await caches.open(CACHE_NAME);
-      return (await cache.match(OFFLINE_URL)) || Response.error();
+    event.respondWith(network(request).catch(async () => {
+      const cache = await openCache();
+      return (cache && await optionalCache(() => cache.match(OFFLINE_URL))) || Response.error();
     }));
     return;
   }
 
   if (["image", "font", "script", "style"].includes(request.destination)) {
     const result = (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request).catch(() => undefined);
+      const cache = await openCache();
+      const cached = cache && await optionalCache(() => cache.match(request));
       if (cached) return { response: cached, cacheWrite: Promise.resolve() };
 
-      const response = await fetch(request);
+      const response = await network(request);
       let cacheWrite = Promise.resolve();
-      if (response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
+      if (cache && response.ok && (url.pathname.includes("/assets/") || ["image", "font"].includes(request.destination))) {
         try {
           const copy = response.clone();
-          cacheWrite = cache.put(request, copy).catch(() => undefined);
+          cacheWrite = optionalCache(() => cache.put(request, copy));
         } catch {
           // A cache copy is optional; the successful network response remains authoritative.
         }

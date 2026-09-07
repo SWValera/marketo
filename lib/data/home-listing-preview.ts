@@ -1,4 +1,5 @@
 import type { ListingSummary } from "@/lib/data/types";
+import { fetchWithDeadline } from "../http/fetch-deadline.ts";
 
 type PreviewFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -20,7 +21,7 @@ function isListingSummary(value: unknown): value is ListingSummary {
 
 export async function fetchHomeListingPreview(
   signal?: AbortSignal,
-  fetcher: PreviewFetch = fetch,
+  fetcher: PreviewFetch = fetchWithDeadline,
 ): Promise<ListingSummary[]> {
   const response = await fetcher("/api/listings?view=home-preview", {
     cache: "no-store",

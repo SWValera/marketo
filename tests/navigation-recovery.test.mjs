@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createNavigationRecovery, NAVIGATION_RECOVERY_MS } from '../lib/navigation/recovery.ts';
-import { metadataOrigin, SITE_ORIGIN } from '../lib/site-origin.ts';
+import { metadataOrigin, SITE_ORIGIN, DIRECT_SITE_ORIGIN } from '../lib/site-origin.ts';
 
 function fixture() {
   let href = 'https://marketo.test/';
@@ -19,6 +19,8 @@ test('metadata uses the actual publication or an exact local preview host, never
   for (const host of [null, 'attacker.test', 'localhost.attacker.test', '127.0.0.1@attacker.test', 'localhost:99999']) assert.equal(metadataOrigin(host).origin, SITE_ORIGIN);
   assert.equal(metadataOrigin('127.0.0.1:5173').origin, 'http://127.0.0.1:5173');
   assert.equal(metadataOrigin('localhost').origin, 'http://localhost');
+  assert.equal(metadataOrigin(new URL(DIRECT_SITE_ORIGIN).host).origin, DIRECT_SITE_ORIGIN);
+  assert.equal(metadataOrigin(new URL(DIRECT_SITE_ORIGIN).host + '.attacker.test').origin, SITE_ORIGIN);
 });
 
 test('accepted navigation gives immediate feedback and recovers one stuck request', () => {
