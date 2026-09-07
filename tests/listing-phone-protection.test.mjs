@@ -39,7 +39,7 @@ test("siteverify checks success, hostname, action and listing binding on every c
     }
     assert.equal(calls.length,5);
     for(const [url,options] of calls) {
-      assert.equal(url,"https://challenges.cloudflare.com/turnstile/v0/siteverify");assert.equal(options.redirect,"error");
+      assert.equal(url,"https://challenges.cloudflare.com/turnstile/v0/siteverify");assert.equal(options.redirect,"manual");
       assert.deepEqual(Object.keys(JSON.parse(options.body)).sort(),["response","secret"]);
       assert.equal(options.headers.Authorization,undefined);assert.equal(options.headers.Prefer,undefined);
     }

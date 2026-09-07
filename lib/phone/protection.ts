@@ -75,7 +75,9 @@ export async function boundedJson(request: Request | Response, signal: AbortSign
 export async function verifyPhoneChallenge(token: string, listingId: string, config: Config, signal: AbortSignal) {
   // Deliberately no remoteip: Sites forwarding does not establish trusted visitor IP.
   const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method:"POST", headers:{"Content-Type":"application/json"}, cache:"no-store", redirect:"error", signal,
+    // workerd rejects redirect:"error". Keep redirects manual so the secret is
+    // never forwarded elsewhere; the non-2xx guard below rejects every redirect.
+    method:"POST", headers:{"Content-Type":"application/json"}, cache:"no-store", redirect:"manual", signal,
     body:JSON.stringify({secret:config.secretKey, response:token}),
   });
   if (!response.ok) throw new Error("challenge_unavailable");
