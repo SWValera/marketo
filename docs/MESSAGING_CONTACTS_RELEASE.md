@@ -1,5 +1,8 @@
 # Messages and listing calls — 0029
 
+The phone-checkbox behavior below describes the historical0029release. The prepared
+replacement and its separate activation gates are in [Protected calls](PROTECTED_PHONE_RELEASE.md).
+
 Status: source implementation, NOT live until the database and frontend release gates pass.
 
 ## Product behavior

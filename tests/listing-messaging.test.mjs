@@ -60,7 +60,8 @@ test("phone consent defaults off, and private profile numbers are never a fallba
   const contact=await source("components/listing-contacts.tsx");
   assert.match(sql,/p_allow_phone boolean default false/);
   assert.match(sql,/case when contact.allow_phone then contact.contact_phone_e164 else null end/);
-  assert.match(contact,/href=\{"tel:" \+ phone\}/);
+  assert.match(await source("components/listing-phone-button.tsx"),/href=\{"tel:" \+ phone\}/);
+  assert.doesNotMatch(contact,/options.phone|href=\{"tel:/);
   assert.doesNotMatch(contact,/profile_private|contact_phone_e164/);
   assert.match(await source("lib/publish/contract.ts"),/allowPhone: z.boolean\(\).default\(false\)/);
 });

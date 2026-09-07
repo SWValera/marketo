@@ -5,6 +5,7 @@ import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { createPGliteTestDatabase, closePGliteTestDatabase } from "./pglite-test-database.mjs";
 import { auditListingMessaging } from "./listing-messaging-db-audit.mjs";
+import { auditListingPhones } from "./listing-phone-db-audit.mjs";
 const db=await createPGliteTestDatabase({extensions:{pg_trgm,pgcrypto}});
 const users={owner:"10000000-0000-4000-8000-000000000001",buyer:"20000000-0000-4000-8000-000000000002",admin:"40000000-0000-4000-8000-000000000004",suspended:"50000000-0000-4000-8000-000000000005"};
 try {
@@ -49,5 +50,20 @@ try {
   const conversationId=(await db.query("select public.get_or_create_listing_conversation($1) as id",[listingId])).rows[0].id;
   await db.exec("reset role");
   await auditListingMessaging(db,users,listingId,conversationId);
+  if (process.argv.includes("--phone")) {
+    // Include the exact publication guard from immutable0028 even in this small
+    // fixture, so arranging an expired date cannot silently leave an active term.
+    const lifecycle=await readFile(new URL("../supabase/migrations/0028_profile_lifecycle_registration.sql",import.meta.url),"utf8");
+    const publicationGuard=lifecycle.match(/create or replace function private\.enforce_listing_publication_period\(\)[\s\S]*?\$\$;/);
+    if(!publicationGuard) throw new Error("Missing canonical publication guard");
+    await db.exec(publicationGuard[0]);
+    await db.exec("create trigger listings_publication_period before insert or update on public.listings for each row execute function private.enforce_listing_publication_period()");
+    const preflight=await db.exec(await readFile(new URL("../supabase/operations/0030_phone_preflight.sql",import.meta.url),"utf8"));
+    if(!preflight.flatMap(x=>x.rows).every(x=>x.ok===true)) throw new Error("Phone preflight failed");
+    await db.exec(await readFile(new URL("../supabase/migrations/0030_protected_listing_phone.sql",import.meta.url),"utf8"));
+    await auditListingPhones(db,users,listingId);
+    const postflight=await db.exec(await readFile(new URL("../supabase/operations/0030_phone_postflight.sql",import.meta.url),"utf8"));
+    if(!postflight.flatMap(x=>x.rows).every(x=>x.ok===true)) throw new Error("Phone postflight failed: "+JSON.stringify(postflight.flatMap(x=>x.rows)));
+  }
   console.log("PASS: focused database contacts/messaging audit; full catalog clone remains separate.");
 } finally { await closePGliteTestDatabase(db); }

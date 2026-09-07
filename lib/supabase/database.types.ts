@@ -269,6 +269,10 @@ export type Database = {
         Args: { target_listing_id: string };
         Returns: Array<{ allow_messages: boolean; allow_phone: boolean; phone: string | null }>;
       };
+      reveal_listing_phone: {
+        Args: { target_listing_id: string; p_session_key: string };
+        Returns: Json;
+      };
       save_listing_draft_with_contacts: {
         Args: Database["public"]["Functions"]["create_listing_draft"]["Args"] & {
           p_listing_id?: string;
