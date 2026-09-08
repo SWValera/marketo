@@ -11,7 +11,8 @@ test("category attribute requests are single-flight and survive consumer cleanup
   assert.match(source, /inFlightRequests\.set\(cacheKey, request\)/);
   assert.match(source, /if \(inFlightRequests\.get\(cacheKey\) === request\) inFlightRequests\.delete\(cacheKey\)/);
   assert.match(source, /attributes\?v=\$\{encodeURIComponent\(CATEGORY_REFERENCE_VERSION\)\}/);
-  assert.equal(source.match(/\bfetch\s*\(/g)?.length ?? 0, 1, "one shared loader owns the network request");
+  assert.equal(source.match(/\bfetchWithDeadline\s*\(/g)?.length ?? 0, 1, "one shared bounded loader owns the network request");
+  assert.doesNotMatch(source, /\bfetch\s*\(/, "no unbounded bypass of the shared loader");
   assert.doesNotMatch(source, /AbortController/, "one consumer must not abort a request shared by another consumer");
   assert.match(source, /return \(\) => \{ active = false; \}/);
 });

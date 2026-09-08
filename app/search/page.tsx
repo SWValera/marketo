@@ -37,7 +37,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       title={unavailable ? t("reference.categoriesUnavailableTitle") : t("catalog.emptyTitle")}
       description={unavailable ? t("reference.categoriesUnavailable") : t("catalog.emptyDescription")}
       actionHref="/search"
-      actionLabel={t("catalog.reset")}
+      retry={unavailable}
+      actionLabel={unavailable ? t("common.retry") : t("catalog.reset")}
     /></main><MobileNav /></>;
   }
   let initialAttributes;
@@ -65,6 +66,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       [initialAttributes, listings] = await Promise.all([attributePromise, list({})]);
     } else {
       initialAttributes = await attributePromise;
+      if (categoryIsLeaf && initialAttributes?.status !== "ready") throw new Error("category_filters_unavailable");
       initialDynamicFilters = initialAttributes?.status === "ready"
         ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
         : {};
@@ -75,7 +77,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       title={t("state.error")}
       description={t("state.errorNote")}
       actionHref="/search"
-      actionLabel={t("common.retry")}
+      retry actionLabel={t("common.retry")}
     /></main><MobileNav /></>;
   }
   const searchPlaceholder = localize(category?.searchPlaceholder ?? rootCategory?.searchPlaceholder, locale) || t("header.searchPlaceholder");

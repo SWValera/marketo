@@ -1,0 +1,10 @@
+import {spawn} from 'node:child_process';
+import {createWriteStream,mkdirSync} from 'node:fs';
+const [label,...args]=process.argv.slice(2);
+if(!/^[a-z0-9-]+$/.test(label)||!args.length)throw new Error('label and Node arguments required');
+mkdirSync('artifacts/performance-20260908',{recursive:true});
+const output=createWriteStream(`artifacts/performance-20260908/${label}.log`);
+const child=spawn(process.execPath,args,{env:process.env,stdio:['ignore','pipe','pipe'],windowsHide:true});
+child.stdout.on('data',chunk=>output.write(chunk));child.stderr.on('data',chunk=>output.write(chunk));
+child.on('error',error=>{output.end(String(error));process.exitCode=1;});
+child.on('exit',code=>{output.end();console.log(JSON.stringify({label,code,log:`artifacts/performance-20260908/${label}.log`}));process.exitCode=code??1;});

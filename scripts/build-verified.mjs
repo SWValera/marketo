@@ -9,11 +9,13 @@ import {
   runLocalBin,
 } from "./lib/sites-runtime.mjs";
 import { validateArtifact } from "./validate-artifact.mjs";
+import { checkPageReadRegressions } from "./check-page-read-regressions.mjs";
 
 export async function buildVerified() {
   const { environment } = createSitesEnvironment();
   const timeoutMilliseconds = parseDuration(environment.SITES_BUILD_TIMEOUT, 180_000);
   const killAfterMilliseconds = parseDuration(environment.SITES_BUILD_KILL_AFTER, 10_000);
+  await checkPageReadRegressions(environment);
 
   console.log("Running bounded vinext build...");
   for (const generatedDirectory of [join(projectRoot, "dist"), join(projectRoot, ".vinext")]) {

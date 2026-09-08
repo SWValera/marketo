@@ -27,7 +27,7 @@ export default async function FavoritesPage({ searchParams }: { searchParams: Pr
   }
   if (authContext.status === "error") {
     return <DashboardShell title={t("favorites.title")} description={t("favorites.description")} active="/favorites" authContext={authContext}>
-      <EmptyState icon={<AlertTriangle size={30} />} title={t("favorites.loadErrorTitle")} description={t("favorites.loadErrorNote")} actionHref="/favorites" actionLabel={t("common.retry")} />
+      <EmptyState icon={<AlertTriangle size={30} />} title={t("favorites.loadErrorTitle")} description={t("favorites.loadErrorNote")} actionHref="/favorites" retry actionLabel={t("common.retry")} />
     </DashboardShell>;
   }
 
@@ -38,7 +38,7 @@ export default async function FavoritesPage({ searchParams }: { searchParams: Pr
     // The authenticated and empty states must remain distinct from a data failure.
   }
   return <DashboardShell title={t("favorites.title")} description={favorites ? `${favorites.total} ${t("favorites.saved")}.` : t("favorites.description")} active="/favorites" authContext={authContext}>
-    {!favorites ? <EmptyState icon={<AlertTriangle size={30} />} title={t("favorites.loadErrorTitle")} description={t("favorites.loadErrorNote")} actionHref={page === 1 ? "/favorites" : `/favorites?page=${page}`} actionLabel={t("common.retry")} />
+    {!favorites ? <EmptyState icon={<AlertTriangle size={30} />} title={t("favorites.loadErrorTitle")} description={t("favorites.loadErrorNote")} actionHref={page === 1 ? "/favorites" : `/favorites?page=${page}`} retry actionLabel={t("common.retry")} />
       : favorites.total === 0 ? <EmptyState icon={<Heart size={30} />} title={t("favorites.empty")} description={t("favorites.emptyNote")} actionHref="/search" actionLabel={t("home.viewCatalog")} />
         : favorites.items.length === 0 ? <EmptyState icon={<Heart size={30} />} title={t("favorites.pageOutOfRangeTitle")} description={t("favorites.pageOutOfRangeNote")} actionHref="/favorites" actionLabel={t("favorites.firstPage")} />
           : <>

@@ -8,6 +8,7 @@ import {
 } from "@/lib/reference-data/types";
 import { readLruEntry, writeLruEntry } from "@/lib/reference-data/bounded-map";
 import { CATEGORY_REFERENCE_VERSION } from "@/lib/reference-data/release";
+import { fetchWithDeadline } from "@/lib/http/fetch-deadline";
 
 const RESPONSE_CACHE_MAX_ENTRIES = 64;
 const responseCache = new Map<string, CategoryAttributeReferenceData>();
@@ -21,7 +22,7 @@ function requestCategoryAttributes(categoryId: string) {
   const pending = inFlightRequests.get(cacheKey);
   if (pending) return pending;
 
-  const request = fetch(`/api/reference/categories/${encodeURIComponent(categoryId)}/attributes?v=${encodeURIComponent(CATEGORY_REFERENCE_VERSION)}`, {
+  const request = fetchWithDeadline(`/api/reference/categories/${encodeURIComponent(categoryId)}/attributes?v=${encodeURIComponent(CATEGORY_REFERENCE_VERSION)}`, {
     headers: { accept: "application/json" },
   })
     .then(async (response) => {

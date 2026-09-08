@@ -369,7 +369,7 @@ test("listing cards defer the Supabase browser SDK until favorite state is reque
   assert.match(store, /import\("@\/lib\/supabase\/browser"\)/);
   assert.match(store, /import\("@\/lib\/data\/supabase\/favorites"\)/);
   assert.match(store, /const \{ getSupabaseBrowserClient, listFavoriteListingIds \} = await loadFavoriteDependencies\(\)/);
-  assert.match(store, /\.catch\(\(error\) => \{\s*dependenciesPromise = null;\s*throw error;/);
+  assert.match(store, /\.catch\(\(error\) => \{\s*if \(dependenciesPromise === request\) dependenciesPromise = null;\s*throw error;/);
 });
 
 test("authenticated profile listings reuse the verified Auth identity without a second getUser call", async () => {

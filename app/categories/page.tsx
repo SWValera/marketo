@@ -20,5 +20,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CategoriesPage() {
   const [{ t }, catalog] = await Promise.all([getServerI18n(), getHomeCategoryReferences()]);
-  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><PageHeader fallback="/" eyebrow={t("categories.eyebrow")} title={t("categories.title")} description={t("categories.description")} />{catalog.status === "ready" && catalog.data.categories.length > 0 ? <CategoryDirectory initialData={catalog.data} /> : <EmptyState title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/help" actionLabel={t("nav.help")} />}</main><MobileNav /></>;
+  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><PageHeader fallback="/" eyebrow={t("categories.eyebrow")} title={t("categories.title")} description={t("categories.description")} />{catalog.status === "ready" && catalog.data.categories.length > 0 ? <CategoryDirectory initialData={catalog.data} /> : <EmptyState retry title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/categories" actionLabel={t("common.retry")} />}</main><MobileNav /></>;
 }

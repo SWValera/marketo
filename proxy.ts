@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { classifyRequestRouting } from "@/lib/http/request-routing";
-import { fetchWithDeadline } from "@/lib/http/fetch-deadline";
+import { fetchWithinRead } from "@/lib/http/read-scope";
+import { getRequestUser } from "@/lib/auth/request-user";
 import type { Database } from "@/lib/supabase/database.types";
 import { tryGetServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 
@@ -29,7 +30,8 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   const client = createServerClient<Database>(config.url, config.publishableKey, {
-    global: { fetch: fetchWithDeadline },
+    global: { fetch: fetchWithinRead },
+    db: { retry: false },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (cookiesToSet) => {
@@ -41,7 +43,7 @@ export async function proxy(request: NextRequest) {
   });
 
   try {
-    await client.auth.getUser();
+    await getRequestUser(client);
   } catch {
     // A transient Auth outage must not take down public marketplace pages.
     // Protected pages and RLS still reject missing/invalid sessions.

@@ -7,6 +7,9 @@ import type { AuthMode } from "@/components/auth-form";
 import type { AuthCallbackError } from "@/lib/auth/callback-error";
 import { safeInternalPath } from "@/lib/auth/redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-user";
+import { isAuthSessionMissing } from "@/lib/auth/context-core";
+import { AuthReadError } from "@/components/auth-read-error";
 
 export const metadata: Metadata = { title: "Вход и регистрация", robots: { index: false, follow: false } };
 
@@ -25,13 +28,10 @@ async function LoginPageContent({ searchParams }: LoginPageProps) {
   const callbackError: AuthCallbackError | null = rawCallbackError === "expired" || rawCallbackError === "invalid" ? rawCallbackError : null;
   const passwordResetSuccess = params.password_reset === "success";
   if (!passwordResetSuccess) {
-    try {
-      const client = await createSupabaseServerClient();
-      const { data } = await client.auth.getUser();
-      if (data.user) redirect(next);
-    } catch (error) {
-      if (error && typeof error === "object" && "digest" in error) throw error;
-    }
+    const client = await createSupabaseServerClient();
+    const { data, error } = await getRequestUser(client);
+    if (error && !isAuthSessionMissing(error)) return <AuthReadError href="/login" />;
+    if (data.user) redirect(next);
   }
   return <><Header /><LoginContent mode={mode} next={next} callbackError={callbackError} passwordResetSuccess={passwordResetSuccess} /><MobileNav /></>;
 }

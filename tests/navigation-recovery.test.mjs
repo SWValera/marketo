@@ -86,7 +86,7 @@ test('feedback is non-blocking and preserves caller cancellation and new-tab lin
   assert.match(link, /onNavigate=\{/);
   assert.match(link, /prevented = true; event\.preventDefault\(\)/);
   assert.match(link, /!prevented && !props\.download/);
-  assert.match(feedback, /\[pathname, search\]/);
-  assert.match(feedback, /removeEventListener\("pagehide", recovery\.finish\)/);
+  assert.doesNotMatch(feedback, /\[pathname, search\]/);
+  assert.match(feedback, /removeEventListener\(PAGE_READ_EVENT, onRead\)/);
   assert.match(css, /\.navigation-feedback \{[^}]*pointer-events: none/);
 });

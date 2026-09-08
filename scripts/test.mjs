@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { createSitesEnvironment, projectRoot, reportFailure, runNodeScript, runProcess } from "./lib/sites-runtime.mjs";
+import { pgliteRunScopes } from "./lib/test-plan.mjs";
 
 const PGLITE_TEST_NAMES = new Set([
   "premium-commercial-security.test.mjs",
@@ -17,6 +18,9 @@ const PGLITE_WASM_FLAGS = [
 
 async function main() {
   const { environment } = createSitesEnvironment();
+  delete environment.MARKETO_AUDIT_WORKER_ROOT;
+  delete environment.MARKETO_TEST_UNPATCHED;
+  delete environment.MARKETO_DB_AUDIT_SCOPE;
   // Production bundles may inline NEXT_PUBLIC_* values at build time. Tests use a
   // deterministic public-only Supabase endpoint that rendered-html.test.mjs mocks,
   // so a developer's .env.local can never make the suite depend on live data.
@@ -57,16 +61,20 @@ async function main() {
   // own process with bounded baseline compilation avoids V8 native Zone OOM on
   // constrained Windows hosts without skipping or changing any test assertion.
   for (const testFile of pgliteTestFiles) {
-    await runProcess(process.execPath, [
-      ...PGLITE_WASM_FLAGS,
-      "--import",
-      new URL("./lib/register-cloudflare-node-shim.mjs", import.meta.url).href,
-      testFile,
-    ], {
-      environment,
-      cwd: projectRoot,
-      label: `PGlite test suite ${basename(testFile)}`,
-    });
+    for (const scope of pgliteRunScopes(basename(testFile))) {
+      const scopedEnvironment = { ...environment };
+      if (scope) scopedEnvironment.MARKETO_DB_AUDIT_SCOPE = scope;
+      await runProcess(process.execPath, [
+        ...PGLITE_WASM_FLAGS,
+        "--import",
+        new URL("./lib/register-cloudflare-node-shim.mjs", import.meta.url).href,
+        testFile,
+      ], {
+        environment: scopedEnvironment,
+        cwd: projectRoot,
+        label: `PGlite test suite ${basename(testFile)}${scope ? ` (${scope})` : ""}`,
+      });
+    }
   }
 }
 

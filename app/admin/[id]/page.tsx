@@ -42,7 +42,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
         title={t("admin.detailLoadErrorTitle")}
         description={t("admin.detailLoadErrorNote")}
         actionHref={`/admin/${id}`}
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       />
     </DashboardShell>;
   }
@@ -59,7 +59,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
         title={t("admin.detailLoadErrorTitle")}
         description={t("admin.detailLoadErrorNote")}
         actionHref={`/admin/${id}`}
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       />
     </DashboardShell>;
   }

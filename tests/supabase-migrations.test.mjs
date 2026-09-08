@@ -80,7 +80,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.equal(names.length, 29);
+    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:31},(_,index)=>String(index+1).padStart(4,'0')));
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -96,7 +96,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       where procedure.prosecdef
         and namespace.nspname in ('public', 'private')
     `);
-    assert.equal(elevatedFunctions.rows.length, 23);
+    // 0030 adds reveal_listing_phone; 0031 adds five elevated account guards/RPCs.
+    assert.equal(elevatedFunctions.rows.length, 29);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -689,7 +690,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
           join pg_namespace as namespace on namespace.oid = procedure.pronamespace
           where namespace.nspname = 'public'
             and has_function_privilege('anon', procedure.oid, 'EXECUTE')
-            and procedure.proname not in ('search_catalog_listing_cards', 'get_city_premium_placements')
+            and procedure.proname not in ('search_catalog_listing_cards', 'get_city_premium_placements', 'get_listing_contact_options')
         ) as unexpected_anon_public_execute,
         (
           select count(*)::int
@@ -741,7 +742,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       anon_private_execute: 0,
       default_acl_violations: 0,
       rls_disabled: 0,
-      affected_read_policies: 11,
+      // 0028 adds two restrictive publication-term SELECT policies.
+      affected_read_policies: 13,
     });
 
     const passengerCars = await db.query(`

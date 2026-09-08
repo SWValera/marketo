@@ -16,18 +16,45 @@ function optionalCache(work, milliseconds = 120) {
   ]).catch(() => undefined).finally(() => clearTimeout(timer));
 }
 const openCache = () => optionalCache(() => caches.open(CACHE_NAME));
-function network(request) {
+async function network(request, milliseconds = 15000) {
   const controller = new AbortController();
-  const onAbort = () => controller.abort();
+  let reject;
+  const stopped = new Promise((_, fail) => { reject = fail; });
+  const onAbort = () => {
+    const error = new DOMException("Page read deadline or cancellation", "AbortError");
+    controller.abort(error);
+    reject(error);
+  };
   if (request.signal?.aborted) onAbort();
   else request.signal?.addEventListener("abort", onAbort, { once: true });
-  const timer = setTimeout(onAbort, 15000);
-  // Bound connection/header waiting only. Never truncate a streamed document
-  // after its headers; the server bounds its own data requests independently.
-  return fetch(request, { signal: controller.signal }).finally(() => {
+  const timer = setTimeout(onAbort, milliseconds);
+  const dispose = () => {
     clearTimeout(timer);
     request.signal?.removeEventListener("abort", onAbort);
-  });
+  };
+  let reader;
+  try {
+    const response = await Promise.race([fetch(request, { signal: controller.signal }), stopped]);
+    if (!response.body || milliseconds === 15000) { dispose(); return response; }
+    reader = response.body.getReader();
+    // Keep streaming useful chunks immediately. One timer covers both headers
+    // and body, even if the underlying transport ignores abort.
+    const body = new ReadableStream({
+      async pull(stream) {
+        try {
+          const chunk = await Promise.race([reader.read(), stopped]);
+          if (chunk.done) { dispose(); stream.close(); }
+          else stream.enqueue(chunk.value);
+        } catch (error) {
+          dispose(); void reader.cancel(error).catch(() => {}); stream.error(error);
+        }
+      },
+      cancel(reason) { dispose(); controller.abort(reason); return reader.cancel(reason); },
+    });
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  } catch (error) {
+    dispose(); if (reader) void reader.cancel(error).catch(() => {}); throw error;
+  }
 }
 const PUBLIC_REFERENCE_PATHS = new Set([
   "/api/reference/categories",
@@ -77,7 +104,7 @@ self.addEventListener("fetch", (event) => {
       const cached = cache && await optionalCache(() => cache.match(request));
       if (cached) return { response: cached, cacheWrite: Promise.resolve() };
 
-      const response = await network(request);
+      const response = await network(request, 9000);
       let cacheWrite = Promise.resolve();
       const responseVersion = response.headers?.get("x-marketo-reference-version");
       const contentType = response.headers?.get("content-type") ?? "";
@@ -99,7 +126,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(network(request).catch(async () => {
+    event.respondWith(network(request, 9000).catch(async () => {
       const cache = await openCache();
       return (cache && await optionalCache(() => cache.match(OFFLINE_URL))) || Response.error();
     }));

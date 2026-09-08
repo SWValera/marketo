@@ -18,7 +18,7 @@ export default async function SettingsPage() {
   }
   if (authContext.status === "error") {
     return <DashboardShell active="/settings" title={t("settings.title")} description={t("settings.description")} authContext={authContext}>
-      <EmptyState icon={<AlertTriangle size={30} />} title={t("settings.loadErrorTitle")} description={t("settings.loadErrorNote")} actionHref="/settings" actionLabel={t("common.retry")} />
+      <EmptyState icon={<AlertTriangle size={30} />} title={t("settings.loadErrorTitle")} description={t("settings.loadErrorNote")} actionHref="/settings" retry actionLabel={t("common.retry")} />
     </DashboardShell>;
   }
   return <DashboardShell active="/settings" title={t("settings.title")} description={t("settings.description")} authContext={authContext}>

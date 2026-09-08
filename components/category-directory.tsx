@@ -53,6 +53,7 @@ export function CategoryDirectory({ initialData }: { initialData: DirectoryData 
   const cityId = useStoredLocation();
   const [catalogData, setCatalogData] = useState<DirectoryData>(initialData);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [retryCount, setRetryCount] = useState(0);
   const view = useMemo(
     () => createCategoryCatalogView(catalogData as CategoryReferenceData),
     [catalogData],
@@ -88,7 +89,7 @@ export function CategoryDirectory({ initialData }: { initialData: DirectoryData 
     return () => {
       active = false;
     };
-  }, []);
+  }, [retryCount]);
 
   function toggleBranch(id: string, open: boolean) {
     setExpandedBranches((current) => {
@@ -100,6 +101,10 @@ export function CategoryDirectory({ initialData }: { initialData: DirectoryData 
   }
 
   return <>
+    {loadState === "error" ? <section className="empty-state" role="status" data-marketo-error={true}>
+      <p>{t("reference.categoriesUnavailable")}</p>
+      <button type="button" className="secondary-button" onClick={() => { setLoadState("loading"); setRetryCount(value => value + 1); }}>{t("common.retry")}</button>
+    </section> : null}
     <section className="category-directory-tools" aria-label={t("categories.search")}>
       <label className="category-directory-search">
         <Search size={20} aria-hidden="true" />

@@ -12,7 +12,7 @@ import type {
   PageResult,
   Profile,
 } from "@/lib/data/types";
-import { cache } from "react";
+import { requestCache as cache } from "@/lib/http/read-scope";
 import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";

@@ -60,7 +60,7 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   const category = getCategoryBySlug(view, slug);
   if (catalog.status === "ready" && !category) notFound();
   if (!category) {
-    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref="/help" actionLabel={t("nav.help")} /></main><MobileNav /></>;
+    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main"><EmptyState retry title={t("reference.categoriesUnavailableTitle")} description={t("reference.categoriesUnavailable")} actionHref={`/category/${slug}`} actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   const requestedCategory = getCategoryBySlug(view, parsed.categorySlug);
   const filteredCategory = requestedCategory && isCategoryWithin(view, requestedCategory.slug, category.slug)
@@ -92,6 +92,7 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
       [initialAttributes, listings] = await Promise.all([attributePromise, list({})]);
     } else {
       initialAttributes = await attributePromise;
+      if (categoryIsLeaf && initialAttributes?.status !== "ready") throw new Error("category_filters_unavailable");
       initialDynamicFilters = initialAttributes?.status === "ready"
         ? sanitizeAttributeFilters(initialAttributes.data.attributes, parsed.dynamicFilters)
         : {};
@@ -102,7 +103,7 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
       title={t("state.error")}
       description={t("state.errorNote")}
       actionHref={`/category/${category.slug}`}
-      actionLabel={t("common.retry")}
+      retry actionLabel={t("common.retry")}
     /></main><MobileNav /></>;
   }
   const parent = getCategoryParent(view, filteredCategory);

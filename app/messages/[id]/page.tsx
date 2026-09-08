@@ -25,13 +25,13 @@ async function ConversationPageContent({ params }: ConversationPageProps) {
   const [{ t, locale }, authContext] = await Promise.all([getServerI18n(), getCurrentAuthContext()]);
   if (authContext.status === "anonymous") redirect(`/login?next=${encodeURIComponent(`/messages/${id}`)}`);
   if (authContext.status === "error") {
-    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} /><EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={`/messages/${id}`} actionLabel={t("common.retry")} /></main><MobileNav /></>;
+    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} /><EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={`/messages/${id}`} retry actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   let conversation: Awaited<ReturnType<typeof chatRepository.findById>> | null = null;
   try {
     conversation = await chatRepository.findById(id, locale);
   } catch {
-    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} /><EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={`/messages/${id}`} actionLabel={t("common.retry")} /></main><MobileNav /></>;
+    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} /><EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={`/messages/${id}`} retry actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   if (!conversation) notFound();
   return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={conversation.peerName} description={conversation.listingTitle ? t("messages.aboutListing", { title: conversation.listingTitle }) : t("messages.safeChat")} /><section className="conversation conversation-standalone"><header className="conversation-header"><span className="chat-avatar">{conversation.peerAvatarUrl

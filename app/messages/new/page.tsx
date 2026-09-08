@@ -21,7 +21,7 @@ export default async function NewConversationPage({ searchParams }: { searchPara
 
   return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.newTitle")} description={t("messages.newDescription")} />
     {authContext.status === "anonymous" ? <section className="state-card compact-state"><h2>{t("messages.signInTitle")}</h2><p>{t("messages.signInNote")}</p><Link className="primary-button" href={`/login?next=${encodeURIComponent(next)}`}>{t("messages.signIn")}</Link></section>
-      : authContext.status === "error" ? <EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={next} actionLabel={t("common.retry")} />
+      : authContext.status === "error" ? <EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={next} retry actionLabel={t("common.retry")} />
         : !validListingId ? <EmptyState icon={<MessageCircle size={30} />} title={t("messages.listingRequiredTitle")} description={t("messages.listingRequiredNote")} actionHref="/search" actionLabel={t("messages.findListing")} />
           : <section className="state-card compact-state"><h2>{t("messages.start")}</h2><p>{t("messages.signInNote")}</p><StartConversation listingId={validListingId} /></section>}
   </main><MobileNav /></>;

@@ -103,8 +103,9 @@ export function isAuthSessionMissing(error: unknown) {
 export async function resolveCurrentAuthContext(
   client: MarketoSupabaseClient,
   logger: SafeAuthLogger = ({ scope, ...details }) => console.error("[marketo-auth] request failed", { scope, ...details }),
+  getUser = () => client.auth.getUser(),
 ): Promise<CurrentAuthContext> {
-  const { data: authData, error: authError } = await client.auth.getUser();
+  const { data: authData, error: authError } = await getUser();
   if (authError && !isAuthSessionMissing(authError)) {
     logger({ scope: "auth", ...errorDetails(authError) });
     return createAuthContextError(false);

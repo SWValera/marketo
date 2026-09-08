@@ -26,7 +26,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   }
   if (authContext.status === "error") {
     return <DashboardShell title={t("notifications.title")} description={t("notifications.description")} active="/notifications" authContext={authContext}>
-      <EmptyState icon={<AlertTriangle size={30} />} title={t("notifications.loadErrorTitle")} description={t("notifications.loadErrorNote")} actionHref="/notifications" actionLabel={t("common.retry")} />
+      <EmptyState icon={<AlertTriangle size={30} />} title={t("notifications.loadErrorTitle")} description={t("notifications.loadErrorNote")} actionHref="/notifications" retry actionLabel={t("common.retry")} />
     </DashboardShell>;
   }
   let notifications: Awaited<ReturnType<typeof notificationRepository.list>> | null = null;
@@ -46,7 +46,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       <Link className={initialFilter === "all" ? "primary-button" : "secondary-button"} aria-current={initialFilter === "all" ? "page" : undefined} href="/notifications">{t("common.all")}</Link>
       <Link className={initialFilter === "unread" ? "primary-button" : "secondary-button"} aria-current={initialFilter === "unread" ? "page" : undefined} href="/notifications?filter=unread">{t("notifications.unread")}</Link>
     </nav>
-    {!notifications ? <EmptyState icon={<AlertTriangle size={30} />} title={t("notifications.loadErrorTitle")} description={t("notifications.loadErrorNote")} actionHref={page === 1 ? baseHref : pageHref(page)} actionLabel={t("common.retry")} />
+    {!notifications ? <EmptyState icon={<AlertTriangle size={30} />} title={t("notifications.loadErrorTitle")} description={t("notifications.loadErrorNote")} actionHref={page === 1 ? baseHref : pageHref(page)} retry actionLabel={t("common.retry")} />
       : notifications.total === 0 ? <EmptyState icon={<Bell size={30} />} title={t("notifications.empty")} description={t("notifications.emptyNote", { count: notifications.total })} />
         : notifications.items.length === 0 ? <EmptyState icon={<Bell size={30} />} title={t("notifications.pageOutOfRangeTitle")} description={t("notifications.pageOutOfRangeNote")} actionHref={baseHref} actionLabel={t("notifications.firstPage")} />
           : <><NotificationList notifications={notifications.items} />

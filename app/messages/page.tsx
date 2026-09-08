@@ -20,6 +20,6 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   }
   return <DashboardShell title={t("messages.title")} description={t("messages.description")} active="/messages" authContext={authContext}>
     {chats && authContext.status === "authenticated" ? <ChatInbox key={authContext.user.id + ":" + page + ":" + locale} initial={chats} currentUserId={authContext.user.id} page={page} />
-      : <EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={page === 1 ? "/messages" : "/messages?page=" + page} actionLabel={t("common.retry")} />}
+      : <EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={page === 1 ? "/messages" : "/messages?page=" + page} retry actionLabel={t("common.retry")} />}
   </DashboardShell>;
 }

@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { requestCache as cache } from "@/lib/http/read-scope";
 import {
   getCategoryAttributes,
   listActiveCategories,
@@ -181,7 +181,7 @@ export const getCategoryAttributeReferences = cache(async (
 export const getCategoryAttributeOptionReferences = cache(async (
   attributeId: string,
   parentOptionId?: string,
-  query = "",
+  query: string = "",
 ): Promise<ReferenceDataEnvelope<ReferenceAttributeOption[]>> => {
   const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase("ru");
   const cacheKey = `${attributeId}:${parentOptionId ?? "root"}:${normalizedQuery}`;

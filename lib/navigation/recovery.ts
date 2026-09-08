@@ -28,6 +28,7 @@ export function createNavigationRecovery({ currentHref, navigate, onPending, clo
     begin(href: string) {
       const from = new URL(currentHref());
       const to = new URL(href, from);
+      if (target?.href === to.href) return;
       if (to.origin !== from.origin || !['http:', 'https:'].includes(to.protocol)) return;
       if (to.pathname === from.pathname && to.search === from.search) return;
       finish();

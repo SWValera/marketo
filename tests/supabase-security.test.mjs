@@ -459,9 +459,13 @@ async function createFixtureDatabase() {
 }
 
 test("Supabase v2 security and reference-data audit", async (t) => {
-  const { db, refs, listings } = await createFixtureDatabase();
-  let currentDbClosed = false;
+  // Diagnostic partition for constrained hosts. The default still runs every
+  // current-schema and immutable replay assertion; no test is silently skipped.
+  const replayOnly = process.env.MARKETO_DB_AUDIT_SCOPE === "replay";
+  const { db, refs, listings } = replayOnly ? {} : await createFixtureDatabase();
+  let currentDbClosed = replayOnly;
   try {
+    if (!replayOnly) {
     await t.test("category tree has no cycles, orphans, localization gaps or ordering collisions", async () => {
       const result = await db.query(`
         with recursive category_walk as (
@@ -1368,18 +1372,19 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 23);
+      assert.equal(functions.rows.length, 29);
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
       assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_listing_contact_options"]);
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
-      assert.deepEqual(notClientCallable, ["enforce_listing_publication_period", "handle_new_auth_user", "touch_conversation_after_message", "archive_expired_listings", "registration_handoff"]);
+      assert.deepEqual(notClientCallable, ["enforce_listing_publication_period", "handle_new_auth_user", "require_writable_account_owner", "touch_conversation_after_message", "advance_account_deletion", "archive_expired_listings", "begin_account_deletion", "finish_account_deletion", "registration_handoff", "reveal_listing_phone"]);
     });
 
     await t.test("0028 owner lifecycle, calendar month, exact public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
-    await t.test("0029 two-party messages, idempotent retries, read state and private phone consent", () => auditListingMessaging(db, users, listings.activeOwner, conversationId));
+    await t.test("0029 messages and 0030 protected phone metadata", () => auditListingMessaging(db, users, listings.activeOwner, conversationId, { protectedPhones: true }));
     await t.test("0028 private PKCE mailbox capabilities, leases, cancellation and rate limits", () => auditRegistrationHandoff(db, users.owner));
     await closePGliteTestDatabase(db);
     currentDbClosed = true;
+    }
     if (process.env.MARKETO_DB_AUDIT_SCOPE === "current") {
       console.log("Current-schema audit selected; immutable 0025 replay cases are not selected.");
       return;

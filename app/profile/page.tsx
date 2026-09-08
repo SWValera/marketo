@@ -97,7 +97,7 @@ export default async function ProfilePage({
         title={t("profile.loadErrorTitle")}
         description={t("profile.loadErrorNote")}
         actionHref="/profile"
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       />
     </DashboardShell>;
   }
@@ -170,7 +170,7 @@ export default async function ProfilePage({
         title={t("profile.listingsLoadErrorTitle")}
         description={t("profile.listingsLoadErrorNote")}
         actionHref={ownerProfileHref(tab, page)}
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       /> : listings.state === "empty" ? <EmptyState
         title={t("profile.emptyListings")}
         description={t("profile.emptyListingsNote")}

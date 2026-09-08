@@ -40,7 +40,7 @@ test("frontend auth implements register, login, refreshed session, recovery, pas
   assert.match(callback, /exchangeCodeForSession|verifyOtp/);
   assert.match(callback, /classifyAuthCallbackError/);
   assert.match(authResult, /publishBrowserAuthEvent\("signup-confirmed"\)/);
-  assert.match(updatePassword, /auth\.getUser\(\)/);
+  assert.match(updatePassword, /getRequestUser\(/);
   assert.match(events, /BroadcastChannel/);
   assert.match(events, /storage/);
   assert.match(logout, /auth\.signOut/);
@@ -51,7 +51,10 @@ test("frontend auth implements register, login, refreshed session, recovery, pas
   assert.match(proxy, /createServerClient<Database>/);
   assert.match(proxy, /request\.cookies\.getAll\(\)/);
   assert.match(proxy, /response\.cookies\.set/);
-  assert.match(proxy, /client\.auth\.getUser\(\)/);
+  assert.match(proxy, /getRequestUser\(client\)/);
+  const verifiedUser = await readFile(new URL("lib/auth/request-user.ts", root), "utf8");
+  assert.match(verifiedUser, /client\.auth\.getUser\(\)/);
+  assert.doesNotMatch(verifiedUser, /auth\.getSession\(/);
 });
 
 test("auth and profile messages are complete in RU and KK", () => {
@@ -61,7 +64,7 @@ test("auth and profile messages are complete in RU and KK", () => {
     "auth.submit.update-password", "auth.errorGeneric", "auth.logout",
     "auth.confirmedSignIn", "auth.resend", "auth.errorCallbackExpired",
     "profile.requiredError", "profile.phoneError", "profile.saveError",
-    "profile.login", "profile.register", "profile.recover", "profile.loadErrorTitle",
+    "profile.login", "profile.register", "profile.recover", "profile.loadErrorTitle", "auth.readErrorTitle", "auth.readErrorNote",
   ];
   for (const key of required) {
     assert.ok(messages.ru[key]?.trim(), `missing RU ${key}`);

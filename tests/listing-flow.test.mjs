@@ -511,7 +511,7 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(loader, /loadBrowserCategoryReferences/);
   assert.doesNotMatch(loader, /listActiveCategories|mapCategoryReferenceRows/);
   assert.doesNotMatch(loader, /CATEGORY_COLUMNS/);
-  assert.match(browserReferences, /fetch\(\`\/api\/reference\/categories\?v=/);
+  assert.match(browserReferences, /fetchWithDeadline\(\`\/api\/reference\/categories\?v=/);
   assert.doesNotMatch(browserReferences, /listActiveCategories|mapCategoryReferenceRows|getSupabaseBrowserClient/);
   assert.match(browserReferences, /createSingleFlightTtlLoader/);
   assert.match(loader, /const draft = requestedListingId \? await loadDraft/);

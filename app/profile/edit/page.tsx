@@ -19,7 +19,7 @@ async function EditProfilePageContent() {
   if (authContext.status === "anonymous") redirect("/login?next=/profile/edit");
   if (authContext.status === "error") {
     const { t } = await getServerI18n();
-    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main profile-edit-page"><EmptyState icon={<AlertTriangle size={30} />} title={t("profile.loadErrorTitle")} description={t("profile.loadErrorNote")} actionHref="/profile/edit?retry=1" actionLabel={t("common.retry")} /></main><MobileNav /></>;
+    return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main profile-edit-page"><EmptyState icon={<AlertTriangle size={30} />} title={t("profile.loadErrorTitle")} description={t("profile.loadErrorNote")} actionHref="/profile/edit?retry=1" retry actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   return <><Header /><ProfileEditContent profile={authContext.profile} /><MobileNav /></>;
 }

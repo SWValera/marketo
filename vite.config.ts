@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { publicSupabaseBuildEnvGuard } from "./build/public-supabase-env-guard";
 import { sites } from "./build/sites-vite-plugin";
+import { navigationReadGuard } from "./build/navigation-read-guard";
 
 const hostingConfigPath = fileURLToPath(new URL("./.openai/hosting.json", import.meta.url));
 const hostingConfig = existsSync(hostingConfigPath)
@@ -49,6 +50,7 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      navigationReadGuard(),
       vinext(),
       sites(),
       cloudflare({

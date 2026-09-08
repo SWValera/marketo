@@ -41,7 +41,7 @@ async function AdminPageContent({ searchParams }: AdminPageProps) {
         title={t("admin.loadErrorTitle")}
         description={t("admin.loadErrorNote")}
         actionHref="/admin"
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       />
     </DashboardShell>;
   }
@@ -57,7 +57,7 @@ async function AdminPageContent({ searchParams }: AdminPageProps) {
         title={t("admin.loadErrorTitle")}
         description={t("admin.loadErrorNote")}
         actionHref="/admin"
-        actionLabel={t("common.retry")}
+        retry actionLabel={t("common.retry")}
       />
     </DashboardShell>;
   }

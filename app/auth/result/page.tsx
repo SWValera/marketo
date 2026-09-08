@@ -5,6 +5,9 @@ import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
 import { safeInternalPath } from "@/lib/auth/redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-user";
+import { isAuthSessionMissing } from "@/lib/auth/context-core";
+import { AuthReadError } from "@/components/auth-read-error";
 
 export const metadata: Metadata = { title: "Подтверждение аккаунта", robots: { index: false, follow: false } };
 
@@ -17,7 +20,8 @@ export default function AuthResultPage(props: AuthResultPageProps) {
 async function AuthResultPageContent({ searchParams }: AuthResultPageProps) {
   const params = await searchParams;
   if (params.event !== "signup-confirmed") redirect("/login?mode=register&auth_error=invalid");
-  const { data, error } = await (await createSupabaseServerClient()).auth.getUser();
+  const { data, error } = await getRequestUser(await createSupabaseServerClient());
+  if (error && !isAuthSessionMissing(error)) return <AuthReadError href="/auth/result" />;
   if (error || !data.user) redirect("/login?mode=register&auth_error=invalid");
   const next = safeInternalPath(typeof params.next === "string" ? params.next : null, "/profile");
   return <><Header /><AuthResultContent next={next} /><MobileNav /></>;

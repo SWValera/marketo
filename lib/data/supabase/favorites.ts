@@ -60,8 +60,9 @@ type FavoriteListingRow = {
   listing_images: unknown;
 };
 
-export async function listFavoriteListingIds(client: MarketoSupabaseClient, userId: string) {
-  const { data, error } = await client.from("favorites").select("listing_id, created_at").eq("user_id", userId).order("created_at", { ascending: false });
+export async function listFavoriteListingIds(client: MarketoSupabaseClient, userId: string, signal?: AbortSignal) {
+  const request = client.from("favorites").select("listing_id, created_at").eq("user_id", userId).order("created_at", { ascending: false });
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw error;
   return data;
 }

@@ -104,7 +104,7 @@ async function SellerPageContent({ params, searchParams }: SellerPageProps) {
           title={t("seller.loadErrorTitle")}
           description={t("seller.loadErrorNote")}
           actionHref={retryPath}
-          actionLabel={t("common.retry")}
+          retry actionLabel={t("common.retry")}
         /> : listings.total === 0 ? <EmptyState
           title={t("seller.empty")}
           description={t("seller.emptyNote")}

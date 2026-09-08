@@ -35,9 +35,9 @@ function HomeCatalogFallback({ locale }: { locale: Locale }) {
 async function HomeCatalogPanel({ locale }: { locale: Locale }) {
   const catalog = await getHomeCategoryReferences();
   const rootCategories = sortCategoryReferences(catalog.data.categories);
-  return <section className="home-tab-panel" aria-labelledby="home-catalog-title">
+  return <section className="home-tab-panel" aria-labelledby="home-catalog-title" data-marketo-error={catalog.status !== "ready" || undefined}>
     <HomeCatalogHeading locale={locale} />
-    {rootCategories.length ? <div className="category-grid">{rootCategories.map((category) => <CategoryLink href={`/category/${category.slug}`} className="category-tile" key={category.id}><span className={`category-icon tone-${category.tone ?? "green"}`}><CategoryIcon name={category.icon ?? undefined} size={26} /></span><strong>{localize(category.name, locale)}</strong><small>{category.childCount} {homeText(locale, "home.sections")}</small></CategoryLink>)}</div> : <EmptyState title={homeText(locale, "reference.categoriesUnavailableTitle")} description={homeText(locale, "reference.categoriesUnavailable")} actionHref="/help" actionLabel={homeText(locale, "nav.help")} />}
+    {rootCategories.length ? <div className="category-grid">{rootCategories.map((category) => <CategoryLink href={`/category/${category.slug}`} className="category-tile" key={category.id}><span className={`category-icon tone-${category.tone ?? "green"}`}><CategoryIcon name={category.icon ?? undefined} size={26} /></span><strong>{localize(category.name, locale)}</strong><small>{category.childCount} {homeText(locale, "home.sections")}</small></CategoryLink>)}</div> : <EmptyState retry title={homeText(locale, "reference.categoriesUnavailableTitle")} description={homeText(locale, "reference.categoriesUnavailable")} actionHref="/" actionLabel={homeText(locale, "common.retry")} />}
   </section>;
 }
 
