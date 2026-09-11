@@ -11,27 +11,27 @@ function harness(fetch){
   vm.runInNewContext(source,{
     URL,AbortController,AbortSignal,DOMException,Response,ReadableStream,fetch,
     setTimeout(fn,ms){timers.set(++id,{fn,ms});return id;},clearTimeout(id){timers.delete(id);},
-    caches:{async open(){return {async match(){return offline;}};}},
+    caches:{async open(){return {async match(){return null;}};}},
     self:{location:{origin:'https://test.invalid'},addEventListener(type,fn){handlers.set(type,fn);}},
   });
   return {timers,offline,request(){let response;handlers.get('fetch')({
-    request:{url:'https://test.invalid/profile',method:'GET',mode:'navigate',destination:'document'},
+    request:{url:'https://test.invalid/api/reference/categories?v=fixture',method:'GET',mode:'same-origin',destination:''},
     respondWith(value){response=value;},waitUntil(){},
   });return response;}};
 }
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
 
-test('PWA document header wait has a total deadline below ten seconds and a fallback',async()=>{
+test('PWA public reference header wait retains its bounded deadline',async()=>{
   let signal;const h=harness(async(_request,init)=>{signal=init.signal;return new Promise(()=>{});});
-  const pending=h.request();await flush();
+  const pending=h.request();const rejected=assert.rejects(pending,{name:'AbortError'});await flush();
   const deadline=[...h.timers.values()].find(t=>t.ms>=1000);
   assert.ok(deadline && deadline.ms<=9500,'leave time for bounded offline-cache lookup');
   deadline.fn();await flush();
   assert.equal(signal.aborted,true);
-  assert.equal(await pending,h.offline);
+  await rejected;
 });
 
-test('PWA streams its first chunk immediately but does not forget the body deadline',async()=>{
+test('PWA reference read streams its first chunk immediately but does not forget the body deadline',async()=>{
   let cancelled=false;const h=harness(async()=>new Response(new ReadableStream({
     start(c){c.enqueue(new TextEncoder().encode('first'));},cancel(){cancelled=true;},
   })));
@@ -44,7 +44,7 @@ test('PWA streams its first chunk immediately but does not forget the body deadl
   assert.equal(cancelled,true);assert.equal(h.timers.size,0);
 });
 
-test('PWA successful document consumption disposes its timer without caching HTML',async()=>{
+test('PWA successful reference consumption disposes its timer',async()=>{
   const h=harness(async()=>new Response('complete'));
   assert.equal(await(await h.request()).text(),'complete');
   assert.equal(h.timers.size,0);

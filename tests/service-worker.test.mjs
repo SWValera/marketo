@@ -214,12 +214,12 @@ test("service worker bypasses private, mutable and unversioned API routes and ne
     destination: "document",
   });
   const response = await navigationEvent.response;
-  assert.equal(response, navigation);
-  assert.equal(fetchCount, 1);
+  assert.equal(response, undefined);
+  assert.equal(fetchCount, 0);
   assert.equal(harness.puts.length, 0);
 });
 
-test("service worker keeps offline navigation fallback and lifecycle work attached to events", async () => {
+test("service worker leaves offline document handling native and preserves update lifecycle", async () => {
   const offline = { source: "offline" };
   const harness = createWorkerHarness({
     match: async (request) => request === "/offline.html" ? offline : null,
@@ -231,7 +231,7 @@ test("service worker keeps offline navigation fallback and lifecycle work attach
     mode: "navigate",
     destination: "document",
   });
-  assert.equal(await navigationEvent.response, offline);
+  assert.equal(navigationEvent.response, undefined);
 
   let installWork;
   harness.handlers.get("install")({ waitUntil(value) { installWork = value; } });
@@ -304,7 +304,7 @@ test("service worker keeps cache lookup and write scoped to an asynchronous name
   assert.equal(harness.puts.length, 1);
 });
 
-for (const path of ['/auth/callback?flow=recovery&code=fixture', '/auth/update-password', '/auth/result', '/auth/registration-confirmed', '/login?mode=recover', '/login/?password_reset=success']) {
+for (const path of ['/api/auth/callback?flow=recovery&code=fixture', '/api/auth/callback?type=signup&token_hash=fixture', '/api/reference/categories?v=release-1', '/auth/callback?flow=recovery&code=fixture', '/auth/update-password', '/auth/result', '/auth/registration-confirmed', '/login?mode=recover', '/login/?password_reset=success']) {
   test(`auth navigation stays native without respondWith: ${path.split('?')[0]}`, async () => {
     const harness = createWorkerHarness({ fetch: async () => { throw new Error('SW must not fetch auth navigation'); } });
     const event = dispatchFetch(harness, { url:'https://marketo.test'+path, method:'GET', mode:'navigate', destination:'document', redirect:'manual' });
@@ -314,10 +314,13 @@ for (const path of ['/auth/callback?flow=recovery&code=fixture', '/auth/update-p
   });
 }
 
-test('protected-page redirects pass through unchanged without consuming or wrapping the response', async () => {
-  const redirect = { type:'opaqueredirect', status:0, get body(){throw new Error('must not inspect redirect body');} };
-  const harness = createWorkerHarness({ fetch:async(_request,init)=>{assert.equal(init.redirect,'manual');return redirect;} });
-  const event=dispatchFetch(harness,{url:'https://marketo.test/profile',method:'GET',mode:'navigate',destination:'document'});
-  assert.equal(await event.response,redirect);
-  assert.deepEqual(harness.puts,[]);
-});
+for (const path of ['/profile','/messages','/','/arbitrary-redirect','/offline.html']) {
+ test('all documents stay native including redirecting routes: '+path,async()=>{
+  let calls=0;const harness=createWorkerHarness({fetch:async()=>{calls++;throw new Error('navigation must not reach SW network');}});
+  for(const redirect of ['follow','manual','error']){
+   const event=dispatchFetch(harness,{url:'https://marketo.test'+path,method:'GET',mode:'navigate',destination:'document',redirect});
+   assert.equal(event.response,undefined);await event.lifetime;
+  }
+  assert.equal(calls,0);assert.deepEqual(harness.opened,[]);assert.deepEqual(harness.puts,[]);
+ });
+}

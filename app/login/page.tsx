@@ -25,7 +25,7 @@ async function LoginPageContent({ searchParams }: LoginPageProps) {
   const mode: AuthMode = rawMode === "register" || rawMode === "recover" ? rawMode : "login";
   const next = safeInternalPath(typeof params.next === "string" ? params.next : null, "/profile");
   const rawCallbackError = typeof params.auth_error === "string" ? params.auth_error : null;
-  const callbackError: AuthCallbackError | null = rawCallbackError === "expired" || rawCallbackError === "invalid" ? rawCallbackError : null;
+  const callbackError: AuthCallbackError | null = rawCallbackError === "expired" || rawCallbackError === "invalid" || rawCallbackError === "rate_limited" || rawCallbackError === "unavailable" ? rawCallbackError : null;
   const passwordResetSuccess = params.password_reset === "success";
   if (!passwordResetSuccess && !callbackError) {
     const client = await createSupabaseServerClient();

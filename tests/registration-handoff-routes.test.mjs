@@ -100,16 +100,29 @@ test("profile filters include elapsed active records in archive and preserve pag
 
 test("confirmation on another device deposits the code but never exchanges there", async () => {
   const deposited = [];
-  const route = await loadRoute("app/auth/callback/route.ts", {
+  const route = await loadRoute("lib/auth/email-callback.ts", {
+    "server-only": {},
     "next/server": { NextResponse: { redirect: (url, init = {}) => new Response(null, { status:307, headers:{ ...init.headers, location:String(url) } }) } },
     "@/lib/auth/redirect": { safeInternalPath: () => "/profile" },
     "@/lib/auth/callback-error": { classifyAuthCallbackError: () => "invalid" },
     "@/lib/supabase/server": { createSupabaseServerClient: () => { throw new Error("Foreign browser must not exchange the code"); } },
     "@/lib/auth/registration-handoff": { depositRegistrationCode: async (proof, code) => { deposited.push([proof,code]); return true; } },
   });
-  const response = await route.GET(new Request("https://marketo.test/auth/callback?flow=signup&bridge=write-only-proof&code=one-use-code"));
+  const response = await route.handleEmailAuthCallback(new Request("https://marketo.test/api/auth/callback?flow=signup&bridge=write-only-proof&code=one-use-code"));
   assert.deepEqual(deposited, [["write-only-proof","one-use-code"]]);
   assert.equal(response.headers.get("location"), "https://marketo.test/auth/registration-confirmed");
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test('registration start returns only canonical API callback with write capability',async()=>{
+ const set=[];const calls=[];
+ const route=await loadRoute('app/api/auth/registration/start/route.ts',{
+  'next/headers':{cookies:async()=>({set:(...args)=>set.push(args)})},
+  'next/server':{NextResponse:{json:(body,init)=>Response.json(body,init)}},
+  '@/lib/http/same-origin':{isSameOriginMutationRequest:()=>true},
+  '@/lib/auth/registration-handoff':{capability:()=> 'fixture-capability',clientRateProof:async()=> 'client-proof',digest:async()=> 'hashed',HANDOFF_COOKIE:'fixture-proof',readProof:async()=>null,handoffRpc:async(operation)=>{calls.push(operation);return {state:'waiting'};}},
+ });
+ const response=await route.POST(new Request('https://jevu.kz/api/auth/registration/start',{method:'POST'}));
+ const url=new URL((await response.json()).callback);assert.equal(url.origin,'https://jevu.kz');assert.equal(url.pathname,'/api/auth/callback');assert.equal(url.searchParams.get('flow'),'signup');assert.equal(url.searchParams.get('bridge'),'fixture-capability');assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(set[0][2].httpOnly,true);assert.deepEqual(calls,['start']);
 });

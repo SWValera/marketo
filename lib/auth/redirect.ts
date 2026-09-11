@@ -12,7 +12,7 @@ export function safeInternalPath(value: string | null | undefined, fallback = "/
 export type AuthCallbackFlow = "signup" | "recovery";
 
 export function authCallbackUrl(origin: string, next: string, flow: AuthCallbackFlow = "signup") {
-  const url = new URL("/auth/callback", origin);
+  const url = new URL("/api/auth/callback", origin);
   url.searchParams.set("next", safeInternalPath(next));
   url.searchParams.set("flow", flow);
   return url.toString();

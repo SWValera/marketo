@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+  <body style="margin:0;padding:0;background:#f4f7f5;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+
+          <table width="100%" cellpadding="0" cellspacing="0" border="0"
+            style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e4e9e6;">
+
+            <tr>
+              <td align="center" style="padding:32px 32px 16px;">
+                <img
+                  src="https://jevu.kz/icons/jevu-192-v1.png"
+                  width="72"
+                  height="72"
+                  alt="JEVU"
+                  style="display:block;border:0;border-radius:16px;"
+                >
+
+                <div style="margin-top:12px;font-size:26px;font-weight:800;color:#111827;">
+                  JEVU
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:8px 32px 32px;text-align:center;">
+
+                <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#111827;">
+                  Восстановление пароля
+                </h1>
+
+                <p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#4b5563;">
+                  Мы получили запрос на изменение пароля вашего аккаунта JEVU.
+                </p>
+
+                <p style="margin:0 0 28px;font-size:16px;line-height:1.6;color:#4b5563;">
+                  Нажмите кнопку ниже, чтобы установить новый пароль.
+                </p>
+
+                <table cellpadding="0" cellspacing="0" border="0" align="center">
+                  <tr>
+                    <td bgcolor="#10a84f" style="border-radius:12px;">
+                      <a
+                        href="https://jevu.kz/api/auth/callback?token_hash={{ .TokenHash }}&amp;type=recovery&amp;flow=recovery"
+                        style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;"
+                      >
+                        Создать новый пароль
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:28px 0 0;font-size:14px;line-height:1.6;color:#7b8493;">
+                  Если кнопка не работает, откройте эту ссылку:
+                </p>
+
+                <p style="margin:8px 0 0;font-size:13px;line-height:1.5;word-break:break-all;">
+                  <a href="https://jevu.kz/api/auth/callback?token_hash={{ .TokenHash }}&amp;type=recovery&amp;flow=recovery" style="color:#07883e;text-decoration:none;">
+                    https://jevu.kz/api/auth/callback?token_hash={{ .TokenHash }}&amp;type=recovery&amp;flow=recovery
+                  </a>
+                </p>
+
+                <div style="height:1px;background:#e8ece9;margin:28px 0;"></div>
+
+                <p style="margin:0;font-size:13px;line-height:1.6;color:#8a929f;">
+                  Если вы не запрашивали восстановление пароля, просто проигнорируйте это письмо.
+                  Ваш пароль останется прежним.
+                </p>
+
+              </td>
+            </tr>
+
+            <tr>
+              <td align="center" style="padding:20px 32px;background:#f8faf9;color:#8a929f;font-size:12px;line-height:1.6;">
+                JEVU — объявления по всему Казахстану<br>
+                jevu.kz
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

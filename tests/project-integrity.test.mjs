@@ -34,7 +34,8 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.match(worker, /jevu-static-v1/);
   assert.match(worker, /"\/offline\.html"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
-  assert.match(worker, /request\.mode === "navigate"[\s\S]*network\(request, 9000\)/);
+  assert.match(worker, /if \(request\.mode === "navigate" \|\| request\.destination === "document"\) return;/);
+  assert.doesNotMatch(worker, /redirect: "manual"|opaqueredirect/);
   assert.match(worker, /fetch\(request, \{ signal: controller.signal[, }]/);
   assert.match(worker, /event\.waitUntil\(self\.skipWaiting/);
   assert.match(worker, /postMessage\(\{ activated: true \}\)/);

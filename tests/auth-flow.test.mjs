@@ -13,7 +13,7 @@ test("auth redirect targets remain internal", () => {
   assert.equal(safeInternalPath("/\\evil.example"), "/profile");
   const callback = new URL(authCallbackUrl("https://marketo.kz", "/publish"));
   assert.equal(callback.origin, "https://marketo.kz");
-  assert.equal(callback.pathname, "/auth/callback");
+  assert.equal(callback.pathname, "/api/auth/callback");
   assert.equal(callback.searchParams.get("next"), "/publish");
   assert.equal(callback.searchParams.get("flow"), "signup");
   const recovery = new URL(authCallbackUrl("https://marketo.kz", "/login?password_reset=success", "recovery"));
@@ -23,7 +23,7 @@ test("auth redirect targets remain internal", () => {
 test("frontend auth implements register, login, refreshed session, recovery, password update, callback and logout", async () => {
   const [form, callback, authResult, updatePassword, events, logout, profileEdit, publishPage, proxy] = await Promise.all([
     readFile(new URL("components/auth-form.tsx", root), "utf8"),
-    readFile(new URL("app/auth/callback/route.ts", root), "utf8"),
+    readFile(new URL("lib/auth/email-callback.ts", root), "utf8"),
     readFile(new URL("components/auth-result-content.tsx", root), "utf8"),
     readFile(new URL("app/auth/update-password/page.tsx", root), "utf8"),
     readFile(new URL("lib/auth/events.ts", root), "utf8"),
@@ -70,4 +70,11 @@ test("auth and profile messages are complete in RU and KK", () => {
     assert.ok(messages.ru[key]?.trim(), `missing RU ${key}`);
     assert.ok(messages.kk[key]?.trim(), `missing KK ${key}`);
   }
+});
+
+test("recovery email opens the canonical server OTP callback without an originating PKCE verifier", async () => {
+  const template = await readFile(new URL("supabase/templates/recovery.html", root), "utf8");
+  assert.doesNotMatch(template, /ConfirmationURL|localhost|workers\.dev|access_token|refresh_token/);
+  assert.equal((template.match(/https:\/\/jevu\.kz\/api\/auth\/callback\?token_hash=\{\{ \.TokenHash \}\}&amp;type=recovery&amp;flow=recovery/g) ?? []).length, 3);
+  assert.match(template, /Восстановление пароля/);
 });

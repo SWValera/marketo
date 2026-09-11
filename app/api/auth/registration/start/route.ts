@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const result = await handoffRpc("start", { read_proof: await digest(read), write_proof: await digest(write), client_proof: await clientRateProof(request), lease_proof: previous });
     if (result.state !== "waiting") return NextResponse.json({ error: "rate_limited" }, { status: 429 });
     (await cookies()).set(HANDOFF_COOKIE, read, { path: "/", maxAge: 3600, secure: new URL(request.url).protocol === "https:", httpOnly: true, sameSite: "lax" });
-    const callback = new URL("/auth/callback", request.url);
+    const callback = new URL("/api/auth/callback", request.url);
     callback.searchParams.set("flow", "signup");
     callback.searchParams.set("bridge", write);
     return NextResponse.json({ callback: callback.toString() }, { headers: { "cache-control": "no-store" } });
