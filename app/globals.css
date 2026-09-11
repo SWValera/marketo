@@ -293,8 +293,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .listing-card:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(17,24,39,.09); }
 .listing-image-wrap { position: relative; display: block; aspect-ratio: 4/3; overflow: hidden; background: #e7ece9; }
 .listing-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(135deg,#eef4f0,#dce9e0); font-size: clamp(42px,5vw,70px); }
-.listing-image { position: relative; z-index: 1; width: 100%; height: 100%; display: block; object-fit: cover; transition: transform .35s; }
-.listing-card:hover .listing-image { transform: scale(1.03); }
+.listing-image { position: relative; z-index: 1; width: 100%; height: 100%; display: block; object-fit: contain; background: #e7ece9; }
 .favorite-button { position: absolute; right: 11px; top: 11px; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #25313a; background: rgba(255,255,255,.93); box-shadow: 0 4px 12px rgba(0,0,0,.12); cursor: pointer; }
 .favorite-button.is-favorite { color: #e11d48; }
 .top-badge { position: absolute; left: 11px; top: 11px; padding: 5px 9px; border-radius: 7px; background: #f5c542; color: #392b00; font-size: var(--font-ui); font-weight: 900; }
@@ -747,6 +746,19 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .gallery-selectors button { font-size: 1rem; font-weight: 700; }
 .gallery-selectors button[aria-pressed="true"] { color: white; background: var(--green); border-color: var(--green); }
 .gallery-track:focus-visible, .gallery-controls button:focus-visible, .gallery-selectors button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+/* Fullscreen shares the listing gallery selection and native scroll-snap track. */
+.gallery-open { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.gallery-open:focus-visible { outline: 3px solid var(--green); outline-offset: -3px; }
+.gallery-viewer { position: fixed; z-index: 2000; inset: 0; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: contain; background: #111315; color: white; }
+.gallery-viewer-toolbar { display: flex; justify-content: flex-end; }
+.gallery-viewer-close { display: inline-grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid #596166; border-radius: 50%; background: #252a2d; color: white; cursor: pointer; }
+.gallery-viewer .gallery-track { min-width: 0; min-height: 0; height: 100%; border-radius: 0; touch-action: pan-x pinch-zoom; }
+.gallery-viewer .gallery-main { height: 100%; aspect-ratio: auto; border-radius: 0; background: transparent; }
+.gallery-viewer .gallery-main img { display: block; object-fit: contain; }
+.gallery-viewer .gallery-controls { margin: 0; }
+.gallery-viewer .gallery-controls button { border-color: #596166; background: #252a2d; color: white; }
+.gallery-viewer-count { min-height: 44px; display: grid; place-items: center; font-weight: 650; }
+.gallery-viewer button:focus-visible, .gallery-viewer .gallery-track:focus-visible { outline: 3px solid white; outline-offset: -3px; }
 .gallery-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 9px; }
 .gallery-thumbs button { aspect-ratio: 1.7; overflow: hidden; padding: 0; border: 2px solid transparent; border-radius: 10px; background: #eee; cursor: pointer; }
 .gallery-thumbs button:first-child { border-color: var(--green); }
@@ -1105,7 +1117,7 @@ select {
 .owner-listing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .owner-listing-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 19px; background: #fff; box-shadow: var(--shadow-sm); }
 .owner-listing-media { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; background: #edf3ef; color: var(--text-muted); }
-.owner-listing-media img { width: 100%; height: 100%; object-fit: cover; }
+.owner-listing-media img { display: block; min-width: 0; min-height: 0; width: 100%; height: 100%; object-fit: contain; }
 .owner-listing-status { position: absolute; top: 10px; left: 10px; padding: 5px 9px; border-radius: 999px; background: rgba(25, 38, 30, .82); color: #fff; font-size: var(--font-ui); font-weight: 820; backdrop-filter: blur(6px); }
 .owner-listing-status.is-active { background: rgba(8, 123, 59, .9); }
 .owner-listing-status.is-pending { background: rgba(151, 94, 4, .91); }
