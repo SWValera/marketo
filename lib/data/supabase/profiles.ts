@@ -1,7 +1,7 @@
-import type { MarketoSupabaseClient } from "./client.ts";
+import type { JevuSupabaseClient } from "./client.ts";
 import type { TablesUpdate } from "../../supabase/database.types.ts";
 
-export async function getCurrentProfile(client: MarketoSupabaseClient) {
+export async function getCurrentProfile(client: JevuSupabaseClient) {
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) return null;
@@ -10,20 +10,20 @@ export async function getCurrentProfile(client: MarketoSupabaseClient) {
   return data;
 }
 
-export async function getCurrentAccountProfile(client: MarketoSupabaseClient) {
+export async function getCurrentAccountProfile(client: JevuSupabaseClient) {
   const { data: authData, error: authError } = await client.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) return null;
   return getAuthenticatedAccountProfile(client);
 }
 
-export async function getAuthenticatedAccountProfile(client: MarketoSupabaseClient) {
+export async function getAuthenticatedAccountProfile(client: JevuSupabaseClient) {
   const { data, error } = await client.rpc("get_my_account_profile").maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function updateCurrentAccountProfile(client: MarketoSupabaseClient, input: {
+export async function updateCurrentAccountProfile(client: JevuSupabaseClient, input: {
   displayName: string;
   bio: string | null;
   language: "ru" | "kk";
@@ -41,13 +41,13 @@ export async function updateCurrentAccountProfile(client: MarketoSupabaseClient,
   return data;
 }
 
-export async function getPublicSellerProfile(client: MarketoSupabaseClient, userId: string) {
+export async function getPublicSellerProfile(client: JevuSupabaseClient, userId: string) {
   const { data, error } = await client.from("seller_profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function getProfileForStaff(client: MarketoSupabaseClient, userId: string) {
+export async function getProfileForStaff(client: JevuSupabaseClient, userId: string) {
   const { data, error } = await client.rpc("get_profile_for_staff", { target_profile_id: userId }).maybeSingle();
   if (error) throw error;
   return data;
@@ -58,7 +58,7 @@ export type EditableProfilePatch = Pick<
   "display_name" | "avatar_path" | "bio" | "language_code" | "settlement_id"
 >;
 
-export async function updateOwnProfile(client: MarketoSupabaseClient, userId: string, patch: EditableProfilePatch) {
+export async function updateOwnProfile(client: JevuSupabaseClient, userId: string, patch: EditableProfilePatch) {
   const { error } = await client.from("profiles").update(patch).eq("id", userId);
   if (error) throw error;
   const { data, error: readError } = await client.rpc("get_my_profile").maybeSingle();
@@ -66,7 +66,7 @@ export async function updateOwnProfile(client: MarketoSupabaseClient, userId: st
   return data;
 }
 
-export async function updateOwnPrivateContact(client: MarketoSupabaseClient, userId: string, contactPhoneE164: string | null) {
+export async function updateOwnPrivateContact(client: JevuSupabaseClient, userId: string, contactPhoneE164: string | null) {
   const { data, error } = await client.from("profile_private").upsert({
     user_id: userId,
     contact_phone_e164: contactPhoneE164,

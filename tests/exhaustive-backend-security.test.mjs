@@ -179,8 +179,8 @@ test("upload and media routes preserve fail-closed cleanup and error classificat
   assert.match(uploadRoute, /createListingImageStorageKey/);
   assert.match(uploadRoute, /metadataCleanupError/);
   assert.match(uploadRoute, /photo_upload_cleanup_failed/);
-  assert.match(uploadRoute, /validateListingImage\(file\)/);
-  assert.doesNotMatch(uploadRoute, /getListingImageProcessor|normalizeListingImage|media_processing_unavailable/);
+  assert.match(uploadRoute, /normalizeListingImage\(file, getListingImageProcessor\(\), signal\)/);
+  assert.match(uploadRoute, /withPhotoProcessing/);
   assert.match(uploadRoute, /file\.size > listingImageLimits\.maxBytes/);
   assert.match(mediaRoute, /publicResult\.error.*status: 503/s);
   assert.match(mediaRoute, /protectedResult\.error.*status: 503/s);
@@ -193,7 +193,8 @@ test("upload and media routes preserve fail-closed cleanup and error classificat
   assert.match(imageValidation, /!\[1, 3\]\.includes\(componentCount\)/);
   assert.equal(listingImageLimits.maxPixels, 20_000_000);
   assert.equal(listingImageLimits.maxDecodedBytes, 64 * 1024 * 1024);
-  assert.equal(listingImageLimits.maxRequestBytes, listingImageLimits.maxTotalBytes + 512 * 1024);
+  assert.equal(listingImageLimits.maxRequestBytes, 4 * 1024 * 1024 + 512 * 1024);
+  assert.ok(listingImageLimits.maxRequestBytes < listingImageLimits.maxTotalBytes);
   assert.equal(requestRouting.classifyRequestRouting("/api/media/listings/public/photo.jpg", "GET"), "continue");
   assert.equal(requestRouting.classifyRequestRouting("/api/media/listings/private/photo.jpg", "HEAD"), "continue");
 });

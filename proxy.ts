@@ -53,6 +53,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next(?:/|$)|assets(?:/|$)|icons(?:/|$)|favicon\\.svg$|file\\.svg$|globe\\.svg$|manifest\\.webmanifest$|marketo-app-icon\\.svg$|marketo-favicon-v2\\.svg$|marketo-maskable\\.svg$|robots\\.txt$|sitemap(?:-\\d+)?\\.xml$|sw\\.js$|window\\.svg$).*)",
+    "/((?!_next(?:/|$)|assets(?:/|$)|icons(?:/|$)|favicon\\.ico$|file\\.svg$|globe\\.svg$|manifest\\.webmanifest$|robots\\.txt$|sitemap(?:-\\d+)?\\.xml$|sw\\.js$|window\\.svg$).*)",
   ],
 };

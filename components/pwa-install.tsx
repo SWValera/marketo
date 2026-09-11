@@ -1,4 +1,5 @@
 "use client";
+import { BrandIcon } from "@/components/brand";
 
 import { Check, Download, MoreVertical, Share, Smartphone, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -144,7 +145,7 @@ export function PwaInstall() {
               <X size={21} />
             </button>
 
-            <div className="install-modal-brand" aria-hidden="true">M</div>
+            <BrandIcon className="install-modal-brand" size={52} />
             <span className="section-kicker">{t("pwa.app")}</span>
             <h2 id="install-title">{t("pwa.installPhone")}</h2>
             <p className="install-lead" id="install-description">{t("pwa.lead")}</p>

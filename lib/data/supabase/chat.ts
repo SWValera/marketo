@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { normalizePageSize, normalizePositivePage } from "@/lib/data/pagination";
 import type { ChatSummary, Conversation, PageResult } from "@/lib/data/types";
 import type { Locale } from "@/lib/i18n/messages";
@@ -15,14 +15,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 function safeDisplayName(value: string | null | undefined, locale: Locale) {
   return value?.trim() || (locale === "kk" ? "Пайдаланушы" : "Пользователь");
 }
-export async function getOrCreateListingConversation(client: MarketoSupabaseClient, listingId: string, signal?: AbortSignal) {
+export async function getOrCreateListingConversation(client: JevuSupabaseClient, listingId: string, signal?: AbortSignal) {
   const deadline = AbortSignal.timeout(12000);
   const { data, error } = await client.rpc("get_or_create_listing_conversation", { target_listing_id: listingId })
     .abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline);
   if (error || !data || !UUID.test(data)) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
   return data;
 }
-export async function listUserConversations(client: MarketoSupabaseClient, userId: string,
+export async function listUserConversations(client: JevuSupabaseClient, userId: string,
   options: { page?: number; pageSize?: number; locale?: Locale; signal?: AbortSignal } = {}): Promise<PageResult<ChatSummary>> {
   if (!userId) throw new ChatDataError("LIST_UNAVAILABLE");
   const page = normalizePositivePage(options.page);
@@ -43,7 +43,7 @@ export async function listUserConversations(client: MarketoSupabaseClient, userI
     total: result.total, nextCursor: page * pageSize < result.total ? String(page + 1) : null,
   };
 }
-export async function readMessagePage(client: MarketoSupabaseClient, conversationId: string,
+export async function readMessagePage(client: JevuSupabaseClient, conversationId: string,
   options: { after?: MessageCursor; before?: MessageCursor; signal?: AbortSignal } = {}) {
   const cursor = options.after ?? options.before;
   if (cursor && (!UUID.test(cursor.id) || !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.sentAt) || !Number.isFinite(Date.parse(cursor.sentAt)))) throw new ChatDataError("DETAIL_UNAVAILABLE");
@@ -61,11 +61,11 @@ export async function readMessagePage(client: MarketoSupabaseClient, conversatio
   const rows = (data ?? []).slice(0, 100) as MessageRow[];
   return { rows: ascending ? rows : rows.reverse(), hasMore: (data?.length ?? 0) > 100 };
 }
-export async function listConversationMessages(client: MarketoSupabaseClient, conversationId: string, limit = 50) {
+export async function listConversationMessages(client: JevuSupabaseClient, conversationId: string, limit = 50) {
   const page = await readMessagePage(client, conversationId);
   return page.rows.slice(-Math.min(Math.max(Math.trunc(limit) || 50, 1), 100));
 }
-export async function getConversation(client: MarketoSupabaseClient, conversationId: string, userId: string, locale: Locale = "ru"): Promise<Conversation | null> {
+export async function getConversation(client: JevuSupabaseClient, conversationId: string, userId: string, locale: Locale = "ru"): Promise<Conversation | null> {
   const conversationResult = await client.from("conversations")
     .select("id, listing_id, participant_low_id, participant_high_id, last_message_at, status")
     .eq("id", conversationId).maybeSingle();
@@ -93,7 +93,7 @@ export async function getConversation(client: MarketoSupabaseClient, conversatio
       own:message.sender_id === userId, read:message.sender_id === userId && Boolean(readAt && readAt >= message.created_at) })),
   };
 }
-export async function sendTextMessage(client: MarketoSupabaseClient, conversationId: string, senderId: string, body: string, messageId: string) {
+export async function sendTextMessage(client: JevuSupabaseClient, conversationId: string, senderId: string, body: string, messageId: string) {
   const cleanBody = body.trim();
   if (!cleanBody || Array.from(cleanBody).length > 4000 || !UUID.test(messageId)) throw new ChatDataError("MESSAGE_FAILED");
   const { data, error } = await client.rpc("send_listing_message", {
@@ -103,7 +103,7 @@ export async function sendTextMessage(client: MarketoSupabaseClient, conversatio
   if (error || !row || row.sender_id !== senderId) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
   return row;
 }
-export async function markConversationRead(client: MarketoSupabaseClient, conversationId: string, throughMessageId: string) {
+export async function markConversationRead(client: JevuSupabaseClient, conversationId: string, throughMessageId: string) {
   const { error } = await client.rpc("mark_listing_conversation_read", {
     target_conversation_id: conversationId, through_message_id: throughMessageId,
   }).abortSignal(AbortSignal.timeout(10000));

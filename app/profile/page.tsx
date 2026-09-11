@@ -17,6 +17,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/empty-state";
 import { OwnerListingActions } from "@/components/owner-listing-actions";
 import { getCurrentAuthContext } from "@/lib/auth/context";
+import { beginVerifiedAccountRead } from "@/lib/data/account-page-read";
 import { listingRepository } from "@/lib/data/repositories";
 import type { MyListingSummary } from "@/lib/data/types";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -41,7 +42,7 @@ function logOwnerListingReadFailure(error: unknown) {
   const record = error && typeof error === "object"
     ? error as { name?: unknown; code?: unknown }
     : {};
-  console.error("[marketo-owner-listings] read failed", {
+  console.error("[jevu-owner-listings] read failed", {
     name: typeof record.name === "string" ? record.name : "Error",
     ...(typeof record.code === "string" ? { code: record.code } : {}),
   });
@@ -52,13 +53,17 @@ export default async function ProfilePage({
 }: {
   searchParams: Promise<{ page?: string | string[]; registered?: string; tab?: string }>;
 }) {
-  const [{ t, locale }, params, authContext] = await Promise.all([
+  const authContextPromise = getCurrentAuthContext();
+  const [{ t, locale }, params] = await Promise.all([
     getServerI18n(),
     searchParams,
-    getCurrentAuthContext(),
   ]);
   const page = normalizePositivePage(params.page);
   const tab = normalizeOwnerListingTab(params.tab);
+  const listingsPromise = beginVerifiedAccountRead(userId => listingRepository.mine({
+    page, pageSize: PAGE_SIZE, locale, authenticatedUserId: userId, tab,
+  }));
+  const authContext = await authContextPromise;
 
   if (authContext.status === "anonymous") {
     return <DashboardShell
@@ -103,17 +108,9 @@ export default async function ProfilePage({
   }
 
   let listings: Awaited<ReturnType<typeof listingRepository.mine>> | null = null;
-  try {
-    listings = await listingRepository.mine({
-      page,
-      pageSize: PAGE_SIZE,
-      locale,
-      authenticatedUserId: authContext.user.id,
-      tab,
-    });
-  } catch (error) {
-    logOwnerListingReadFailure(error);
-  }
+  const result = await listingsPromise;
+  if (result.ok) listings = result.value;
+  else logOwnerListingReadFailure(result.error);
 
   const statusLabel = (status: MyListingSummary["status"]) => t(`profile.status.${status}`);
   const rejectionLabel = (code: string | null) => {

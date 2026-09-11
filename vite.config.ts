@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { publicSupabaseBuildEnvGuard } from "./build/public-supabase-env-guard";
 import { sites } from "./build/sites-vite-plugin";
 import { navigationReadGuard } from "./build/navigation-read-guard";
+import { multipartRouteGuard } from "./build/multipart-route-guard";
 
 const hostingConfigPath = fileURLToPath(new URL("./.openai/hosting.json", import.meta.url));
 const hostingConfig = existsSync(hostingConfigPath)
@@ -21,6 +22,9 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
 const localBindingConfig = {
   main: "./worker/index.ts",
+  // Explicit opt-in only after Images entitlement and staging verification.
+  // No account, token, resource or billing configuration is invented here.
+  ...(process.env.MARKETO_IMAGE_PROCESSING === "cloudflare" ? {images: {binding: "MARKETO_IMAGES"}} : {}),
   r2_buckets: r2
     ? [
       {
@@ -51,6 +55,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       navigationReadGuard(),
+      multipartRouteGuard(),
       vinext(),
       sites(),
       cloudflare({

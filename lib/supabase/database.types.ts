@@ -1,4 +1,4 @@
-// Generated-style database contract for the reviewed Marketo schema.
+// Generated-style database contract for the reviewed JEVU schema.
 // Do not hand-edit after a Supabase project is linked: replace this file with
 // `supabase gen types typescript --linked` and run `npm run validate:db`.
 import type { InferInsertModel, InferSelectModel, Table } from "drizzle-orm";

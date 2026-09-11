@@ -1,4 +1,4 @@
-# Supabase Auth email setup — Marketo v1.0
+# Supabase Auth email setup — JEVU v1.0
 
 Status: **NOT VERIFIED in the external Supabase Dashboard**. This repository
 contains no Dashboard access, SMTP credentials or production secrets. Apply and
@@ -7,7 +7,7 @@ verify the settings below in a disposable/staging project before production.
 ## 1. Redirect URL allowlist
 
 The application creates callback URLs from the current same-origin address and
-always routes through `/auth/callback`. Add only origins that Marketo actually
+always routes through `/auth/callback`. Add only origins that JEVU actually
 uses. Do not add an unrelated domain and do not place a user-controlled full URL
 in `redirectTo`.
 
@@ -29,7 +29,7 @@ after each environment is retired.
 Subject:
 
 ```text
-Подтвердите регистрацию в Marketo
+Подтвердите регистрацию в JEVU
 ```
 
 Body: use the reviewed file `supabase/templates/confirmation.html` for the RU
@@ -41,7 +41,7 @@ Minimal body:
 
 ```html
 <h2>Подтвердите email</h2>
-<p>Вы создали аккаунт в Marketo.</p>
+<p>Вы создали аккаунт в JEVU.</p>
 <p><a href="{{ .ConfirmationURL }}">Подтвердить регистрацию</a></p>
 <p>Если вы не создавали аккаунт, просто проигнорируйте это письмо.</p>
 ```
@@ -51,21 +51,21 @@ Minimal body:
 Subject:
 
 ```text
-Marketo-да тіркелуді растаңыз
+JEVU-да тіркелуді растаңыз
 ```
 
 Body:
 
 ```html
 <h2>Email мекенжайын растаңыз</h2>
-<p>Сіз Marketo-да аккаунт жасадыңыз.</p>
+<p>Сіз JEVU-да аккаунт жасадыңыз.</p>
 <p><a href="{{ .ConfirmationURL }}">Тіркелуді растау</a></p>
 <p>Егер аккаунтты сіз жасамаған болсаңыз, бұл хатты елемеңіз.</p>
 ```
 
 If the selected Supabase plan/Dashboard exposes only one template per email
 type, use one bilingual RU/KK template or select the language through a reviewed
-server-side sending flow later. Do not create a second Marketo user database to
+server-side sending flow later. Do not create a second JEVU user database to
 solve email localization.
 
 ## 4. Password recovery email — RU
@@ -73,14 +73,14 @@ solve email localization.
 Subject:
 
 ```text
-Восстановление пароля Marketo
+Восстановление пароля JEVU
 ```
 
 Body:
 
 ```html
 <h2>Установите новый пароль</h2>
-<p>Мы получили запрос на восстановление пароля Marketo.</p>
+<p>Мы получили запрос на восстановление пароля JEVU.</p>
 <p><a href="{{ .ConfirmationURL }}">Продолжить восстановление</a></p>
 <p>Если вы не запрашивали восстановление, проигнорируйте письмо.</p>
 ```
@@ -90,21 +90,21 @@ Body:
 Subject:
 
 ```text
-Marketo құпиясөзін қалпына келтіру
+JEVU құпиясөзін қалпына келтіру
 ```
 
 Body:
 
 ```html
 <h2>Жаңа құпиясөз орнатыңыз</h2>
-<p>Marketo құпиясөзін қалпына келтіру сұрауын алдық.</p>
+<p>JEVU құпиясөзін қалпына келтіру сұрауын алдық.</p>
 <p><a href="{{ .ConfirmationURL }}">Қалпына келтіруді жалғастыру</a></p>
 <p>Егер бұл сұрауды сіз жібермеген болсаңыз, хатты елемеңіз.</p>
 ```
 
 ## 6. Sender branding checklist
 
-- Sender name is `Marketo` (or the final reviewed marketplace brand).
+- Sender name is `JEVU` (or the final reviewed marketplace brand).
 - From-address uses a verified domain, for example `no-reply@<brand-domain>`.
 - Reply-To points to a monitored support mailbox.
 - SPF, DKIM and DMARC pass for the sending domain.

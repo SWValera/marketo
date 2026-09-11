@@ -14,7 +14,7 @@ import { EMPTY_CATEGORIES } from "@/lib/reference-data/types";
 
 export const metadata: Metadata = {
   title: "Каталог объявлений",
-  description: "Товары, транспорт, недвижимость, работа и услуги по всему Казахстану на Marketo.",
+  description: "Товары, транспорт, недвижимость, работа и услуги по всему Казахстану на JEVU.",
   robots: { index: false, follow: true },
 };
 

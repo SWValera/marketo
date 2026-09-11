@@ -33,7 +33,7 @@ export async function ownerListingAction(request: Request, listingId: string, ac
   } catch (error) {
     const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
     if (code === "42501") return NextResponse.json({ error: "listing_action_stale" }, { status: 409 });
-    console.error("[marketo-listing] owner action failed", {
+    console.error("[jevu-listing] owner action failed", {
       action,
       name: error instanceof Error ? error.name : "Error",
       ...(code ? { code } : {}),

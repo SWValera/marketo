@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { deflateSync, inflateSync } from "node:zlib";
-import { clientListingImageSize, normalizeListingPhotoForUpload } from "../lib/media/client-image-normalization.ts";
+import { photoOutputSize } from "../lib/media/photo-contract.ts";
 import { validateListingImage } from "../lib/media/image-validation.ts";
 
 const root = new URL("../", import.meta.url);
@@ -67,29 +67,6 @@ const REAL_WEBP_ALPHA = Buffer.from(
 
 function imageFile(bytes, name, type) {
   return new File([bytes], name, { type });
-}
-
-function fakeClientImageRuntime({ width = 8064, height = 6048, outputs = [new Blob([REAL_JPEG], { type: "image/jpeg" })], failDecode = false } = {}) {
-  const calls = { encodes: [], releases: 0 };
-  let outputIndex = 0;
-  return {
-    calls,
-    runtime: {
-      async decode() {
-        if (failDecode) throw new Error("decode failed");
-        return {
-          source: {},
-          width,
-          height,
-          release() { calls.releases += 1; },
-        };
-      },
-      async encodeJpeg(_source, outputWidth, outputHeight, quality) {
-        calls.encodes.push({ width: outputWidth, height: outputHeight, quality });
-        return outputs[Math.min(outputIndex++, outputs.length - 1)];
-      },
-    },
-  };
 }
 
 function findPngChunk(bytes, wanted) {
@@ -219,45 +196,10 @@ test("listing image validator accepts real baseline JPEG and fully checked PNG p
   await assert.rejects(validateListingImage(new File(["<svg xmlns='http://www.w3.org/2000/svg'/>"] , "image.svg", { type: "image/svg+xml" })), /unsupported_image_content/);
 });
 
-test("client normalization turns a 48 MP iPhone HEIC into a bounded JPEG accepted by the server", async () => {
-  assert.deepEqual(clientListingImageSize(8064, 6048), { width: 2560, height: 1920 });
-  const fake = fakeClientImageRuntime();
-  const source = new File([new Uint8Array(64)], "IMG_0001.HEIC", { type: "image/heic", lastModified: 123456 });
-  const image = await normalizeListingPhotoForUpload(source, fake.runtime);
-
-  assert.equal(image.name, "IMG_0001.jpg");
-  assert.equal(image.type, "image/jpeg");
-  assert.equal(image.lastModified, 123456);
-  assert.deepEqual(fake.calls.encodes, [{ width: 2560, height: 1920, quality: 0.86 }]);
-  assert.equal(fake.calls.releases, 1);
-  const validated = await validateListingImage(image);
-  assert.equal(validated.mimeType, "image/jpeg");
-  assert.match(validated.sha256, /^[a-f0-9]{64}$/);
-});
-
-test("client normalization retries compression and always releases decoded images", async () => {
-  const oversized = new Blob([new Uint8Array(12 * 1024 * 1024 + 1)], { type: "image/jpeg" });
-  const retry = fakeClientImageRuntime({ outputs: [oversized, new Blob([REAL_JPEG], { type: "image/jpeg" })] });
-  const source = imageFile(new Uint8Array(64), "IMG_0002.HEIF", "image/heif");
-  const image = await normalizeListingPhotoForUpload(source, retry.runtime);
-  assert.equal(image.type, "image/jpeg");
-  assert.deepEqual(retry.calls.encodes.map((call) => call.quality), [0.86, 0.76]);
-  assert.equal(retry.calls.releases, 1);
-
-  const wrongMime = fakeClientImageRuntime({ outputs: [new Blob([REAL_WEBP], { type: "image/webp" })] });
-  await assert.rejects(
-    normalizeListingPhotoForUpload(source, wrongMime.runtime),
-    /image_encode_failed/,
-  );
-  assert.equal(wrongMime.calls.releases, 1);
-
-  const unavailable = fakeClientImageRuntime({ failDecode: true });
-  await assert.rejects(
-    normalizeListingPhotoForUpload(source, unavailable.runtime),
-    /decode failed/,
-  );
-  assert.equal(unavailable.calls.releases, 0);
-  assert.throws(() => clientListingImageSize(20_000, 300), /invalid_image_dimensions/);
+test("server sizing covers 48 MP without cropping and rejects the documented processor boundary", () => {
+  assert.deepEqual(photoOutputSize(8064,6048),{width:2560,height:1920});
+  assert.deepEqual(photoOutputSize(6048,8064),{width:1920,height:2560});
+  assert.throws(()=>photoOutputSize(20_000,300),/photo_processor_limit/);
 });
 
 test("server strips JPEG application and comment metadata before R2 storage", async () => {
@@ -507,7 +449,8 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.match(publish, /method: currentListingId \? "PATCH" : "POST"/);
   assert.match(publish, /\/images`/);
   assert.match(publish, /\/submit`/);
-  assert.match(publish, /accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(publish, /accept=\{photoSourceAccept\}/);
+  assert.match(publish, /preparePhotoSelection/);
   assert.match(loader, /loadBrowserCategoryReferences/);
   assert.doesNotMatch(loader, /listActiveCategories|mapCategoryReferenceRows/);
   assert.doesNotMatch(loader, /CATEGORY_COLUMNS/);
@@ -520,8 +463,8 @@ test("real listing flow persists draft, verified photos and moderation submissio
   assert.doesNotMatch(publishPage, /getCategoryReferences|getMyListingDraftBundle/);
   assert.match(draftRoute, /save_listing_draft_with_contacts/);
   for (const status of [401, 404, 409, 503]) assert.match(draftReadRoute, new RegExp(`status: ${status}`));
-  assert.match(imageRoute, /validateListingImage\(file\)/);
-  assert.doesNotMatch(imageRoute, /normalizeListingImage|getListingImageProcessor|media_processing_unavailable/);
+  assert.match(imageRoute, /normalizeListingImage\(file, getListingImageProcessor\(\), signal\)/);
+  assert.match(imageRoute, /withPhotoProcessing/);
   assert.match(imageRoute, /listing\.owner_id !== authData\.user\.id/);
   assert.match(imageRoute, /bucket\.put/);
   assert.match(imageRoute, /stored\.size !== image\.byteSize/);

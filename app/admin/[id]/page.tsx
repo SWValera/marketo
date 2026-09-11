@@ -18,7 +18,7 @@ type ModerationCasePageProps = { params: Promise<{ id: string }> };
 
 function logDetailFailure(error: unknown) {
   const record = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : {};
-  console.error("[marketo-moderation] read failed", {
+  console.error("[jevu-moderation] read failed", {
     scope: "detail",
     name: typeof record.name === "string" ? record.name : "Error",
     ...(typeof record.code === "string" ? { code: record.code } : {}),

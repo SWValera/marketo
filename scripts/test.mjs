@@ -27,6 +27,7 @@ async function main() {
   environment.NEXT_PUBLIC_SUPABASE_URL = "https://reference-test.supabase.co";
   environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_reference_test";
   environment.MARKETO_MEDIA_BUCKET_NAME = "marketo-test-media";
+  environment.MARKETO_IMAGE_PROCESSING = "cloudflare"; // Local fixture binding only, never a deployment.
   delete environment.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   delete environment.SUPABASE_SECRET_KEY;
   delete environment.SUPABASE_SERVICE_ROLE_KEY;

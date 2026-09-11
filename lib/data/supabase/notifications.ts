@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { normalizePageSize, normalizePositivePage, pageWindow } from "@/lib/data/pagination";
 import type { Notification, PageResult } from "@/lib/data/types";
 import { safeInternalPath } from "@/lib/auth/redirect";
@@ -24,14 +24,14 @@ function payloadText(payload: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export async function listNotifications(client: MarketoSupabaseClient, userId: string, limit = 40) {
+export async function listNotifications(client: JevuSupabaseClient, userId: string, limit = 40) {
   const { data, error } = await client.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(Math.min(limit, 100));
   if (error) throw error;
   return data;
 }
 
 export async function listNotificationPage(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   userId: string,
   options: { page?: number; pageSize?: number; unreadOnly?: boolean } = {},
 ): Promise<PageResult<Notification>> {
@@ -80,7 +80,7 @@ export async function listNotificationPage(
   };
 }
 
-export async function markNotificationRead(client: MarketoSupabaseClient, notificationId: string) {
+export async function markNotificationRead(client: JevuSupabaseClient, notificationId: string) {
   const { error } = await client.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", notificationId);
   if (error) throw new NotificationDataError("MUTATION_FAILED", { cause: error });
 }

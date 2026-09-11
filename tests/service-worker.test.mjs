@@ -24,7 +24,7 @@ function createWorkerHarness({
   const caches = {
     async open(name) { opened.push({ name }); return open ? open(name, cache) : cache; },
     async match() { throw new Error("global cache matching is forbidden"); },
-    async keys() { return ["foreign-application-cache", "marketo-static-v5", "marketo-static-v6", "marketo-static-v7", "marketo-static-v8", "marketo-static-v9", "marketo-static-v10"]; },
+    async keys() { return ["foreign-application-cache", "marketo-static-v5", "marketo-static-v6", "marketo-static-v7", "marketo-static-v8", "marketo-static-v9", "marketo-static-v10", "jevu-static-v0", "jevu-static-v1"]; },
     async delete(name) { deleted.push(name); return true; },
   };
   const self = {
@@ -116,7 +116,7 @@ test("service worker v10 stores an eligible cache miss before resolving the resp
   const event = dispatchFetch(harness, request);
   assert.equal(await event.response, network);
   await event.lifetime;
-  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v10"));
+  assert.ok(harness.opened.some((entry) => entry.name === "jevu-static-v1"));
   assert.deepEqual(harness.puts, [{ request, response: storedCopy }]);
 });
 
@@ -236,13 +236,13 @@ test("service worker keeps offline navigation fallback and lifecycle work attach
   let installWork;
   harness.handlers.get("install")({ waitUntil(value) { installWork = value; } });
   await installWork;
-  assert.ok(harness.opened.some((entry) => entry.name === "marketo-static-v10"));
+  assert.ok(harness.opened.some((entry) => entry.name === "jevu-static-v1"));
   assert.ok(harness.opened.some((entry) => JSON.stringify(entry.addAll) === JSON.stringify(["/offline.html"])));
 
   let activateWork;
   harness.handlers.get("activate")({ waitUntil(value) { activateWork = value; } });
   await activateWork;
-  assert.deepEqual(harness.deleted, ["marketo-static-v5", "marketo-static-v6", "marketo-static-v7", "marketo-static-v8", "marketo-static-v9"]);
+  assert.deepEqual(harness.deleted, ["marketo-static-v5", "marketo-static-v6", "marketo-static-v7", "marketo-static-v8", "marketo-static-v9", "marketo-static-v10", "jevu-static-v0"]);
   assert.equal(harness.claimed(), true);
 });
 

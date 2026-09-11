@@ -30,6 +30,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .site-header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(18px); }
 .header-inner { width: min(1440px, calc(100% - 48px)); min-height: 74px; padding-block: 12px; margin: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.25rem; letter-spacing: -.04em; white-space: nowrap; }
+.brand-logo { width: 44px; height: 44px; flex: 0 0 44px; object-fit: contain; border-radius: 10px; }
 .brand-mark { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 9px; background: var(--green); color: white; font-size: var(--font-ui); box-shadow: 0 8px 20px rgba(22,163,74,.24); }
 .city-button { display: flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #344054; cursor: pointer; white-space: nowrap; }
 .header-search { flex: 1 1 20rem; min-width: min(100%, 20rem); max-width: 480px; min-height: 48px; display: flex; align-items: center; margin-left: auto; border: 1px solid #dfe3e8; border-radius: 12px; overflow: hidden; background: #f8fafb; }
@@ -445,7 +446,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .hero-card, .hero-slider-dots button { transition: none; }
 }
 
-/* Marketo application UI -------------------------------------------------- */
+/* JEVU application UI -------------------------------------------------- */
 :root {
   --primary-strong: #087b3b;
   --primary-soft: #eaf8ef;
@@ -734,8 +735,18 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .breadcrumbs { margin: 14px 0 22px; color: #98a2b3; font-size: var(--font-ui); }
 .listing-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(310px, .7fr); gap: 24px; align-items: start; }
 .gallery-main { position: relative; aspect-ratio: 16/9; overflow: hidden; border-radius: 18px; background: #edf0f2; }
-.gallery-main::before { content: "🚙"; position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(135deg,#eef4f0,#dce9e0); font-size: 5.75rem; }
-.gallery-main img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
+.gallery-main img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
+.listing-gallery { min-width: 0; }
+.gallery-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; border-radius: 18px; }
+.gallery-slide { flex: 0 0 100%; min-width: 0; margin: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.gallery-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.gallery-controls span { font-size: 1rem; font-weight: 650; }
+.gallery-controls button, .gallery-selectors button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--green-dark); cursor: pointer; }
+.gallery-controls button:disabled { opacity: .4; cursor: default; }
+.gallery-selectors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.gallery-selectors button { font-size: 1rem; font-weight: 700; }
+.gallery-selectors button[aria-pressed="true"] { color: white; background: var(--green); border-color: var(--green); }
+.gallery-track:focus-visible, .gallery-controls button:focus-visible, .gallery-selectors button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
 .gallery-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 9px; }
 .gallery-thumbs button { aspect-ratio: 1.7; overflow: hidden; padding: 0; border: 2px solid transparent; border-radius: 10px; background: #eee; cursor: pointer; }
 .gallery-thumbs button:first-child { border-color: var(--green); }

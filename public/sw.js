@@ -1,5 +1,6 @@
-const CACHE_NAME = "marketo-static-v10";
-const CACHE_PREFIX = "marketo-static-";
+const CACHE_NAME = "jevu-static-v1";
+const CACHE_PREFIX = "jevu-static-";
+const LEGACY_CACHE_PREFIX = "marketo-static-";
 // HTML and authenticated pages are deliberately never cached. Only the
 // self-contained offline document, immutable/static assets and explicitly
 // versioned public reference payloads are stored.
@@ -86,7 +87,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     optionalCache(() => caches.keys()
       .then((keys) => Promise.all(keys
-        .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+        .filter((key) => (key.startsWith(CACHE_PREFIX) || key.startsWith(LEGACY_CACHE_PREFIX)) && key !== CACHE_NAME)
         .map((key) => caches.delete(key)))))
       .then(() => self.clients.claim()),
   );

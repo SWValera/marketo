@@ -1,4 +1,5 @@
 "use client";
+import { BrandIcon } from "@/components/brand";
 
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Building2, CarFront, PackageOpen, Wrench } from "lucide-react";
 import { AppLink as Link } from "@/components/app-link";
@@ -107,7 +108,7 @@ export function HeroSlider({
       <div className="hero-visual" aria-hidden="true">
         <span className="hero-visual-halo" />
         <span className="hero-visual-icon"><VisualIcon size={92} strokeWidth={1.35} /></span>
-        <span className="hero-visual-mark">M</span>
+        <BrandIcon className="hero-visual-mark" size={50} />
       </div>
     </article>
     <div className="hero-slider-controls">

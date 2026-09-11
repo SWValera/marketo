@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 
 import { AppLink as Link } from "@/components/app-link";
 import { Bell, Heart, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
@@ -28,8 +29,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
     <header className="site-header">
       <div className="header-inner" inert={menuOpen || undefined}>
         <Link href="/" className="brand" aria-label={t("header.homeAria")}>
-          <span className="brand-mark">M</span>
-          <span>Marketo</span>
+          <Brand />
         </Link>
 
         <LocationPicker compact className="city-button" />
@@ -57,7 +57,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           className="menu-toggle"
           aria-label={menuOpen ? t("header.closeMenu") : t("header.openMenu")}
           aria-expanded={menuOpen}
-          aria-controls="marketo-mobile-menu"
+          aria-controls="jevu-mobile-menu"
           onClick={() => setMenuOpen((value) => !value)}
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -65,7 +65,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
       </div>
 
       {menuOpen && (
-        <><button className="mobile-menu-overlay" type="button" aria-label={t("header.closeMenu")} onClick={() => setMenuOpen(false)} /><nav ref={mobileMenuRef} id="marketo-mobile-menu" className="mobile-menu" role="dialog" aria-modal="true" tabIndex={-1} aria-label={t("header.mobileMenu")}>
+        <><button className="mobile-menu-overlay" type="button" aria-label={t("header.closeMenu")} onClick={() => setMenuOpen(false)} /><nav ref={mobileMenuRef} id="jevu-mobile-menu" className="mobile-menu" role="dialog" aria-modal="true" tabIndex={-1} aria-label={t("header.mobileMenu")}>
           <LanguageSwitcher />
           <LocationPicker className="mobile-location-trigger" />
           <Link href="/search" onClick={() => setMenuOpen(false)}>{t("header.catalog")}</Link>

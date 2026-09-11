@@ -36,7 +36,7 @@ function rpcFailure(error: unknown) {
   if (code === "22023" || /reason_code|note is too long|invalid moderation/i.test(message)) {
     return NextResponse.json({ error: "invalid_moderation_input" }, { status: 422 });
   }
-  console.error("[marketo-moderation] decision failed", {
+  console.error("[jevu-moderation] decision failed", {
     name: typeof record.name === "string" ? record.name : "Error",
     ...(code ? { code } : {}),
   });

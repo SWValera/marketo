@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 import type { GeographyReferenceData } from "@/lib/reference-data/types";
 
@@ -54,7 +54,7 @@ export function mapGeographyReferenceRows(
   };
 }
 
-export async function listActiveCountries(client: MarketoSupabaseClient) {
+export async function listActiveCountries(client: JevuSupabaseClient) {
   const { data, error } = await client
     .from("countries")
     .select("id, code, slug, name_ru, name_kk, currency_code, currency_symbol, currency_exponent, phone_code, sort_order")
@@ -66,7 +66,7 @@ export async function listActiveCountries(client: MarketoSupabaseClient) {
   return data;
 }
 
-export async function listActiveRegions(client: MarketoSupabaseClient, countryId?: string) {
+export async function listActiveRegions(client: JevuSupabaseClient, countryId?: string) {
   let request = client
     .from("regions")
     .select("id, country_id, code, slug, name_ru, name_kk, kind, sort_order")
@@ -77,7 +77,7 @@ export async function listActiveRegions(client: MarketoSupabaseClient, countryId
   return data;
 }
 
-export async function listSelectableSettlements(client: MarketoSupabaseClient) {
+export async function listSelectableSettlements(client: JevuSupabaseClient) {
   const rows = [];
   const pageSize = 500;
   for (let from = 0; ; from += pageSize) {
@@ -96,7 +96,7 @@ export async function listSelectableSettlements(client: MarketoSupabaseClient) {
   }
 }
 
-export async function searchSelectableSettlements(client: MarketoSupabaseClient, query: string, regionId?: string, limit = 30) {
+export async function searchSelectableSettlements(client: JevuSupabaseClient, query: string, regionId?: string, limit = 30) {
   let request = client
     .from("settlements")
     .select("id, region_id, parent_id, kato_code, slug, name_ru, name_kk, kind, sort_order")

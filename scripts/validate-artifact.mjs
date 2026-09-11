@@ -72,8 +72,10 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   if (workerConfig.main !== "index.js" || workerConfig.assets?.binding !== "ASSETS" || workerConfig.assets?.directory !== "../client") {
     throw artifactError("Generated Worker configuration has an invalid entry or assets binding.");
   }
-  if (workerConfig.images !== undefined) {
-    throw artifactError("Generated Worker configuration must not depend on a Cloudflare Images binding.");
+  if (environment.MARKETO_IMAGE_PROCESSING === "cloudflare") {
+    if (workerConfig.images?.binding !== "MARKETO_IMAGES") throw artifactError("Configured photo processing requires the MARKETO_IMAGES binding.");
+  } else if (workerConfig.images !== undefined) {
+    throw artifactError("Images must not be enabled without the explicit staging configuration.");
   }
   if (sourceHosting?.r2) {
     const bindings = (workerConfig.r2_buckets ?? []).filter((item) => item?.binding === sourceHosting.r2);

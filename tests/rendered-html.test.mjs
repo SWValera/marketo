@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-process.env.NEXT_PUBLIC_SUPABASE_URL = "https://reference-test.supabase.co";
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_reference_test";
+// A production-configured artifact can be exercised entirely against local fixtures.
+// These overrides never change the artifact or permit Supabase network access.
+const fixtureOrigin = process.env.JEVU_TEST_PUBLIC_SUPABASE_URL ?? "https://reference-test.supabase.co";
+const fixtureKey = process.env.JEVU_TEST_PUBLIC_SUPABASE_KEY ?? "sb_publishable_reference_test";
+process.env.NEXT_PUBLIC_SUPABASE_URL = fixtureOrigin;
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = fixtureKey;
 
 const ids = {
   country: "00000000-0000-4000-8000-000000000001",
@@ -51,8 +55,13 @@ const sellerListingRows = Array.from({ length: 49 }, (_, index) => ({
   deleted_at: null,
   categories: { ...electronicsCategoryRelation },
   settlements: { id: ids.astana, name_ru: "Астана", name_kk: "Астана" },
-  listing_images: [{ storage_key: `seller/offer-${index + 1}.jpg`, sort_order: 0 }],
+  listing_images: [{ storage_key: `seller/offer-${index + 1}.jpg`, sort_order: 0 },
+    ...(index===0?[{storage_key:'seller/offer-1-back.jpg',sort_order:1}]:[])],
 }));
+
+// Distinct records exercise full, empty and single-image albums without request-cache reuse.
+sellerListingRows[1].listing_images = Array.from({length:7},(_,i)=>({storage_key:`seller/seven-${i}.jpg`,sort_order:i}));
+sellerListingRows[2].listing_images = [];
 
 const invalidCategoryRelationListing = {
   ...sellerListingRows[0],
@@ -147,7 +156,6 @@ for (let index = referenceTables.categories.length; index < 1356; index += 1) {
   });
 }
 
-const originalFetch = globalThis.fetch;
 const supabaseRequestCounts = new Map();
 const sellerListingRangeRequests = [];
 const mediaGetRequests = [];
@@ -155,7 +163,7 @@ let categoryResponseGate = null;
 const avatarBytes = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
 globalThis.fetch = async (input, init) => {
   const requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
-  if (requestUrl.hostname !== "reference-test.supabase.co") return originalFetch(input, init);
+  if (requestUrl.origin !== fixtureOrigin) throw new Error('Unexpected network request in rendered HTML fixture: ' + requestUrl.origin);
   supabaseRequestCounts.set(requestUrl.pathname, (supabaseRequestCounts.get(requestUrl.pathname) ?? 0) + 1);
   const table = requestUrl.pathname.split("/").at(-1);
   if (table === "categories" && categoryResponseGate) await categoryResponseGate;
@@ -225,6 +233,10 @@ globalThis.fetch = async (input, init) => {
     if (table === "listings") sellerListingRangeRequests.push({ offset, limit: end - offset + 1, url: requestUrl.href });
     rows = rows.slice(offset, end + 1);
   }
+  if(table==='listings' && requestUrl.searchParams.has('listing_images.limit')) {
+    const imageLimit=Number(requestUrl.searchParams.get('listing_images.limit'));
+    rows=rows.map(row=>({...row,listing_images:row.listing_images?.slice(0,imageLimit)}));
+  }
   return new Response(JSON.stringify(rows), {
     status: 200,
     headers: { "content-type": "application/json", "content-range": total === 0 ? "*/0" : `0-${Math.max(0, rows.length - 1)}/${total}` },
@@ -232,8 +244,8 @@ globalThis.fetch = async (input, init) => {
 };
 
 globalThis.__MARKETO_CLOUDFLARE_ENV__ = {
-  NEXT_PUBLIC_SUPABASE_URL: "https://reference-test.supabase.co",
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_reference_test",
+  NEXT_PUBLIC_SUPABASE_URL: fixtureOrigin,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: fixtureKey,
   MARKETO_MEDIA: {
     async get(storageKey) {
       mediaGetRequests.push(storageKey);
@@ -249,7 +261,9 @@ globalThis.__MARKETO_CLOUDFLARE_ENV__ = {
   },
 };
 
-const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+const workerUrl = process.env.JEVU_TEST_WORKER_URL
+  ? new URL(process.env.JEVU_TEST_WORKER_URL)
+  : new URL("../dist/server/index.js", import.meta.url);
 workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
 const { default: worker } = await import(workerUrl.href);
 const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
@@ -309,7 +323,7 @@ test("Home streams its shell before bounded category data resolves and performs 
 
 test("core routes render through the production worker", async () => {
   const routes = [
-    ["/", "Городская премиум витрина"], ["/categories", "Все категории"], ["/search", "Каталог Marketo"],
+    ["/", "Городская премиум витрина"], ["/categories", "Все категории"], ["/search", "Каталог JEVU"],
     ["/category/jobs", "Работа"], ["/category/services", "Услуги"], ["/category/cars", "Легковые автомобили"],
     ["/profile", "Войдите, чтобы открыть профиль"],
     ["/favorites", "Войдите, чтобы открыть избранное"], ["/messages", "Войдите, чтобы написать продавцу"],
@@ -321,7 +335,7 @@ test("core routes render through the production worker", async () => {
     const { response, html } = await render(pathname);
     assert.equal(response.status, 200, pathname);
     assert.match(html, new RegExp(expected), pathname);
-    assert.match(html, /class="back-button|marketo-kz|Marketo/, pathname);
+    assert.match(html, /class="back-button|marketo-kz|JEVU/, pathname);
   }
 });
 
@@ -337,6 +351,8 @@ test("listing detail uses its validated category relation and populated public c
   assert.match(ru.html, /Память/);
   assert.match(ru.html, /256 ГБ/);
   assert.match(ru.html, /Например, iPhone 15/);
+  assert.match(ru.html, /src="\/api\/media\/seller\/offer-1-back.jpg"/,'second saved photo must be rendered, not just retained in an unused relation');
+  assert.match(ru.html, /Фото 2 из 2/);
 
   const kk = await render(path, "kk");
   assert.equal(kk.response.status, 200);
@@ -351,6 +367,25 @@ test("listing detail uses its validated category relation and populated public c
   assert.notEqual(invalid.response.status, 404);
   assert.match(invalid.html, /Не удалось загрузить страницу/);
   assert.doesNotMatch(invalid.html, /Seller offer 1 description/);
+});
+
+test('listing gallery renders two, seven, single and empty albums in the actual Worker', async () => {
+  for (const [index,count] of [[0,2],[1,7],[2,0],[3,1]]) {
+    const row=sellerListingRows[index];
+    const {response,html}=await render(`/listing/${row.id}-${row.slug}`);
+    assert.equal(response.status,200);
+    const slides=html.match(/<figure\b[^>]*class="gallery-main gallery-slide"/g)??[];
+    assert.equal(slides.length,count);
+    for (const image of row.listing_images) assert.ok(html.includes(`src="/api/media/${image.storage_key}"`));
+    assert.equal(html.includes('class="gallery-controls"'),count>1);
+    assert.equal(html.includes('class="gallery-selectors"'),count>1);
+    if(count) assert.ok(html.includes('loading="eager"'));
+    if(count>1) {
+      assert.ok(html.includes('loading="lazy"'));
+      assert.ok(html.includes(`Фото ${count} из ${count}`));
+      assert.ok(html.indexOf(row.listing_images[0].storage_key)<html.indexOf(row.listing_images.at(-1).storage_key));
+    }
+  }
 });
 
 test("Home listing preview stays idle until its explicit public API request", async () => {
@@ -613,7 +648,7 @@ test("seller absence is 404 while an operational profile query failure is not", 
 });
 
 test("missing asset probes bypass the application 404 render pipeline", async () => {
-  for (const pathname of ["/favicon.ico", "/apple-touch-icon.png", "/does-not-exist.js", "/.well-known/probe.json"]) {
+  for (const pathname of ["/favicon.svg", "/apple-touch-icon.png", "/does-not-exist.js", "/.well-known/probe.json"]) {
     const { response, html } = await render(pathname);
     assert.equal(response.status, 404, pathname);
     assert.match(response.headers.get("content-type") ?? "", /^text\/plain/, pathname);

@@ -1,4 +1,4 @@
-# Marketo Supabase foundation
+# JEVU Supabase foundation
 
 This directory is a forward-only, locally verified database contract. Nothing
 in the build or test chain connects to or mutates production Supabase.

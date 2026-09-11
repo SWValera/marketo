@@ -1,6 +1,6 @@
 # Catalog data release policy
 
-Marketo separates immutable database migrations from evolving catalog reference
+JEVU separates immutable database migrations from evolving catalog reference
 data. Migration `0024_catalog_completeness.sql` is historical and must remain
 byte-for-byte unchanged. A new make, model, attribute label or option does not
 justify another migration unless the database schema or contract also changes.

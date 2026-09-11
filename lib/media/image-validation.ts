@@ -1,3 +1,5 @@
+import {photoPipeline} from './photo-contract.ts';
+
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 20_000_000;
 const MIN_IMAGE_SIDE = 240;
@@ -535,10 +537,12 @@ export async function validateListingImage(file: File): Promise<ValidatedImage> 
 }
 
 export const listingImageLimits = {
-  maxFiles: 12,
+  maxFiles: photoPipeline.maxFiles,
   maxBytes: MAX_IMAGE_BYTES,
   maxTotalBytes: 60 * 1024 * 1024,
-  maxRequestBytes: 60 * 1024 * 1024 + 512 * 1024,
+  // New clients upload prepared photos sequentially. Bound FormData's retained
+  // bytes even when a direct caller tries to send all seven files together.
+  maxRequestBytes: photoPipeline.maxOutputBytes + 512 * 1024,
   minSide: MIN_IMAGE_SIDE,
   maxPixels: MAX_IMAGE_PIXELS,
   maxDecodedBytes: MAX_DECODED_IMAGE_BYTES,

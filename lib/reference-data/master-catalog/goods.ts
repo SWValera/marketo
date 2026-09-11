@@ -4,7 +4,7 @@ import { branch, fallbackLeaf, leaves, overlay, tx } from "./types.ts";
 const goods = (entries: Parameters<typeof leaves>[0], profiles: readonly string[] = ["goodsBrand"]) =>
   leaves(entries, profiles);
 
-/** Product vertical missing from the original Marketo tree. */
+/** Product vertical missing from the original JEVU tree. */
 const constructionRoot: MasterCatalogNode = {
   slug: "construction-repair",
   name: tx("Стройматериалы и инструменты", "Құрылыс материалдары мен құралдар"),

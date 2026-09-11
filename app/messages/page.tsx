@@ -9,14 +9,17 @@ import { chatRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
 export const metadata: Metadata = { title: "Чаты", robots: { index: false, follow: false } };
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
-  const [{ t, locale }, authContext, params] = await Promise.all([getServerI18n(), getCurrentAuthContext(), searchParams]);
+  const authContextPromise = getCurrentAuthContext();
+  const [{ t, locale }, params] = await Promise.all([getServerI18n(), searchParams]);
   const page = normalizePositivePage(params.page);
+  const chatsPromise = chatRepository.list({ page, pageSize:20, locale }).catch(() => null);
+  const authContext = await authContextPromise;
   if (authContext.status === "anonymous") return <DashboardShell title={t("messages.title")} description={t("messages.description")} active="/messages" authContext={authContext}>
     <EmptyState icon={<LogIn size={30} />} title={t("messages.signInTitle")} description={t("messages.signInNote")} actionHref="/login?next=/messages" actionLabel={t("messages.signIn")} />
   </DashboardShell>;
   let chats: Awaited<ReturnType<typeof chatRepository.list>> | null = null;
   if (authContext.status === "authenticated") {
-    try { chats = await chatRepository.list({ page, pageSize:20, locale }); } catch { /* Not an empty inbox. */ }
+    chats = await chatsPromise;
   }
   return <DashboardShell title={t("messages.title")} description={t("messages.description")} active="/messages" authContext={authContext}>
     {chats && authContext.status === "authenticated" ? <ChatInbox key={authContext.user.id + ":" + page + ":" + locale} initial={chats} currentUserId={authContext.user.id} page={page} />

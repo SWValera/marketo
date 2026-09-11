@@ -1,7 +1,7 @@
 # First admin and moderator bootstrap
 
 Use this procedure first on a disposable or staging Supabase project. Nothing
-in the Marketo build, tests or migrations creates demo users or assigns a role.
+in the JEVU build, tests or migrations creates demo users or assigns a role.
 Production changes require a separate, explicit approval and a verified backup.
 
 ## 1. Find the intended Auth user

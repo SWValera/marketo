@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site-origin";
 import type { Metadata } from "next";
 import { AppLink as Link } from "@/components/app-link";
 import { CategoryLink } from "@/components/category-link";
@@ -38,10 +39,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), slug);
   const name = category ? localize(category.name, locale) : "";
   return catalog.status !== "ready" ? { robots: { index: false, follow: true } } : category ? {
-    title: `${name} — Marketo`,
-    description: locale === "kk" ? `Қазақстан бойынша «${name}» санатындағы хабарландырулар.` : `Объявления категории «${name}» по всему Казахстану на Marketo.`,
+    title: `${name} — JEVU`,
+    description: locale === "kk" ? `Қазақстан бойынша «${name}» санатындағы хабарландырулар.` : `Объявления категории «${name}» по всему Казахстану на JEVU.`,
     alternates: { canonical: `/category/${category.slug}` },
-    openGraph: { title: `${name} — Marketo`, description: locale === "kk" ? `Marketo-дағы «${name}» бөлімінің өзекті хабарландырулары.` : `Актуальные объявления раздела «${name}» на Marketo.`, url: `/category/${category.slug}` },
+    openGraph: { siteName: "JEVU", images: [{url:`${SITE_ORIGIN}/icons/jevu-512-v1.png`,width:512,height:512,alt:"JEVU"}], title: `${name} — JEVU`, description: locale === "kk" ? `JEVU-дағы «${name}» бөлімінің өзекті хабарландырулары.` : `Актуальные объявления раздела «${name}» на JEVU.`, url: `/category/${category.slug}` },
   } : { robots: { index: false, follow: true } };
 }
 

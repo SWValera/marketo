@@ -10,12 +10,17 @@ import {
 } from "./lib/sites-runtime.mjs";
 import { validateArtifact } from "./validate-artifact.mjs";
 import { checkPageReadRegressions } from "./check-page-read-regressions.mjs";
+import { checkBrandRegressions } from "./check-brand-regressions.mjs";
+import { assertPhotoBuildConfiguration, checkPhotoRegressions } from "./check-photo-regressions.mjs";
 
 export async function buildVerified() {
   const { environment } = createSitesEnvironment();
+  assertPhotoBuildConfiguration(environment);
+  await checkBrandRegressions(environment);
   const timeoutMilliseconds = parseDuration(environment.SITES_BUILD_TIMEOUT, 180_000);
   const killAfterMilliseconds = parseDuration(environment.SITES_BUILD_KILL_AFTER, 10_000);
   await checkPageReadRegressions(environment);
+  await checkPhotoRegressions(environment);
 
   console.log("Running bounded vinext build...");
   for (const generatedDirectory of [join(projectRoot, "dist"), join(projectRoot, ".vinext")]) {

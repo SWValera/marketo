@@ -1,29 +1,79 @@
 {
-  "name": "Marketo — Қазақстан хабарландырулары / объявления Казахстана",
-  "short_name": "Marketo",
+  "name": "JEVU",
+  "short_name": "JEVU",
   "description": "Қазақстандағы тауарлар, қызметтер, жұмыс және жылжымайтын мүлік / Товары, услуги, работа и недвижимость в Казахстане.",
   "lang": "und",
   "dir": "ltr",
   "id": "/marketo-pwa-v1",
-  "start_url": "/?source=pwa&mode=standalone",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
-  "categories": ["shopping", "lifestyle"],
+  "categories": [
+    "shopping",
+    "lifestyle"
+  ],
   "prefer_related_applications": false,
-  "launch_handler": { "client_mode": "navigate-existing" },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "handle_links": "preferred",
   "icons": [
-    { "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/marketo-pwa-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/marketo-pwa-maskable-192-v2.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/marketo-pwa-maskable-512-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/jevu-192-v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/jevu-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/jevu-maskable-192-v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/jevu-maskable-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Каталог / Каталог", "short_name": "Каталог", "url": "/search", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Хабарландыру беру / Подать объявление", "short_name": "Жариялау / Подать", "url": "/publish", "icons": [{ "src": "/icons/marketo-pwa-192-v2.png", "sizes": "192x192", "type": "image/png" }] }
+    {
+      "name": "Каталог / Каталог",
+      "short_name": "Каталог",
+      "url": "/search",
+      "icons": [
+        {
+          "src": "/icons/jevu-192-v1.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Хабарландыру беру / Подать объявление",
+      "short_name": "Жариялау / Подать",
+      "url": "/publish",
+      "icons": [
+        {
+          "src": "/icons/jevu-192-v1.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

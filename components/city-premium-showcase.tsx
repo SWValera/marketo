@@ -177,7 +177,7 @@ export function CityPremiumShowcase() {
         }
         const Icon = item.icon;
         return <CategoryLink cityId={selectedLocation} className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={`${slot}-${item.id}`}>
-          <span className="showcase-badge">Marketo</span>
+          <span className="showcase-badge">JEVU</span>
           <span className="showcase-brand-icon"><Icon size={34} /></span>
           <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small>{t("showcase.open")} <ArrowRight size={13} /></small></div>
         </CategoryLink>;

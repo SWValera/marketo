@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { publicMediaUrl } from "../media/public-url.ts";
 import type { AccountStatus, Profile } from "../data/types.ts";
-import type { MarketoSupabaseClient } from "../data/supabase/client.ts";
+import type { JevuSupabaseClient } from "../data/supabase/client.ts";
 import { getAuthenticatedAccountProfile } from "../data/supabase/profiles.ts";
 
 export const AUTH_ROLES = ["support", "moderator", "admin"] as const;
@@ -79,7 +79,7 @@ export function logAuthContextError(
   error: unknown,
 ) {
   const details = errorDetails(error);
-  console.error("[marketo-auth] request failed", { scope, ...details });
+  console.error("[jevu-auth] request failed", { scope, ...details });
 }
 
 export function createAuthContextError(isAuthenticated: boolean, user: User | null = null): CurrentAuthContext {
@@ -101,8 +101,8 @@ export function isAuthSessionMissing(error: unknown) {
 }
 
 export async function resolveCurrentAuthContext(
-  client: MarketoSupabaseClient,
-  logger: SafeAuthLogger = ({ scope, ...details }) => console.error("[marketo-auth] request failed", { scope, ...details }),
+  client: JevuSupabaseClient,
+  logger: SafeAuthLogger = ({ scope, ...details }) => console.error("[jevu-auth] request failed", { scope, ...details }),
   getUser = () => client.auth.getUser(),
 ): Promise<CurrentAuthContext> {
   const { data: authData, error: authError } = await getUser();

@@ -36,5 +36,5 @@ async function ConversationPageContent({ params }: ConversationPageProps) {
   if (!conversation) notFound();
   return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={conversation.peerName} description={conversation.listingTitle ? t("messages.aboutListing", { title: conversation.listingTitle }) : t("messages.safeChat")} /><section className="conversation conversation-standalone"><header className="conversation-header"><span className="chat-avatar">{conversation.peerAvatarUrl
     ? <img src={conversation.peerAvatarUrl} alt="" width={44} height={44} decoding="async" />
-    : <UserRound size={21} />}</span><div><strong>{conversation.peerName}</strong><small>{t("messages.marketoChat")}</small></div></header><ConversationThread key={conversation.id} conversation={conversation} currentUserId={authContext.user.id} /></section></main><MobileNav /></>;
+    : <UserRound size={21} />}</span><div><strong>{conversation.peerName}</strong><small>{t("messages.jevuChat")}</small></div></header><ConversationThread key={conversation.id} conversation={conversation} currentUserId={authContext.user.id} /></section></main><MobileNav /></>;
 }

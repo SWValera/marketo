@@ -17,12 +17,13 @@ import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedLi
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
 import type { CategoryAttributeDataType } from "@/lib/reference-data/types";
+import { beginVerifiedAccountRead } from "@/lib/data/account-page-read";
 import { createSupabasePublicServerClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { tryGetServerSupabasePublicConfig } from "@/lib/supabase/server-env";
 import { getPublicSellerProfile } from "@/lib/data/supabase/profiles";
 import { publicMediaUrl } from "@/lib/media/public-url";
 import { getCurrentAuthContext } from "@/lib/auth/context";
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import {
   getModerationListingDetail,
   listModerationQueue,
@@ -189,6 +190,10 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
   if (!Array.isArray(row.listing_images)) throw new PublicListingDataError("INVALID_RELATION");
   const price = priceParts(row.price_minor, row.currency_code, locale);
   const images = (row.listing_images as unknown as Array<{ storage_key: string; sort_order: number }>).sort((left, right) => left.sort_order - right.sort_order);
+  const imageUrls = images.flatMap(image => {
+    const url = publicMediaUrl(image.storage_key);
+    return url ? [url] : [];
+  });
   return {
     id: row.id,
     slug: row.slug,
@@ -203,7 +208,8 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
     priceAmount: price.amount,
     locationLabel: locale === "kk" ? settlement.name_kk ?? settlement.name_ru ?? "" : settlement.name_ru ?? settlement.name_kk ?? "",
     publishedLabel: dateLabel(row.published_at, locale),
-    imageUrl: publicMediaUrl(images[0]?.storage_key ?? null),
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
     expiresAt: row.expires_at,
     categorySlug: category.slug,
     cityId: settlement.id,
@@ -317,9 +323,14 @@ export const profileRepository = {
 
 export const chatRepository = {
   async list(options: { page?: number; pageSize?: number; locale?: Locale } = {}): Promise<PageResult<ChatSummary>> {
-    const context = await getCurrentAuthContext();
+    const contextPromise = getCurrentAuthContext();
+    const inboxPromise = beginVerifiedAccountRead(async userId =>
+      listUserConversations(await createSupabaseServerClient(), userId, options));
+    const context = await contextPromise;
     if (context.status !== "authenticated") throw new ChatDataError("LIST_UNAVAILABLE");
-    return listUserConversations(await createSupabaseServerClient(), context.user.id, options);
+    const result = await inboxPromise;
+    if (!result.ok) throw result.error;
+    return result.value;
   },
   async findById(id: string, locale: Locale = "ru"): Promise<Conversation | null> {
     const context = await getCurrentAuthContext();
@@ -338,20 +349,20 @@ export const notificationRepository = {
 
 export const moderationRepository = {
   async list(
-    client: MarketoSupabaseClient,
+    client: JevuSupabaseClient,
     options: { page?: number; pageSize?: number; locale?: Locale } = {},
   ): Promise<NumberedPageResult<ModerationQueueItem>> {
     return listModerationQueue(client, options);
   },
   async findById(
-    client: MarketoSupabaseClient,
+    client: JevuSupabaseClient,
     id: string,
     locale: Locale = "ru",
   ): Promise<ModerationListingDetail | null> {
     return getModerationListingDetail(client, id, locale);
   },
   async decide(
-    client: MarketoSupabaseClient,
+    client: JevuSupabaseClient,
     id: string,
     decision: ModerationDecision,
     reasonCode?: ModerationRejectionReason,

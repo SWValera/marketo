@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-export type MarketoSupabaseClient = SupabaseClient<Database>;
+export type JevuSupabaseClient = SupabaseClient<Database>;
 
 export function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);

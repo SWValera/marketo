@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { SITE_ORIGIN } from "@/lib/site-origin";
 import { createCategoryCatalogView, getCategoryDepth } from "@/lib/reference-data/catalog";
 import { getCategoryReferences } from "@/lib/reference-data/server";
 import { createSupabasePublicServerClient } from "@/lib/supabase/server";
@@ -42,7 +43,7 @@ async function getListingEntries(base: string, availableUrls: number): Promise<M
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = "https://marketo.kz";
+  const base = SITE_ORIGIN;
   const catalog = await getCategoryReferences();
   if (catalog.status !== "ready") throw new Error("Category references are unavailable for sitemap generation.");
   const view = createCategoryCatalogView(catalog.data);

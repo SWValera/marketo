@@ -16,7 +16,7 @@ type AdminPageProps = { searchParams: Promise<{ page?: string | string[] }> };
 
 function logModerationReadFailure(scope: "queue" | "detail", error: unknown) {
   const record = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : {};
-  console.error("[marketo-moderation] read failed", {
+  console.error("[jevu-moderation] read failed", {
     scope,
     name: typeof record.name === "string" ? record.name : "Error",
     ...(typeof record.code === "string" ? { code: record.code } : {}),

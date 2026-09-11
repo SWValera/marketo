@@ -30,6 +30,8 @@ export type ListingSummary = {
 };
 
 export type ListingDetail = ListingSummary & {
+  /** Complete ordered album. Listing cards continue to use imageUrl only. */
+  imageUrls: string[];
   description: string;
   categoryId: string;
   categoryName: LocalizedText;

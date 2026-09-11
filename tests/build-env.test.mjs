@@ -83,12 +83,12 @@ test("browser Supabase env guard is build-only and runs after vinext config", ()
   assert.equal(typeof plugin.configResolved, "function");
 });
 
-test("test production bundle contains safe public sentinels and no unresolved Supabase env expressions", async () => {
+test("production bundle contains expected public configuration and no unresolved Supabase env expressions", async () => {
   const assetDirectory = new URL("dist/client/assets/", root);
   const scripts = (await readdir(assetDirectory)).filter((name) => name.endsWith(".js"));
   const source = (await Promise.all(scripts.map((name) => readFile(new URL(name, assetDirectory), "utf8")))).join("\n");
-  assert.equal(source.includes("https://reference-test.supabase.co"), true, "test URL was not inlined");
-  assert.equal(source.includes("sb_publishable_reference_test"), true, "test public key was not inlined");
+  assert.equal(source.includes(process.env.JEVU_TEST_PUBLIC_SUPABASE_URL ?? "https://reference-test.supabase.co"), true, "test URL was not inlined");
+  assert.equal(source.includes(process.env.JEVU_TEST_PUBLIC_SUPABASE_KEY ?? "sb_publishable_reference_test"), true, "test public key was not inlined");
   assert.equal(
     /process\.env\.NEXT_PUBLIC_SUPABASE_(?:URL|PUBLISHABLE_KEY|ANON_KEY)/.test(source),
     false,

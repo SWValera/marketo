@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {normalizeListingImage} from '../../lib/media/server-image-normalization.ts';
+import {photoOutputSize,photoPipeline} from '../../lib/media/photo-contract.ts';
+import {photoFixture,localPhotoProcessor} from './photo-processor.mjs';
+import sharp from 'sharp';
+const [width,height]=process.argv.slice(2).map(Number);
+assert.ok(Number.isSafeInteger(width)&&Number.isSafeInteger(height));
+const source=new File([await photoFixture(width,height)],'fixture.jpg',{type:'image/jpeg'});
+const metadata=await sharp(Buffer.from(await source.arrayBuffer())).metadata();
+assert.equal(metadata.width,width);assert.equal(metadata.height,height);
+const result=await normalizeListingImage(source,localPhotoProcessor(),new AbortController().signal);
+assert.deepEqual({width:result.width,height:result.height},photoOutputSize(width,height));
+assert.ok(result.byteSize<=photoPipeline.maxOutputBytes);

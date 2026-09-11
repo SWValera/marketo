@@ -24,7 +24,9 @@ import { ReferenceSelect } from "@/components/reference-select";
 import { useCategoryAttributes } from "@/components/use-category-attributes";
 import type { OwnerDraftBundle, OwnerDraftImage } from "@/lib/data/types";
 import { localize } from "@/lib/i18n/config";
-import { normalizeListingPhotoForUpload } from "@/lib/media/client-image-normalization";
+import { normalizeListingPhotoForUpload, preparePhotoSelection } from "@/lib/media/client-image-normalization";
+import { photoSourceAccept } from "@/lib/media/photo-contract";
+import { createPhotoPreview } from "@/lib/media/photo-preview";
 import { protectedMediaUrl } from "@/lib/media/public-url";
 import { MODERATION_REJECTION_REASONS } from "@/lib/moderation/policy";
 import {
@@ -67,24 +69,6 @@ import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/referen
 
 type PhotoPreview = { name: string; url: string; file: File };
 type UploadedPhoto = { id: string; storageKey: string; sortOrder: number };
-
-const listingPhotoMimeTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "image/heic-sequence",
-  "image/heif-sequence",
-]);
-const listingPhotoExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
-
-function isAcceptedListingPhoto(file: File) {
-  const mimeType = file.type.trim().toLowerCase();
-  const extension = file.name.slice(file.name.lastIndexOf(".") + 1).toLowerCase();
-  return listingPhotoMimeTypes.has(mimeType)
-    || ((!mimeType || mimeType === "application/octet-stream") && listingPhotoExtensions.has(extension));
-}
 
 function isUploadedPhoto(value: unknown): value is UploadedPhoto {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -156,6 +140,7 @@ export function PublishForm({
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [existingImages, setExistingImages] = useState<OwnerDraftImage[]>(initialDraft?.images ?? []);
   const photosRef = useRef<PhotoPreview[]>([]);
+  const photoProcessingAbort = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const priceRef = useRef<HTMLInputElement | null>(null);
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -188,9 +173,13 @@ export function PublishForm({
       ? t("publish.editPageTitle", { step: steps[step] })
       : t("publish.pageTitle", { step: steps[step] });
   useEffect(() => { photosRef.current = photos; }, [photos]);
-  useEffect(() => () => {
-    mountedRef.current = false;
-    photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      photoProcessingAbort.current?.abort();
+      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url));
+    };
   }, []);
 
   useEffect(() => {
@@ -394,29 +383,34 @@ export function PublishForm({
 
   async function addPhotos(selectedFiles: readonly File[]) {
     if (selectedFiles.length === 0 || processingPhotosRef.current) return;
-    const available = Math.max(0, 12 - existingImages.length - photos.length);
-    const candidates = selectedFiles.slice(0, available);
-    if (candidates.length === 0 || candidates.some((file) => !isAcceptedListingPhoto(file) || file.size > 12 * 1024 * 1024)) {
-      setGlobalError(t("publish.photoFileError"));
-      return;
-    }
     processingPhotosRef.current = true;
+    const controller = new AbortController();
+    photoProcessingAbort.current = controller;
     setProcessingPhotos(true);
     setGlobalError("");
     const next: PhotoPreview[] = [];
     try {
-      // Process sequentially to keep peak memory bounded on iPhones when a
-      // user selects several full-resolution photos at once.
-      for (const file of candidates) {
-        const normalized = await normalizeListingPhotoForUpload(file);
-        if (!mountedRef.current) {
-          next.forEach((photo) => URL.revokeObjectURL(photo.url));
-          return;
-        }
-        next.push({ name: normalized.name, url: URL.createObjectURL(normalized), file: normalized });
+      const result = await preparePhotoSelection(selectedFiles, existingImages.length + photos.length,
+        (file) => normalizeListingPhotoForUpload(file, fetch, controller.signal));
+      if (!mountedRef.current) return;
+      for (const file of result.successes) {
+        try {
+          const url = await createPhotoPreview(file, controller.signal);
+          next.push({name:file.name,url,file});
+        } catch { result.failures.push("photo_preview_failed"); }
+        if (!mountedRef.current) { next.forEach((photo) => URL.revokeObjectURL(photo.url)); return; }
       }
       clearFieldError("photos");
       setPhotos((current) => [...current, ...next]);
+      if (result.failures.length) {
+        const reason = result.failures[0];
+        setGlobalError(reason === "photo_limit_exceeded" ? t("publish.photoCountLimit")
+          : reason === "photo_processor_limit" ? t("publish.photoProcessorLimit")
+          : reason === "authentication_required" ? t("publish.signInToSave")
+          : reason === "photo_processing_busy" ? t("publish.photoProcessingBusy")
+          : ["unsupported_image_content", "image_mime_mismatch", "invalid_image_size"].includes(reason)
+            ? t("publish.photoFileError") : t("publish.photoProcessingFailed"));
+      }
     } catch {
       next.forEach((photo) => URL.revokeObjectURL(photo.url));
       if (mountedRef.current) setGlobalError(t("publish.photoProcessingFailed"));
@@ -568,8 +562,11 @@ export function PublishForm({
       savePublishRecovery(safeBrowserStorage("localStorage"), createPublishRecovery(userId, recoveryFields, currentListingId));
 
       if (photos.length > 0) {
+        // Commit one prepared photo at a time. A later failure leaves earlier
+        // successful images visible and removes only those files from retry.
+        for (const photo of photos) {
         const form = new FormData();
-        for (const photo of photos) form.append("photos", photo.file, photo.name);
+        form.append("photos", photo.file, photo.name);
         const upload = await fetch(`/api/listings/${currentListingId}/images`, {
           method: "POST",
           body: form,
@@ -594,7 +591,7 @@ export function PublishForm({
         const responseImages = Array.isArray(uploadBody.images) && uploadBody.images.every(isUploadedPhoto)
           ? uploadBody.images
           : null;
-        if (!responseImages || responseImages.length !== photos.length) {
+        if (!responseImages || responseImages.length !== 1) {
           setStep(2);
           setFieldErrors({ photos: ["invalid"] });
           setGlobalError(t("publish.photoUploadFailed"));
@@ -611,9 +608,10 @@ export function PublishForm({
           setGlobalError(t("publish.photoUploadFailed"));
           return;
         }
-        photos.forEach((photo) => URL.revokeObjectURL(photo.url));
-        setPhotos([]);
+        URL.revokeObjectURL(photo.url);
+        setPhotos((current) => current.filter((candidate) => candidate !== photo));
         setExistingImages((current) => [...current, ...uploadedImages].sort((left, right) => left.sortOrder - right.sortOrder));
+        }
       }
 
       const submittedResponse = await fetch(`/api/listings/${currentListingId}/submit`, {
@@ -790,7 +788,7 @@ export function PublishForm({
           {step === 2 && <div className="publish-panel" ref={(node) => setFieldRef("photos", node)}>
             <div className="panel-heading"><span><Camera size={22} /></span><div><h2>{t("publish.addPhotos")}</h2><p>{t("publish.photosNote")}</p></div></div>
             {existingImages.length > 0 ? <div className="existing-photo-grid">{existingImages.map((image, index) => <article key={image.id}><img src={image.url} alt={t("publish.existingPhoto", { count: index + 1 })} />{index === 0 ? <b>{t("publish.mainPhoto")}</b> : null}</article>)}</div> : null}
-            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{processingPhotos ? t("publish.processingPhotos") : t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processingPhotos} onChange={(event) => {
+            <label className="photo-upload"><span className="photo-upload-icon"><ImagePlus size={30} /></span><strong>{processingPhotos ? t("publish.processingPhotos") : t("publish.choosePhotos")}</strong><small>{t("publish.photoLimits")}</small><input type="file" accept={photoSourceAccept} multiple disabled={processingPhotos} onChange={(event) => {
               const selected = Array.from(event.currentTarget.files ?? []);
               event.currentTarget.value = "";
               void addPhotos(selected);

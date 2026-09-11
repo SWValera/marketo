@@ -32,7 +32,7 @@ function logSellerListingsReadFailure(error: unknown) {
   const record = error && typeof error === "object"
     ? error as { name?: unknown; code?: unknown }
     : {};
-  console.error("[marketo-seller-listings] read failed", {
+  console.error("[jevu-seller-listings] read failed", {
     name: typeof record.name === "string" ? record.name : "Error",
     ...(typeof record.code === "string" ? { code: record.code } : {}),
   });

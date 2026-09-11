@@ -19,7 +19,7 @@ export function AuthResultContent({ next }: { next: string }) {
     <h1>{t("auth.confirmationSuccessTitle")}</h1>
     <p>{t("auth.confirmationSuccessNote")}</p>
     <div className="auth-result-actions">
-      <Link className="primary-action" href={next}>{t("auth.returnToMarketo")}</Link>
+      <Link className="primary-action" href={next}>{t("auth.returnToJEVU")}</Link>
       <button className="secondary-button" type="button" onClick={() => window.close()}><X size={17} />{t("auth.closeTab")}</button>
     </div>
   </section></main>;

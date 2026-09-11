@@ -57,7 +57,8 @@ test("artifact validator covers client assets, bindings and server-only credenti
     assert.match(validator, new RegExp(marker));
   }
   assert.match(validator, /workerConfig\.images !== undefined/);
-  assert.match(validator, /must not depend on a Cloudflare Images binding/);
+  assert.match(validator, /Images must not be enabled without the explicit staging configuration/);
+  assert.match(validator, /workerConfig\.images\?\.binding !== "MARKETO_IMAGES"/);
 });
 
 test("R2 bucket identity is explicit per build environment and never hardcoded", async () => {
@@ -70,7 +71,7 @@ test("R2 bucket identity is explicit per build environment and never hardcoded",
   assert.match(example, /^MARKETO_MEDIA_BUCKET_NAME=/m);
 });
 
-test("listing uploads require only the declared R2 media binding", async () => {
+test("listing uploads keep the R2 binding and explicitly gate the Images binding", async () => {
   const [vite, wrangler, worker, environment, bucket] = await Promise.all([
     source("vite.config.ts"),
     source("wrangler.jsonc"),
@@ -78,9 +79,14 @@ test("listing uploads require only the declared R2 media binding", async () => {
     source("cloudflare-env.d.ts"),
     source("lib/media/bucket.ts"),
   ]);
-  for (const text of [vite, wrangler, worker, environment, bucket]) {
-    assert.doesNotMatch(text, /\bIMAGES\b|ImagesBinding/);
+  // Processing is opt-in, but its exact contract is checked whenever enabled.
+  // R2 remains the only persistent media store; no implicit Images account ID.
+  for (const text of [wrangler, worker, bucket]) {
+    assert.doesNotMatch(text, /ImagesBinding|images:\s*\{/);
   }
+  assert.match(vite, /process\.env\.MARKETO_IMAGE_PROCESSING\s*===\s*"cloudflare"/);
+  assert.match(vite, /images:\s*\{\s*binding:\s*"MARKETO_IMAGES"\s*\}/);
+  assert.match(environment, /MARKETO_IMAGES\?:\s*ImagesBinding/);
   assert.match(vite, /binding:\s*r2/);
   assert.match(bucket, /env\.MARKETO_MEDIA/);
 });

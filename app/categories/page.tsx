@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from "@/lib/site-origin";
 import type { Metadata } from "next";
 import { CategoryDirectory } from "@/components/category-directory";
 import { EmptyState } from "@/components/empty-state";
@@ -14,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: t("categories.description"),
     alternates: { canonical: "/categories" },
     ...(catalog.status === "ready" ? {} : { robots: { index: false, follow: true } }),
-    openGraph: { title: t("categories.title"), description: t("categories.description"), locale: locale === "kk" ? "kk_KZ" : "ru_KZ", url: "/categories" },
+    openGraph: { siteName: "JEVU", images: [{url:`${SITE_ORIGIN}/icons/jevu-512-v1.png`,width:512,height:512,alt:"JEVU"}], title: t("categories.title"), description: t("categories.description"), locale: locale === "kk" ? "kk_KZ" : "ru_KZ", url: "/categories" },
   };
 }
 

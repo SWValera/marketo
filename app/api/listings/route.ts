@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       const items = await listingRepository.preview({ locale, limit: 12 });
       return NextResponse.json({ items }, { headers: { "cache-control": "no-store" } });
     } catch (error) {
-      console.error("[marketo-home-listings] read failed", {
+      console.error("[jevu-home-listings] read failed", {
         name: error instanceof Error ? error.name : "Error",
       });
       return NextResponse.json({ error: "listing_preview_unavailable" }, { status: 503 });
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     if (error instanceof PublishReferenceError) {
       return NextResponse.json({ error: "reference_query_failed" }, { status: 503 });
     }
-    console.error("[marketo-listing] create failed", {
+    console.error("[jevu-listing] create failed", {
       name: error instanceof Error ? error.name : "Error",
     });
     return NextResponse.json({ error: "draft_save_failed" }, { status: 500 });

@@ -22,13 +22,10 @@ const PUBLIC_SESSION_CONTEXT_PATHS = new Set(["/help"]);
 const PUBLIC_ASSET_PREFIXES = ["/_next", "/assets", "/icons"] as const;
 
 const PUBLIC_ROOT_ASSETS = new Set([
-  "/favicon.svg",
+  "/favicon.ico",
   "/file.svg",
   "/globe.svg",
   "/manifest.webmanifest",
-  "/marketo-app-icon.svg",
-  "/marketo-favicon-v2.svg",
-  "/marketo-maskable.svg",
   "/robots.txt",
   "/sitemap.xml",
   "/sw.js",

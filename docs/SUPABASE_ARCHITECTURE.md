@@ -1,11 +1,11 @@
-# Marketo v1.0 — current Supabase/R2 architecture
+# JEVU v1.0 — current Supabase/R2 architecture
 
 State verified from the recovery workspace on 2026-08-29. Production Supabase
 and Cloudflare were not changed.
 
 ## Runtime boundary
 
-Marketo remains one Next.js/Vinext modular monolith deployed as a Cloudflare
+JEVU remains one Next.js/Vinext modular monolith deployed as a Cloudflare
 Worker. Server Components and narrow route handlers call Supabase through typed
 domain adapters. The browser receives only a publishable Supabase key; elevated
 database access is confined to server-only routes that need verified R2
@@ -104,7 +104,7 @@ browser roles have read-only grants.
 RLS and get_city_premium_placements expose only active placement windows whose
 listing is active, published and not deleted. Ordering is deterministic per
 city. The frontend displays only returned paid placements; small paid sets are
-completed by a bounded set of Marketo brand cards rather than empty inventory
+completed by a bounded set of JEVU brand cards rather than empty inventory
 placeholders.
 
 Migration 0020 adds account ownership, payment-neutral orders, priority and

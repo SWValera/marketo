@@ -6,6 +6,8 @@ import {resolve} from 'node:path';
 
 // Reuse the existing data fixtures, but execute the built Worker, proxy, React
 // metadata/content render, repositories and installed SDK without substituting them.
+const fixtureHost=new URL(process.env.JEVU_TEST_PUBLIC_SUPABASE_URL??'https://reference-test.supabase.co').hostname;
+const cookieName='sb-'+fixtureHost.split('.')[0]+'-auth-token';
 const fixtureUrl=new URL('./rendered-html.test.mjs',import.meta.url);
 const source=(await readFile(fixtureUrl,'utf8')).split('test("Home streams')[0];
 let categoryFailure=true,authFailure=false,attributeFailure=false;
@@ -15,7 +17,7 @@ let calls=[];
 const user={id:'5abcdef0-0000-4000-8000-000000000001',email:'fixture@example.invalid',aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'};
 globalThis.__pageReadFixtureWrap=original=>async(input,init)=>{
   const url=new URL(typeof input==='string'||input instanceof URL?input:input.url);
-  assert.equal(url.hostname,'reference-test.supabase.co','test must never reach live services');
+  assert.equal(url.hostname,fixtureHost,'test must never reach live services');
   calls.push(url.pathname);
   if(url.pathname===stalledProtectedPath)return new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(init.signal.reason),{once:true}));
   if(url.pathname==='/auth/v1/user')return authFailure?Response.json({msg:'fixture outage'},{status:503}):Response.json(user);
@@ -36,7 +38,7 @@ const fixtureRuntimeUrl=process.env.MARKETO_AUDIT_WORKER_ROOT?pathToFileURL(reso
 const fixtureSource=source.replace('const workerUrl =','globalThis.fetch=globalThis.__pageReadFixtureWrap(globalThis.fetch);\nconst workerUrl =').replaceAll('import.meta.url',JSON.stringify(fixtureRuntimeUrl.href));
 const f=await import('data:text/javascript;base64,'+Buffer.from(fixtureSource+'\nexport {worker,env,ctx,referenceTables};').toString('base64'));
 const token='eyJhbGciOiJIUzI1NiJ9.'+Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.fixture';
-const cookie='sb-reference-test-auth-token=base64-'+Buffer.from(JSON.stringify({access_token:token,refresh_token:'fixture-refresh',token_type:'bearer',expires_at:Math.floor(Date.now()/1000)+3600,user})).toString('base64url');
+const cookie=cookieName+'=base64-'+Buffer.from(JSON.stringify({access_token:token,refresh_token:'fixture-refresh',token_type:'bearer',expires_at:Math.floor(Date.now()/1000)+3600,user})).toString('base64url');
 async function render(path,authenticated=false,sessionCookie=cookie){calls=[];const response=await f.worker.fetch(new Request('https://marketo.test'+path,{headers:{accept:'text/html',cookie:authenticated?sessionCookie:''}}),f.env,f.ctx);return {response,html:await response.text()};}
 
 test('metadata failure is not fetched again by content; next HTTP read really retries',async()=>{
@@ -153,7 +155,7 @@ test('authentication result page includes proxy and body in the page deadline',a
 test('expired session refreshes once and still verifies identity before protected content',async()=>{
   authFailure=false;
   const expiredToken='eyJhbGciOiJIUzI1NiJ9.'+Buffer.from(JSON.stringify({sub:user.id,exp:1})).toString('base64url')+'.fixture';
-  const expiredCookie='sb-reference-test-auth-token=base64-'+Buffer.from(JSON.stringify({access_token:expiredToken,refresh_token:'fixture-refresh',token_type:'bearer',expires_at:1,user})).toString('base64url');
+  const expiredCookie=cookieName+'=base64-'+Buffer.from(JSON.stringify({access_token:expiredToken,refresh_token:'fixture-refresh',token_type:'bearer',expires_at:1,user})).toString('base64url');
   const {response,html}=await render('/settings',true,expiredCookie);
   assert.equal(response.status,200);
   assert.match(html,/Fixture Account/);

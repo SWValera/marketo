@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { getListingAttributeRecords, getListingDetail } from "@/lib/data/supabase/listings";
 import { getProfileForStaff } from "@/lib/data/supabase/profiles";
 import type {
@@ -74,7 +74,7 @@ function safeNumber(value: unknown) {
 }
 
 export async function listModerationQueue(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   options: { page?: number; pageSize?: number; locale?: Locale } = {},
 ): Promise<NumberedPageResult<ModerationQueueItem>> {
   const page = normalizePositivePage(options.page);
@@ -158,7 +158,7 @@ export async function listModerationQueue(
 }
 
 async function categoryPath(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   category: { id: string; parent_id: string | null; name_ru: string; name_kk: string },
   locale: Locale,
 ) {
@@ -229,7 +229,7 @@ function mapModerationAttributes(
 }
 
 export async function getModerationListingDetail(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   listingId: string,
   locale: Locale = "ru",
 ): Promise<ModerationListingDetail | null> {
@@ -271,7 +271,7 @@ export async function getModerationListingDetail(
 }
 
 export async function moderateListing(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   listingId: string,
   decision: ModerationDecision,
   reasonCode?: ModerationRejectionReason,
@@ -287,7 +287,7 @@ export async function moderateListing(
 }
 
 export async function createReport(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   input: { reporterId: string; listingId?: string; reportedUserId?: string; reasonCode: string; details?: string },
 ) {
   const { data, error } = await client.from("reports").insert({

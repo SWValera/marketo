@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import type { ListingSummary, PageResult } from "@/lib/data/types";
 import { normalizePageSize, normalizePositivePage, pageWindow } from "@/lib/data/pagination";
 import { localeTag } from "@/lib/i18n/config";
@@ -60,7 +60,7 @@ type FavoriteListingRow = {
   listing_images: unknown;
 };
 
-export async function listFavoriteListingIds(client: MarketoSupabaseClient, userId: string, signal?: AbortSignal) {
+export async function listFavoriteListingIds(client: JevuSupabaseClient, userId: string, signal?: AbortSignal) {
   const request = client.from("favorites").select("listing_id, created_at").eq("user_id", userId).order("created_at", { ascending: false });
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw error;
@@ -68,7 +68,7 @@ export async function listFavoriteListingIds(client: MarketoSupabaseClient, user
 }
 
 export async function listFavoriteListings(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   userId: string,
   options: { page?: number; pageSize?: number; locale?: Locale } = {},
 ): Promise<PageResult<ListingSummary>> {
@@ -152,7 +152,7 @@ export async function listFavoriteListings(
   };
 }
 
-export async function addFavorite(client: MarketoSupabaseClient, userId: string, listingId: string) {
+export async function addFavorite(client: JevuSupabaseClient, userId: string, listingId: string) {
   const { error } = await client.from("favorites").upsert(
     { user_id: userId, listing_id: listingId },
     { onConflict: "user_id,listing_id", ignoreDuplicates: true },
@@ -160,7 +160,7 @@ export async function addFavorite(client: MarketoSupabaseClient, userId: string,
   if (error) throw new FavoriteDataError("MUTATION_FAILED", { cause: error });
 }
 
-export async function removeFavorite(client: MarketoSupabaseClient, userId: string, listingId: string) {
+export async function removeFavorite(client: JevuSupabaseClient, userId: string, listingId: string) {
   const { error } = await client.from("favorites").delete().eq("user_id", userId).eq("listing_id", listingId);
   if (error) throw new FavoriteDataError("MUTATION_FAILED", { cause: error });
 }

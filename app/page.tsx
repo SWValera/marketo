@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Brand } from "@/components/brand";
 import { Suspense } from "react";
 import { AppLink as Link } from "@/components/app-link";
 import { CategoryLink } from "@/components/category-link";
@@ -54,7 +55,7 @@ export default async function Home() {
       <section className="trust-row home-trust-row page-shell"><div><ShieldCheck size={24} /><span><strong>{t("home.safety")}</strong><small>{t("home.safetyNote")}</small></span></div><div><Search size={24} /><span><strong>{t("home.preciseSearch")}</strong><small>{t("home.preciseSearchNote")}</small></span></div><div><MessageCircle size={24} /><span><strong>{t("home.chat")}</strong><small>{t("home.chatNote")}</small></span></div><div><Heart size={24} /><span><strong>{t("nav.favorites")}</strong><small>{t("home.favoritesNote")}</small></span></div></section>
       <section className="cta-section page-shell"><div><span className="section-kicker">{t("home.startNow")}</span><h2>{t("home.prepareFirst")}</h2><p>{t("home.prepareFirstNote")}</p></div><Link href="/publish" prefetch={false} className="primary-action">{t("header.publish")} <ArrowRight size={18} /></Link></section>
     </main>
-    <footer className="site-footer"><div className="page-shell"><span className="brand"><span className="brand-mark">M</span>Marketo</span><p>{t("home.footer")}</p><span>© 2026 Marketo</span></div></footer>
+    <footer className="site-footer"><div className="page-shell"><span className="brand"><Brand /></span><p>{t("home.footer")}</p><span>© 2026 JEVU</span></div></footer>
     <MobileNav />
   </>;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "marketo-kz",
+  "name": "jevu",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -58,5 +58,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "Marketo"
+  "displayName": "JEVU"
 }

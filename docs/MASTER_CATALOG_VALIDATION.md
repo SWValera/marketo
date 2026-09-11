@@ -1,4 +1,4 @@
-# Marketo Master Catalog — semantic validation
+# JEVU Master Catalog — semantic validation
 
 Source of truth валидатора: `scripts/validate-master-catalog.mjs`.
 

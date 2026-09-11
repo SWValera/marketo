@@ -1,7 +1,7 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 
 export async function resolveAuthenticatedUserId(
-  client: Pick<MarketoSupabaseClient, "auth">,
+  client: Pick<JevuSupabaseClient, "auth">,
   authenticatedUserId?: string,
 ) {
   if (authenticatedUserId) return authenticatedUserId;

@@ -373,11 +373,15 @@ test("listing cards defer the Supabase browser SDK until favorite state is reque
 });
 
 test("authenticated profile listings reuse the verified Auth identity without a second getUser call", async () => {
-  const [profile, myListings] = await Promise.all([
+  const [profile, myListings, accountRead] = await Promise.all([
     readFile(new URL("app/profile/page.tsx", root), "utf8"),
     readFile(new URL("lib/data/supabase/my-listings.ts", root), "utf8"),
+    readFile(new URL("lib/data/account-page-read.ts", root), "utf8"),
   ]);
-  assert.match(profile, /authenticatedUserId:\s*authContext\.user\.id/);
+  assert.match(profile, /beginVerifiedAccountRead\(userId => listingRepository\.mine/);
+  assert.match(profile, /authenticatedUserId:\s*userId/);
+  assert.match(accountRead, /await getRequestUser\(client\)/);
+  assert.match(accountRead, /if \(error\) throw error;[\s\S]*if \(!data\.user\) throw new Error[\s\S]*return read\(data\.user\.id\)/);
   assert.match(myListings, /currentUserId\(client, options\.authenticatedUserId\)/);
   assert.match(myListings, /\.eq\("owner_id", userId\)/);
 

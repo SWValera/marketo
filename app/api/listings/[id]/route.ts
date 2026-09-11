@@ -74,7 +74,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
     if (code === "42501") return NextResponse.json({ error: "listing_not_editable" }, { status: 409 });
     if (code === "22023" || code === "23514") return NextResponse.json({ error: "invalid_draft" }, { status: 400 });
-    console.error("[marketo-listing] update failed", {
+    console.error("[jevu-listing] update failed", {
       name: error instanceof Error ? error.name : "Error",
       ...(code ? { code } : {}),
     });

@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { normalizePageSize, normalizePositivePage, pageWindow } from "../pagination.ts";
 import type { Json, TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -36,7 +36,7 @@ function catalogSearchArguments(filters: ListingQuery) {
 }
 
 function orderedCatalogRequest(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   filters: ListingQuery,
   options?: { count: "exact" },
 ) {
@@ -51,7 +51,7 @@ function orderedCatalogRequest(
   return request.order("id", { ascending: false });
 }
 
-export async function listPublishedListingCards(client: MarketoSupabaseClient, filters: ListingQuery = {}) {
+export async function listPublishedListingCards(client: JevuSupabaseClient, filters: ListingQuery = {}) {
   const pageSize = normalizePageSize(filters.limit, 24, 60);
   const page = normalizePositivePage(filters.page);
   if (page === 1) {
@@ -108,7 +108,7 @@ export async function listPublishedListingCards(client: MarketoSupabaseClient, f
 }
 
 export async function listPublishedListingPreview(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   filters: Omit<ListingQuery, "page"> = {},
 ) {
   const limit = normalizePageSize(filters.limit, 12, 24);
@@ -164,7 +164,7 @@ export function normalizeSellerListingsPage(value: SellerListingsPageInput) {
   return resolveSellerListingsPage(value).page;
 }
 
-async function countPublishedListingsBySeller(client: MarketoSupabaseClient, sellerId: string) {
+async function countPublishedListingsBySeller(client: JevuSupabaseClient, sellerId: string) {
   const response = await client
     .from("listings")
     .select("id", { count: "exact", head: true })
@@ -181,7 +181,7 @@ async function countPublishedListingsBySeller(client: MarketoSupabaseClient, sel
 }
 
 function requestPublishedListingsBySeller(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   sellerId: string,
   offset: number,
   rangeEnd: number,
@@ -227,7 +227,7 @@ function isUnsatisfiedSellerListingRange(response: {
 }
 
 export async function listPublishedListingCardsBySeller(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   sellerId: string,
   options: { page?: number; pageSize?: number } = {},
 ) {
@@ -309,7 +309,7 @@ export async function listPublishedListingCardsBySeller(
   };
 }
 
-export async function getListingDetail(client: MarketoSupabaseClient, listingId: string) {
+export async function getListingDetail(client: JevuSupabaseClient, listingId: string) {
   const { data, error } = await client
     .from("listings")
     .select("*, categories(*), settlements(*), listing_images(*), listing_attribute_values(*), listing_attribute_option_values(*)")
@@ -319,20 +319,19 @@ export async function getListingDetail(client: MarketoSupabaseClient, listingId:
   return data;
 }
 
-export async function getListingDetailByRouteKey(client: MarketoSupabaseClient, routeKey: string) {
+export async function getListingDetailByRouteKey(client: JevuSupabaseClient, routeKey: string) {
   const uuidPrefix = routeKey.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:-|$)/i)?.[0].slice(0, 36);
   let request = client
     .from("listings")
     .select("*, categories(id, slug, name_ru, name_kk, search_placeholder_ru, search_placeholder_kk), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
-    .order("sort_order", { referencedTable: "listing_images" })
-    .limit(1, { referencedTable: "listing_images" });
+    .order("sort_order", { referencedTable: "listing_images" });
   request = uuidPrefix ? request.eq("id", uuidPrefix) : request.eq("slug", routeKey);
   const { data, error } = await request.maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function getListingAttributeRecords(client: MarketoSupabaseClient, listingIds: string[]) {
+export async function getListingAttributeRecords(client: JevuSupabaseClient, listingIds: string[]) {
   if (listingIds.length === 0) return { scalarValues: [], optionValues: [], attributes: [], options: [] };
   const [scalarResult, optionResult] = await Promise.all([
     client.from("listing_attribute_values").select("listing_id, attribute_id, text_value, number_value, boolean_value, date_value, number_min_value, number_max_value").in("listing_id", listingIds),
@@ -360,48 +359,48 @@ export async function getListingAttributeRecords(client: MarketoSupabaseClient, 
   };
 }
 
-export async function createListingDraft(client: MarketoSupabaseClient, input: ListingDraftInput) {
+export async function createListingDraft(client: JevuSupabaseClient, input: ListingDraftInput) {
   const { data, error } = await client.from("listings").insert(input).select("*").single();
   if (error) throw error;
   return data;
 }
 
-export async function updateListingDraft(client: MarketoSupabaseClient, listingId: string, patch: ListingDraftPatch) {
+export async function updateListingDraft(client: JevuSupabaseClient, listingId: string, patch: ListingDraftPatch) {
   const { data, error } = await client.from("listings").update(patch).eq("id", listingId).select("*").single();
   if (error) throw error;
   return data;
 }
 
-export async function saveListingContact(client: MarketoSupabaseClient, contact: TablesInsert<"listing_contacts">) {
+export async function saveListingContact(client: JevuSupabaseClient, contact: TablesInsert<"listing_contacts">) {
   const { data, error } = await client.from("listing_contacts").upsert(contact, { onConflict: "listing_id" }).select("*").single();
   if (error) throw error;
   return data;
 }
 
 /** Server route only: call after R2 confirms the object and media metadata. */
-export async function addVerifiedListingImageMetadata(client: MarketoSupabaseClient, image: TablesInsert<"listing_images">) {
+export async function addVerifiedListingImageMetadata(client: JevuSupabaseClient, image: TablesInsert<"listing_images">) {
   const { data, error } = await client.from("listing_images").insert(image).select("*").single();
   if (error) throw error;
   return data;
 }
 
-export async function upsertListingScalarAttribute(client: MarketoSupabaseClient, value: TablesInsert<"listing_attribute_values">) {
+export async function upsertListingScalarAttribute(client: JevuSupabaseClient, value: TablesInsert<"listing_attribute_values">) {
   const { data, error } = await client.from("listing_attribute_values").upsert(value, { onConflict: "listing_id,attribute_id" }).select("*").single();
   if (error) throw error;
   return data;
 }
 
-export async function submitListing(client: MarketoSupabaseClient, listingId: string) {
+export async function submitListing(client: JevuSupabaseClient, listingId: string) {
   const { error } = await client.rpc("submit_listing", { target_listing_id: listingId });
   if (error) throw error;
 }
 
-export async function archiveOwnListing(client: MarketoSupabaseClient, listingId: string) {
+export async function archiveOwnListing(client: JevuSupabaseClient, listingId: string) {
   const { error } = await client.rpc("archive_own_listing", { target_listing_id: listingId });
   if (error) throw error;
 }
 
-export async function markOwnListingSold(client: MarketoSupabaseClient, listingId: string) {
+export async function markOwnListingSold(client: JevuSupabaseClient, listingId: string) {
   const { error } = await client.rpc("mark_own_listing_sold", { target_listing_id: listingId });
   if (error) throw error;
 }

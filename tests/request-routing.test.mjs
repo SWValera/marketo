@@ -102,22 +102,19 @@ test("all other mutation methods refresh the session while safe public methods d
 
 test("known public assets and framework asset namespaces remain available", () => {
   for (const pathname of [
-    "/favicon.svg",
+    "/favicon.ico",
     "/file.svg",
     "/globe.svg",
     "/manifest.webmanifest",
-    "/marketo-app-icon.svg",
-    "/marketo-favicon-v2.svg",
-    "/marketo-maskable.svg",
     "/robots.txt",
     "/sitemap.xml",
     "/sitemap-1.xml",
     "/sw.js",
     "/window.svg",
     "/assets/index-abc123.js",
-    "/icons/marketo-pwa-192-v2.png",
+    "/icons/jevu-192-v1.png",
     "/_next/static/chunks/app.js",
-    "/_next/image?url=%2Ficons%2Fmarketo-180.png",
+    "/_next/image?url=%2Ficons%2Fapple-touch-icon.png",
   ]) {
     assert.equal(isKnownPublicAssetPath(pathname), true, pathname);
     assert.equal(classifyRequestRouting(pathname, "GET"), "continue", pathname);
@@ -126,7 +123,7 @@ test("known public assets and framework asset namespaces remain available", () =
 
 test("unknown asset-like and well-known probes receive the cheap 404 decision", () => {
   for (const pathname of [
-    "/favicon.ico",
+    "/favicon.svg",
     "/apple-touch-icon.png",
     "/does-not-exist.js",
     "/nested/missing.css",

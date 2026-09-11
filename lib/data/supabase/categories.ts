@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CategoryPriceMode, CategoryReferenceData } from "@/lib/reference-data/types";
 
@@ -85,7 +85,7 @@ export function mapCategoryReferenceRows(rows: readonly CategoryReferenceRow[]):
   };
 }
 
-export async function listCategoryLevel(client: MarketoSupabaseClient, parentId: string | null) {
+export async function listCategoryLevel(client: JevuSupabaseClient, parentId: string | null) {
   let request = client.from("categories").select(CATEGORY_COLUMNS).eq("is_active", true);
   request = parentId ? request.eq("parent_id", parentId) : request.is("parent_id", null);
   const { data, error } = await request.order("sort_order").order("name_ru").order("id");
@@ -93,7 +93,7 @@ export async function listCategoryLevel(client: MarketoSupabaseClient, parentId:
   return data;
 }
 
-export async function listActiveCategories(client: MarketoSupabaseClient) {
+export async function listActiveCategories(client: JevuSupabaseClient) {
   return collectCategoryReferencePages(async (from, to) => {
     const { data, error } = await client
       .from("categories")
@@ -111,7 +111,7 @@ export async function listActiveCategories(client: MarketoSupabaseClient) {
   });
 }
 
-async function listActiveCategoryParents(client: MarketoSupabaseClient) {
+async function listActiveCategoryParents(client: JevuSupabaseClient) {
   return collectCategoryReferencePages(async (from, to) => {
     const { data, error } = await client
       .from("categories")
@@ -132,7 +132,7 @@ async function listActiveCategoryParents(client: MarketoSupabaseClient) {
  * A compact id/parent hierarchy is loaded beside the roots in the same network
  * wave, avoiding both full leaf presentation payloads and a serial child query.
  */
-export async function listHomeCategories(client: MarketoSupabaseClient): Promise<HomeCategoryReferenceRow[]> {
+export async function listHomeCategories(client: JevuSupabaseClient): Promise<HomeCategoryReferenceRow[]> {
   const [roots, hierarchy] = await Promise.all([
     listCategoryLevel(client, null),
     listActiveCategoryParents(client),
@@ -158,7 +158,7 @@ export async function listHomeCategories(client: MarketoSupabaseClient): Promise
   }));
 }
 
-export async function getCategoryAttributes(client: MarketoSupabaseClient, categoryId: string) {
+export async function getCategoryAttributes(client: JevuSupabaseClient, categoryId: string) {
   const { data, error } = await client
     .from("category_attributes")
     .select("id, category_id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, is_required, is_filterable, is_searchable, inherits_to_children, validation, filter_mode, options_load_mode, depends_on_key, is_visible, sort_order")
@@ -171,7 +171,7 @@ export async function getCategoryAttributes(client: MarketoSupabaseClient, categ
 }
 
 export async function listAttributeOptions(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   attributeIds: string[],
   filters: { parentOptionId?: string; query?: string; limit?: number } = {},
 ) {
@@ -203,7 +203,7 @@ export async function listAttributeOptions(
   }
 }
 
-export async function searchCategories(client: MarketoSupabaseClient, query: string, limit = 40) {
+export async function searchCategories(client: JevuSupabaseClient, query: string, limit = 40) {
   const safeQuery = query.normalize("NFKC").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
   if (!safeQuery) return [];
   const { data, error } = await client

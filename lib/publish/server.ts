@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { getCategoryAttributes } from "@/lib/data/supabase/categories";
 import { getMyListingDraftBundle } from "@/lib/data/supabase/my-listings";
 import {
@@ -121,7 +121,7 @@ function buildRpcAttributes(input: PublishDraftInput, attributes: ReferenceCateg
 }
 
 export async function preparePublishDraft(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   raw: unknown,
   options: { requirePhotos?: boolean; photoCount?: number } = {},
 ): Promise<
@@ -190,7 +190,7 @@ export async function preparePublishDraft(
   };
 }
 
-export async function validateStoredListingForSubmit(client: MarketoSupabaseClient, listingId: string) {
+export async function validateStoredListingForSubmit(client: JevuSupabaseClient, listingId: string) {
   const draft = await getMyListingDraftBundle(client, listingId);
   if (!draft) return { status: "not_found" as const };
   const prepared = await preparePublishDraft(client, {

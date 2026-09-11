@@ -148,18 +148,20 @@ test("upload UI accepts the normalized marketplace image formats", async () => {
     source("lib/media/client-image-normalization.ts"),
     source("lib/i18n/messages.ts"),
   ]);
-  assert.match(form, /accept="image\/jpeg,image\/png,image\/webp"/);
-  assert.match(form, /for \(const file of candidates\)[\s\S]*await normalizeListingPhotoForUpload\(file\)/);
+  assert.match(form, /accept=\{photoSourceAccept\}/);
+  assert.match(form, /preparePhotoSelection/);
   assert.match(form, /event\.currentTarget\.value = ""/);
   assert.match(form, /form\.append\("photos", photo\.file, photo\.name\)/);
-  assert.match(form, /responseImages\.length !== photos\.length/);
+  assert.match(form, /responseImages\.length !== 1/);
+  assert.match(form, /current\.filter\(\(candidate\) => candidate !== photo\)/);
   assert.match(form, /mountedRef\.current/);
-  assert.match(normalizer, /context\.fillStyle = "#ffffff"/);
-  assert.match(normalizer, /colorSpace: "srgb"/);
-  assert.match(normalizer, /\?\? canvas\.getContext\("2d", \{ alpha: false \}\)/);
-  assert.match(normalizer, /canvas\.toBlob\(resolve, "image\/jpeg"/);
-  assert.match(messages, /фото с iPhone автоматически преобразуем в JPEG/);
-  assert.match(messages, /iPhone фотосын JPEG-ке автоматты түрде түрлендіреміз/);
+  assert.match(normalizer, /\/api\/photos\/normalize/);
+  assert.doesNotMatch(normalizer, /new Image\(|createElement\("canvas"\)/);
+  assert.match(messages, /До 7 фотографий/);
+  const contract = await source("lib/media/photo-contract.ts");
+  assert.match(contract, /image\/heic,image\/heif/);
+  assert.match(messages, /7 фотосуретке дейін/);
+  assert.match(messages, /автоматты түрде дайындаймыз/);
 });
 
 test("every rendered main element is a valid target for the global skip link", async () => {
@@ -187,7 +189,7 @@ test("interactive overlays and tabs expose focus and keyboard contracts", async 
   assert.match(modal, /event\.key === "Escape"/);
   assert.match(modal, /event\.key !== "Tab"/);
   assert.match(modal, /previousFocus\?\.focus/);
-  assert.match(header, /aria-controls="marketo-mobile-menu"/);
+  assert.match(header, /aria-controls="jevu-mobile-menu"/);
   assert.match(catalog, /role=\{filtersOpen \? "dialog" : undefined\}/);
   assert.match(auth, /ArrowRight/);
   assert.match(marketplace, /aria-controls/);

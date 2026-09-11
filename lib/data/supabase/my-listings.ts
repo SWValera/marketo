@@ -1,4 +1,4 @@
-import type { MarketoSupabaseClient } from "@/lib/data/supabase/client";
+import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { resolveAuthenticatedUserId } from "@/lib/data/supabase/authenticated-user";
 import { getListingAttributeRecords } from "@/lib/data/supabase/listings";
 import type {
@@ -65,7 +65,7 @@ function dateLabel(value: string, locale: Locale) {
   }).format(new Date(value));
 }
 
-async function currentUserId(client: MarketoSupabaseClient, authenticatedUserId?: string) {
+async function currentUserId(client: JevuSupabaseClient, authenticatedUserId?: string) {
   try {
     return await resolveAuthenticatedUserId(client, authenticatedUserId);
   } catch (error) {
@@ -73,7 +73,7 @@ async function currentUserId(client: MarketoSupabaseClient, authenticatedUserId?
   }
 }
 
-async function rejectionFeedback(client: MarketoSupabaseClient, listingId: string | null = null) {
+async function rejectionFeedback(client: JevuSupabaseClient, listingId: string | null = null) {
   const { data, error } = await client.rpc("get_my_listing_moderation_feedback", {
     p_listing_id: listingId,
   });
@@ -98,7 +98,7 @@ type MyListingRow = {
 };
 
 export async function listMyListings(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   options: { page?: number; pageSize?: number; locale?: Locale; authenticatedUserId?: string; tab?: string } = {},
 ): Promise<NumberedPageResult<MyListingSummary>> {
   const userId = await currentUserId(client, options.authenticatedUserId);
@@ -224,7 +224,7 @@ function scalarAttributeValue(row: {
 }
 
 export async function getMyListingDraftBundle(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   listingId: string,
 ): Promise<OwnerDraftBundle | null> {
   const userId = await currentUserId(client);
@@ -321,7 +321,7 @@ export async function getMyListingDraftBundle(
 }
 
 export async function updateMyListingDraft(
-  client: MarketoSupabaseClient,
+  client: JevuSupabaseClient,
   input: {
     listingId: string;
     categoryId: string;

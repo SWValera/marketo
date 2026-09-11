@@ -1,4 +1,4 @@
-# Marketo v1.0
+# JEVU v1.0
 
 Kazakhstan-first, mobile-first marketplace built as a Next.js/Vinext modular
 monolith for Cloudflare Workers, Supabase PostgreSQL/Auth and Cloudflare R2.
@@ -41,7 +41,7 @@ and account UI is localized in Russian and Kazakh.
   use the session Supabase client, RLS and the audited `moderate_listing` RPC.
 - Home order is Header/Search → City Premium Showcase → Catalog/Listings. Each
   selectable city has default premium capacity 15; only currently active paid
-  placements are returned. A limited RU/KK Marketo card set fills small paid
+  placements are returned. A limited RU/KK JEVU card set fills small paid
   sets without rendering empty placeholders. Rotation follows a persistent
   wall-clock timeline every 3,000 ms; desktop shows three complete cards and
   mobile shows two. Account/order and account-scoped impression/click storage

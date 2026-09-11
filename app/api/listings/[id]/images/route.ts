@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getListingMediaBucket } from "@/lib/media/bucket";
-import { listingImageLimits, validateListingImage } from "@/lib/media/image-validation";
+import { listingImageLimits } from "@/lib/media/image-validation";
+import { normalizeListingImage, withPhotoProcessing } from "@/lib/media/server-image-normalization";
+import { getListingImageProcessor, photoFailure } from "@/lib/media/photo-service";
 import { isSameOriginMutationRequest } from "@/lib/http/same-origin";
 import { MultipartRequestError, parseBoundedMultipartFormData } from "@/lib/http/bounded-multipart";
 import { createListingImageStorageKey } from "@/lib/media/storage-key";
@@ -75,7 +77,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     for (const [index, file] of files.entries()) {
-      const image = await validateListingImage(file);
+      // Never trust a claimed client-side conversion: direct callers can forge
+      // it. Decode/re-encode through the same server processor before storage.
+      const image = await withPhotoProcessing(
+        (signal) => normalizeListingImage(file, getListingImageProcessor(), signal), request.signal,
+      );
       const sortOrder = firstSortOrder + index;
       // The object identity must not depend on the racy sort-order snapshot.
       // A losing concurrent metadata insert can therefore delete only its own
@@ -138,6 +144,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "photo_upload_cleanup_failed" }, { status: 503 });
     }
     const message = error instanceof Error ? error.message : "photo_upload_failed";
+    const processingFailure = photoFailure(error);
+    if (message.startsWith("photo_processing_") || message === "photo_processor_limit") {
+      return NextResponse.json({ error: processingFailure.error }, { status: processingFailure.status });
+    }
     const clientError = /^(?:invalid_image_size|unsupported_image_content|image_mime_mismatch|image_dimensions_too_small|image_dimensions_too_large)$/.test(message);
     if (!clientError) console.error("listing_photo_upload_failed", { code: "internal_upload_failure" });
     return NextResponse.json(

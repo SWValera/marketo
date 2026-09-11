@@ -10,9 +10,11 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.equal(manifest.display_override[0], "standalone");
   assert.equal(manifest.scope, "/");
   assert.notEqual(manifest.id, "/");
-  assert.match(manifest.start_url, /mode=standalone/);
+  assert.equal(manifest.start_url, "/");
+  assert.equal(manifest.name, "JEVU");
+  assert.equal(manifest.short_name, "JEVU");
   assert.equal(manifest.prefer_related_applications, false);
-  for (const [icon, width] of [["marketo-pwa-192-v2.png", 192], ["marketo-pwa-512-v2.png", 512], ["marketo-pwa-maskable-192-v2.png", 192], ["marketo-pwa-maskable-512-v2.png", 512]]) {
+  for (const [icon, width] of [["jevu-192-v1.png", 192], ["jevu-512-v1.png", 512], ["jevu-maskable-192-v1.png", 192], ["jevu-maskable-512-v1.png", 512]]) {
     const data = await readFile(new URL(`public/icons/${icon}`, root));
     assert.ok(data.length > 100);
     assert.equal(data.readUInt32BE(16), width);
@@ -23,14 +25,13 @@ test("PWA manifest, icons and offline update flow are complete", async () => {
   assert.ok(manifest.icons.some((icon) => icon.sizes === "192x192" && icon.purpose === "maskable"));
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
   const layout = await readFile(new URL("app/layout.tsx", root), "utf8");
-  const favicon = await readFile(new URL("public/marketo-favicon-v2.svg", root), "utf8");
-  assert.match(layout, /marketo-favicon-v2\.svg/);
-  assert.match(favicon, /#16a34a/);
-  assert.match(favicon, />M|M132 364/);
-  assert.doesNotMatch(favicon, /#0C79D8|#2E9EFF/);
+  const favicon = await readFile(new URL("public/favicon.ico", root));
+  assert.match(layout, /favicon\.ico/);
+  assert.equal(favicon.readUInt16LE(2), 1);
+  assert.equal(favicon.readUInt16LE(4), 3);
   const worker = await readFile(new URL("public/sw.js", root), "utf8");
   const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
-  assert.match(worker, /marketo-static-v10/);
+  assert.match(worker, /jevu-static-v1/);
   assert.match(worker, /"\/offline\.html"/);
   assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
   assert.match(worker, /request\.mode === "navigate"[\s\S]*network\(request, 9000\)/);
@@ -315,10 +316,18 @@ test("Cloudflare compatibility flag has one production source", async () => {
 });
 
 test("repository source contains no committed credential values", async () => {
-  const ignoredSegments = new Set([".git", ".next", ".sites-runtime", ".vinext", ".wrangler", "dist", "node_modules"]);
-  const candidates = (await readdir(root, { recursive: true }))
-    .map((name) => name.replaceAll("\\", "/"))
-    .filter((name) => !name.split("/").some((segment) => ignoredSegments.has(segment)))
+  const ignoredSegments = new Set([".git", ".next", ".sites-runtime", ".vinext", ".wrangler", "dist", "node_modules", "artifacts", "outputs", "work"]);
+  async function sourcePaths(directory = root, prefix = "") {
+    const files = [];
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (ignoredSegments.has(entry.name)) continue;
+      const name = prefix + entry.name;
+      if (entry.isDirectory()) files.push(...await sourcePaths(new URL(entry.name + "/", directory), name + "/"));
+      else if (entry.isFile()) files.push(name);
+    }
+    return files;
+  }
+  const candidates = (await sourcePaths())
     .filter((name) => /(?:^|\/)(?:\.env\.example|[^/]+\.(?:ts|tsx|js|mjs|cjs|json|jsonc|sql|md|sh|yml|yaml))$/.test(name));
   const credentialPatterns = [
     /sb_secret_[A-Za-z0-9_-]{20,}/,
