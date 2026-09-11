@@ -303,3 +303,21 @@ test("service worker keeps cache lookup and write scoped to an asynchronous name
   await event.lifetime;
   assert.equal(harness.puts.length, 1);
 });
+
+for (const path of ['/auth/callback?flow=recovery&code=fixture', '/auth/update-password', '/auth/result', '/auth/registration-confirmed', '/login?mode=recover', '/login/?password_reset=success']) {
+  test(`auth navigation stays native without respondWith: ${path.split('?')[0]}`, async () => {
+    const harness = createWorkerHarness({ fetch: async () => { throw new Error('SW must not fetch auth navigation'); } });
+    const event = dispatchFetch(harness, { url:'https://marketo.test'+path, method:'GET', mode:'navigate', destination:'document', redirect:'manual' });
+    assert.equal(event.response,undefined);
+    await event.lifetime;
+    assert.deepEqual(harness.opened,[]);
+  });
+}
+
+test('protected-page redirects pass through unchanged without consuming or wrapping the response', async () => {
+  const redirect = { type:'opaqueredirect', status:0, get body(){throw new Error('must not inspect redirect body');} };
+  const harness = createWorkerHarness({ fetch:async(_request,init)=>{assert.equal(init.redirect,'manual');return redirect;} });
+  const event=dispatchFetch(harness,{url:'https://marketo.test/profile',method:'GET',mode:'navigate',destination:'document'});
+  assert.equal(await event.response,redirect);
+  assert.deepEqual(harness.puts,[]);
+});

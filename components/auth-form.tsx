@@ -16,12 +16,14 @@ import { RegistrationWaiter } from "@/components/registration-waiter";
 export type AuthMode = "login" | "register" | "recover" | "update-password";
 type PendingFlow = "signup" | "recovery";
 
-function authErrorKey(error: { message?: string; status?: number }) {
+function authErrorKey(error: { message?: string; status?: number; code?: string }) {
   const message = error.message?.toLowerCase() ?? "";
-  if (error.status === 429) return "auth.errorRateLimited" as const;
-  if (message.includes("email not confirmed")) return "auth.errorEmailNotConfirmed" as const;
-  if (message.includes("invalid login credentials")) return "auth.errorInvalidCredentials" as const;
-  if (message.includes("already registered") || message.includes("user already exists")) return "auth.errorAlreadyRegistered" as const;
+  if (error.code === "same_password") return "auth.errorSamePassword" as const;
+  if (["session_not_found", "refresh_token_not_found", "refresh_token_already_used", "otp_expired", "bad_jwt"].includes(error.code ?? "")) return "auth.errorCallbackExpired" as const;
+  if (error.status === 429 || error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit") return "auth.errorRateLimited" as const;
+  if (error.code === "email_not_confirmed" || message.includes("email not confirmed")) return "auth.errorEmailNotConfirmed" as const;
+  if (error.code === "invalid_credentials" || message.includes("invalid login credentials")) return "auth.errorInvalidCredentials" as const;
+  if (error.code === "user_already_exists" || error.code === "email_exists" || message.includes("already registered") || message.includes("user already exists")) return "auth.errorAlreadyRegistered" as const;
   if (message.includes("password") && (message.includes("short") || message.includes("characters"))) return "auth.errorWeakPassword" as const;
   if (message.includes("email") && message.includes("invalid")) return "auth.errorInvalidEmail" as const;
   return "auth.errorGeneric" as const;
@@ -49,7 +51,7 @@ function clearPendingFlow() {
   }
 }
 
-export function AuthForm({ initialMode = "login", next = "/profile" }: { initialMode?: AuthMode; next?: string }) {
+export function AuthForm({ initialMode = "login", next = "/profile", resumePending = true }: { initialMode?: AuthMode; next?: string; resumePending?: boolean }) {
   const router = useRouter();
   const { locale, t } = useI18n();
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -62,6 +64,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
   const [handoffRevision, setHandoffRevision] = useState(0);
   const destination = safeInternalPath(next);
 
@@ -73,7 +76,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       window.queueMicrotask(() => {
         if (cancelled) return;
         if (storedEmail && /^\S+@\S+\.\S+$/.test(storedEmail)) setEmail(storedEmail);
-        if (initialMode !== "update-password" && (storedFlow === "signup" || storedFlow === "recovery")) {
+        if (resumePending && initialMode !== "update-password" && (storedFlow === "signup" || storedFlow === "recovery")) {
           setMode(storedFlow === "signup" ? "register" : "recover");
           setPendingFlow(storedFlow);
         }
@@ -101,7 +104,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       cancelled = true;
       unsubscribe();
     };
-  }, [initialMode, t]);
+  }, [initialMode, resumePending, t]);
 
   function selectMode(value: Exclude<AuthMode, "update-password">) {
     void fetch("/api/auth/registration/cancel", { method: "POST" }).catch(() => {});
@@ -155,11 +158,11 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       setError(t("auth.errorDisplayName"));
       return;
     }
-    if ((mode === "register" || mode === "update-password") && password.length < 8) {
+    if (!passwordSaved && (mode === "register" || mode === "update-password") && password.length < 8) {
       setError(t("auth.errorWeakPassword"));
       return;
     }
-    if ((mode === "register" || mode === "update-password") && password !== confirmPassword) {
+    if (!passwordSaved && (mode === "register" || mode === "update-password") && password !== confirmPassword) {
       setError(t("auth.errorPasswordMismatch"));
       return;
     }
@@ -192,7 +195,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
         }
         rememberPendingAuth(cleanEmail, "signup");
         setPendingFlow("signup");
-        setMessage(t("auth.registrationCheckEmail"));
+        setMessage("");
         return;
       }
       if (mode === "recover") {
@@ -206,19 +209,29 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
         setMessage(t("auth.recoverySent"));
         return;
       }
-      const result = await client.auth.updateUser({ password });
-      if (result.error) throw result.error;
-      const userResult = await client.auth.getUser();
-      if (userResult.data.user?.email) rememberPendingAuth(userResult.data.user.email, null);
+      if (!passwordSaved) {
+        const result = await client.auth.updateUser({ password });
+        if (result.error) throw result.error;
+        setPasswordSaved(true);
+        setPassword("");
+        setConfirmPassword("");
+        clearPendingFlow();
+      }
       const signOutResult = await client.auth.signOut({ scope: "local" });
-      if (signOutResult.error) throw signOutResult.error;
+      if (signOutResult.error) {
+        setError(t("auth.errorPasswordSavedSignOut"));
+        return;
+      }
       publishBrowserAuthEvent("password-updated");
-      setMessage(t("auth.passwordUpdated"));
-      window.setTimeout(() => {
-        router.replace(destination);
-      }, 500);
+      setMessage(t("auth.passwordResetSuccess"));
+      // Native navigation starts login with the final cookies and no stale RSC.
+      window.location.replace("/login?password_reset=success");
     } catch (caught) {
-      const authError = caught as { message?: string; status?: number };
+      const authError = (caught ?? {}) as { message?: string; status?: number; code?: string };
+      if (mode === "login" && authErrorKey(authError) === "auth.errorEmailNotConfirmed") {
+        rememberPendingAuth(normalizedEmail(email), "signup");
+        setPendingFlow("signup");
+      }
       setError(t(authErrorKey(authError)));
     } finally {
       setLoading(false);
@@ -249,7 +262,7 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
       }
       setMessage(t("auth.emailResent"));
     } catch (caught) {
-      setError(t(authErrorKey(caught as { message?: string; status?: number })));
+      setError(t(authErrorKey((caught ?? {}) as { message?: string; status?: number; code?: string })));
     } finally {
       setResending(false);
     }
@@ -263,31 +276,32 @@ export function AuthForm({ initialMode = "login", next = "/profile" }: { initial
 
   return <form className="auth-form" onSubmit={(event) => void submit(event)} noValidate>
     {mode !== "update-password" ? <div className="auth-mode-tabs" role="tablist" aria-label={t("auth.modeAria")}>
-      {(["login", "register", "recover"] as const).map((value) => <button id={`auth-mode-${value}`} key={value} type="button" role="tab" aria-controls="auth-mode-panel" aria-selected={mode === value} tabIndex={mode === value ? 0 : -1} className={mode === value ? "is-active" : ""} onKeyDown={(event) => handleModeKeyDown(event, value)} onClick={() => selectMode(value)}>{t(`auth.mode.${value}`)}</button>)}
+      {(["login", "register", "recover"] as const).map((value) => <button id={`auth-mode-${value}`} key={value} type="button" role="tab" aria-controls="auth-mode-panel" aria-selected={mode === value} disabled={loading || resending} tabIndex={mode === value ? 0 : -1} className={mode === value ? "is-active" : ""} onKeyDown={(event) => handleModeKeyDown(event, value)} onClick={() => selectMode(value)}>{t(`auth.mode.${value}`)}</button>)}
     </div> : null}
 
     <div id="auth-mode-panel" role={mode === "update-password" ? undefined : "tabpanel"} aria-labelledby={mode === "update-password" ? undefined : `auth-mode-${mode}`}>
     {pendingFlow ? <section className="auth-pending-state" aria-live="polite">
       <h2>{t("auth.checkEmailTitle")}</h2>
       <p>{t(pendingFlow === "signup" ? "auth.pendingSignupNote" : "auth.pendingRecoveryNote", { email: normalizedEmail(email) })}</p>
-      <p className="auth-device-note">{t("auth.crossDeviceNote")}</p>
+      <p className="auth-device-note">{t(pendingFlow === "signup" ? "auth.crossDeviceNote" : "auth.recoveryDeviceNote")}</p>
       {pendingFlow === "signup" && !resending ? <RegistrationWaiter key={handoffRevision} /> : null}
       {error ? <div id="auth-status" className="auth-feedback is-error" role="alert">{error}</div> : null}
       {message ? <div id="auth-status" className="auth-feedback is-success" role="status">{message}</div> : null}
       <div className="auth-pending-actions">
         <button className="secondary-button" type="button" disabled={resending} onClick={() => void resend()}>{resending ? t("auth.resending") : t("auth.resend")}</button>
-        {pendingFlow === "signup" ? <button className="auth-submit" type="button" disabled={loading} onClick={() => void confirmedAndSignIn()}>{loading ? t("auth.loading") : t("auth.confirmedSignIn")}</button> : <button className="auth-submit" type="button" onClick={() => selectMode("login")}>{t("auth.backToLogin")}</button>}
+        {pendingFlow === "signup" ? <button className="auth-submit" type="button" disabled={loading || resending} onClick={() => void confirmedAndSignIn()}>{t("auth.submit.login")}</button> : <button className="auth-submit" type="button" onClick={() => selectMode("login")}>{t("auth.backToLogin")}</button>}
+        {pendingFlow === "signup" ? <button className="secondary-button" type="button" disabled={resending} onClick={() => selectMode("recover")}>{t("auth.recoverPassword")}</button> : null}
       </div>
-      <button className="auth-change-email" type="button" onClick={() => selectMode(pendingFlow === "signup" ? "register" : "recover")}>{t("auth.useAnotherEmail")}</button>
+      <button className="auth-change-email" type="button" disabled={resending} onClick={() => selectMode(pendingFlow === "signup" ? "register" : "recover")}>{t("auth.useAnotherEmail")}</button>
     </section> : <>
       {mode === "register" ? <label className="form-field"><span>{t("auth.displayName")}</span><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" maxLength={80} required /></label> : null}
       {mode !== "update-password" ? <label className="form-field"><span>{t("auth.email")}</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.kz" autoComplete="email" inputMode="email" required /></label> : null}
-      {mode === "login" || mode === "register" || mode === "update-password" ? <label className="form-field"><span>{mode === "update-password" ? t("auth.newPassword") : t("auth.password")}</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required /></label> : null}
-      {mode === "register" || mode === "update-password" ? <label className="form-field"><span>{t("auth.confirmPassword")}</span><input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={8} required /></label> : null}
+      {mode === "login" || mode === "register" || mode === "update-password" ? <label className="form-field"><span>{mode === "update-password" ? t("auth.newPassword") : t("auth.password")}</span><input type="password" disabled={passwordSaved} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required /></label> : null}
+      {mode === "register" || mode === "update-password" ? <label className="form-field"><span>{t("auth.confirmPassword")}</span><input type="password" disabled={passwordSaved} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={8} required /></label> : null}
 
       {error ? <div id="auth-status" className="auth-feedback is-error" role="alert">{error}</div> : null}
       {message ? <div id="auth-status" className="auth-feedback is-success" role="status">{message}</div> : null}
-      <button className="auth-submit" type="submit" disabled={loading}>{loading ? t("auth.loading") : t(`auth.submit.${mode}`)}</button>
+      <button className="auth-submit" type="submit" disabled={loading}>{loading ? t("auth.loading") : passwordSaved ? t("auth.backToLogin") : t(`auth.submit.${mode}`)}</button>
     </>}
     </div>
   </form>;

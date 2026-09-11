@@ -35,8 +35,8 @@ async function network(request, milliseconds = 15000) {
   };
   let reader;
   try {
-    const response = await Promise.race([fetch(request, { signal: controller.signal }), stopped]);
-    if (!response.body || milliseconds === 15000) { dispose(); return response; }
+    const response = await Promise.race([fetch(request, { signal: controller.signal, ...(request.mode === "navigate" ? { redirect: "manual" } : {}) }), stopped]);
+    if (response.type === "opaqueredirect" || !response.body || milliseconds === 15000) { dispose(); return response; }
     reader = response.body.getReader();
     // Keep streaming useful chunks immediately. One timer covers both headers
     // and body, even if the underlying transport ignores abort.
@@ -97,6 +97,10 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  // Let the browser handle auth redirects and session cookies natively.
+  // In particular, never wrap an opaque redirect (status 0) in a new Response.
+  if (url.pathname === "/auth" || url.pathname.startsWith("/auth/") || url.pathname === "/login" || url.pathname === "/login/") return;
 
   const referenceVersion = publicReferenceVersion(url);
   if (referenceVersion) {

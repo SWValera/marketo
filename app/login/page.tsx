@@ -27,11 +27,11 @@ async function LoginPageContent({ searchParams }: LoginPageProps) {
   const rawCallbackError = typeof params.auth_error === "string" ? params.auth_error : null;
   const callbackError: AuthCallbackError | null = rawCallbackError === "expired" || rawCallbackError === "invalid" ? rawCallbackError : null;
   const passwordResetSuccess = params.password_reset === "success";
-  if (!passwordResetSuccess) {
+  if (!passwordResetSuccess && !callbackError) {
     const client = await createSupabaseServerClient();
     const { data, error } = await getRequestUser(client);
     if (error && !isAuthSessionMissing(error)) return <AuthReadError href="/login" />;
     if (data.user) redirect(next);
   }
-  return <><Header /><LoginContent mode={mode} next={next} callbackError={callbackError} passwordResetSuccess={passwordResetSuccess} /><MobileNav /></>;
+  return <><Header /><LoginContent mode={mode} next={next} callbackError={callbackError} passwordResetSuccess={passwordResetSuccess} resumePending={!params.mode} /><MobileNav /></>;
 }
