@@ -2,9 +2,10 @@
 
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PREVIOUS_ROUTE_KEY } from "@/components/navigation-history";
+import { CURRENT_ROUTE_KEY, PREVIOUS_ROUTE_KEY } from "@/components/navigation-history";
 import { useI18n } from "@/components/i18n-provider";
 import { safeReadBrowserStorage } from "@/lib/browser/storage";
+import { browserPreviousEntry, resolveBackTarget } from "@/lib/navigation/back-target";
 
 export function BackButton({
   fallback,
@@ -26,10 +27,18 @@ export function BackButton({
       onBack();
       return;
     }
-    const previousRoute = safeReadBrowserStorage("sessionStorage", PREVIOUS_ROUTE_KEY);
-    const hasInternalHistory = Boolean(previousRoute && previousRoute !== window.location.pathname && window.history.length > 1);
-    if (hasInternalHistory) router.back();
-    else router.push(fallback);
+    const target = resolveBackTarget({
+      currentHref: window.location.href,
+      historyLength: window.history.length,
+      previousEntry: browserPreviousEntry(),
+      routerPrevious: window.history.state?.__vinext_previousNextUrl,
+      storedCurrent: safeReadBrowserStorage("sessionStorage", CURRENT_ROUTE_KEY),
+      storedPrevious: safeReadBrowserStorage("sessionStorage", PREVIOUS_ROUTE_KEY),
+      referrer: document.referrer,
+      fallback,
+    });
+    if (target.kind === "back") router.back();
+    else router.replace(target.href);
   }
 
   return (

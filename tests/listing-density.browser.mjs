@@ -24,7 +24,7 @@ const mocks={
  '@/components/header':`export function Header(){return <div style={{display:'contents'}} dangerouslySetInnerHTML={{__html:${JSON.stringify(header)}}}/>}`,
  '@/components/i18n-provider':"import {translate} from './lib/i18n/messages'; export function useI18n(){return {locale:'ru',t:(k,v)=>translate('ru',k,v)}}",
  '@/components/app-link':`export function AppLink({prefetch,children,...props}){return <a {...props} onClick={e=>{e.preventDefault();window.lastNavigation=props.href;props.onClick?.(e)}}>{children}</a>}`,
- 'next/navigation':"export const usePathname=()=>'/listing/fixture-listing-camry'; export const useRouter=()=>({push:p=>window.lastNavigation=p,back:()=>window.lastNavigation='back'});export const permanentRedirect=()=>{};export const notFound=()=>{throw Error('notFound')}",
+ 'next/navigation':"export const usePathname=()=>'/listing/fixture-listing-camry'; export const useSearchParams=()=>new URLSearchParams(); export const useRouter=()=>({push:p=>window.lastNavigation=p,replace:p=>window.lastNavigation=p,back:()=>window.lastNavigation='back'});export const permanentRedirect=()=>{};export const notFound=()=>{throw Error('notFound')}",
  '@/components/publication-refresh':'export const PublicationRefresh=()=>null',
  '@/lib/i18n/server':'export const getServerI18n=()=>{}',
  '@/lib/data/repositories':'export const listingRepository={}',
@@ -51,8 +51,8 @@ let socket;const report=[];try{
  let port;for(let i=0;i<100&&!port;i++){port=await readFile(join(profile,'DevToolsActivePort'),'utf8').then(x=>Number(x.split('\n')[0]),()=>0);if(!port)await delay(100);}
  assert.ok(port,'headless browser failed to start');
  const pages=await json('http://127.0.0.1:'+port+'/json/list');const page=pages.find(x=>x.type==='page');assert.ok(page);
- socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.onopen=r;socket.onerror=j;});let id=0;const pending=new Map(),errors=[];
- socket.onmessage=e=>{const x=JSON.parse(e.data);if(x.id){const p=pending.get(x.id);pending.delete(x.id);if(x.error)p?.reject(new Error(JSON.stringify(x.error)));else p?.resolve(x.result);}else if(x.method==='Runtime.exceptionThrown')errors.push(x.params.exceptionDetails.text);};
+ socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.onopen=r;socket.onerror=j;});let id=0;const pending=new Map(),errors=[],httpErrors=[];
+ socket.onmessage=e=>{const x=JSON.parse(e.data);if(x.id){const p=pending.get(x.id);pending.delete(x.id);if(x.error)p?.reject(new Error(JSON.stringify(x.error)));else p?.resolve(x.result);}else if(x.method==='Runtime.exceptionThrown')errors.push(x.params.exceptionDetails.text);else if(x.method==='Network.responseReceived'&&x.params.response.status>=400)httpErrors.push({url:x.params.response.url,status:x.params.response.status});};
  const send=(method,params={})=>new Promise((resolve,reject)=>{const next=++id;pending.set(next,{resolve,reject});socket.send(JSON.stringify({id:next,method,params}));});
  const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
  const until=async expression=>{for(let i=0;i<80;i++){if(await evaluate(expression))return;await delay(50);}assert.fail('DOM condition timed out: '+expression);};
@@ -60,17 +60,26 @@ let socket;const report=[];try{
  const key=async(key,modifiers=0)=>{await send('Input.dispatchKeyEvent',{type:'keyDown',key,code:key,modifiers,windowsVirtualKeyCode:key==='Escape'?27:key==='Tab'?9:key==='ArrowRight'?39:37});await send('Input.dispatchKeyEvent',{type:'keyUp',key,code:key,modifiers});await delay(100);};
  const selected=()=>evaluate(`Number(document.querySelector('.gallery-selectors button[aria-pressed="true"]')?.textContent||1)`);
  const swipe=async(selector,direction)=>{const p=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};})()`);const start=p.x+p.w*(direction==='left'?.8:.2),end=p.x+p.w*(direction==='left'?.2:.8),y=p.y+p.h/2;await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:start,y,id:1}]});for(let i=1;i<=12;i++){await send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start+(end-start)*i/12,y,id:1}]});await delay(20);}await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await delay(700);};
- await send('Page.enable');await send('Runtime.enable');
+ await send('Page.enable');await send('Runtime.enable');await send('Network.enable');
  for(const [width,height] of [[390,844],[393,852],[430,932],[440,956],[768,1024],[1280,900]]){
   await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<700});await send('Emulation.setTouchEmulationEnabled',{enabled:width<700});
   await send('Page.navigate',{url});await until(`!!document.querySelector('.contact-message-button')`);await until(`document.querySelector('.gallery-open img').complete`);
-  const measurements=await evaluate(`(()=>{const selectors={header:'.site-header',toolbar:'.app-page-header',photo:'.listing-gallery',attributes:'.characteristics-grid',description:'.listing-description, .detail-card:nth-of-type(2)',location:'.listing-location, .detail-card:nth-of-type(3)',seller:'.seller-card',price:'.price-card',actions:'.listing-contact-actions'};const blocks=Object.fromEntries(Object.entries(selectors).map(([k,s])=>{const e=document.querySelector(s);const r=e?.getBoundingClientRect();return [k,r?{top:r.top+scrollY,height:r.height,bottom:r.bottom+scrollY}:null]}));return {blocks,documentHeight:document.documentElement.scrollHeight,horizontalScroll:document.documentElement.scrollWidth>innerWidth,columns:getComputedStyle(document.querySelector('.characteristics-grid')).gridTemplateColumns,attributes:document.querySelectorAll('.characteristics-grid > div').length};})()`);
+  const measurements=await evaluate(`(()=>{const selectors={header:'.site-header',toolbar:'.app-page-header',photo:'.listing-gallery',attributes:'.characteristics-grid',description:'.listing-description, .detail-card:nth-of-type(2)',location:'.listing-location, .detail-card:nth-of-type(3)',seller:'.seller-card',price:'.detail-price',title:'.listing-mobile-title',actions:'.listing-contact-actions'};const blocks=Object.fromEntries(Object.entries(selectors).map(([k,s])=>{const e=document.querySelector(s);const r=e?.getBoundingClientRect();return [k,r?{top:r.top+scrollY,height:r.height,bottom:r.bottom+scrollY}:null]}));return {blocks,documentHeight:document.documentElement.scrollHeight,horizontalScroll:document.documentElement.scrollWidth>innerWidth,columns:getComputedStyle(document.querySelector('.characteristics-grid')).gridTemplateColumns,attributes:document.querySelectorAll('.characteristics-grid > div').length};})()`);
   assert.equal(measurements.horizontalScroll,false);
   await evaluate('window.scrollTo({top:0,behavior:"instant"})');
   const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:Math.max(height,Math.min(measurements.documentHeight,2200)),scale:1}});await writeFile(join(out,`${mode}-${width}.png`),Buffer.from(shot.data,'base64'));
+  if(mode==='after'&&width<700){
+   const layout=await evaluate(`(()=>{const rect=s=>document.querySelector(s).getBoundingClientRect(),grid=getComputedStyle(document.querySelector('.characteristics-grid')),tile=getComputedStyle(document.querySelector('.characteristics-grid > div'));return {priceAfterTitle:rect('.detail-price').top>=rect('.listing-mobile-title').bottom-1,priceBeforeAttributes:rect('.detail-price').bottom<=rect('.listing-characteristics').top+1,gap:grid.gap,background:grid.backgroundColor,border:tile.borderTopWidth,radius:tile.borderRadius,dockPosition:getComputedStyle(document.querySelector('.listing-contact-dock')).position,dockBottom:rect('.listing-contact-dock').bottom,height:innerHeight}})()`);
+   assert.equal(layout.priceAfterTitle,true);assert.equal(layout.priceBeforeAttributes,true);assert.equal(layout.gap,'6px');assert.equal(layout.background,'rgb(255, 255, 255)');assert.equal(layout.border,'1px');assert.equal(layout.radius,'12px');assert.equal(layout.dockPosition,'fixed');assert.equal(layout.dockBottom,layout.height);
+   for(const y of [500,100000]){await evaluate(`window.scrollTo({top:${y},behavior:'instant'})`);assert.equal(await evaluate(`document.querySelector('.listing-contact-dock').getBoundingClientRect().bottom`),height);}
+   assert.ok(await evaluate(`document.querySelector('.listing-publication-note').getBoundingClientRect().bottom<document.querySelector('.listing-contact-dock').getBoundingClientRect().top`),'last content not covered by action dock');
+   await evaluate(`window.scrollTo({top:0,behavior:'instant'})`);await delay(50);
+   const viewport=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(join(out,`viewport-${width}.png`),Buffer.from(viewport.data,'base64'));
+   measurements.layout=layout;
+  }
   report.push({width,height,...measurements});
  }
- const interactions=[];
+ const interactions=[],scenarios=[];
  if(mode==='after') {
   for(const [width,height] of [[390,844],[430,932]]) {
    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
@@ -83,6 +92,7 @@ let socket;const report=[];try{
    await click('.listing-disclosure-description > button');assert.ok(await evaluate(`document.querySelector('.listing-description').getBoundingClientRect().height>200`));
    assert.equal(await evaluate(`document.querySelector('.listing-description p').textContent`),longDescription);await click('.listing-disclosure-description > button');
    await click('.detail-secondary button:first-child');assert.equal(await evaluate(`document.querySelector('.detail-secondary button').getAttribute('aria-pressed')`),'true');await click('.detail-secondary button:first-child');
+   await evaluate(`Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.shared=data}})`);await click('.detail-secondary button:nth-child(2)');assert.equal(await evaluate(`window.shared.title`),fixture.title);
    await click('.contact-message-button');assert.equal(await evaluate('window.lastNavigation'),'/messages/new?listing=fixture-listing');
    await click('.seller-card');assert.equal(await evaluate('window.lastNavigation'),'/seller/fixture-seller');
    assert.equal(await evaluate(`document.querySelector('.listing-location p').textContent.trim()`),'Петропавловск');
@@ -109,7 +119,26 @@ let socket;const report=[];try{
    interactions.push({width,attributesExpanded:15,descriptionExpanded:true,favoriteToggle:true,messageLink:true,sellerLink:true,protectedPhone:'fixture GET/challenge/POST + tel + pagehide clear PASS',gallery:'12 photos, arrows, selectors, swipe, fullscreen, Escape PASS',edge});
   }
  }
- await writeFile(join(out,'interaction-results.json'),JSON.stringify({mode,interactions,realProductionWrites:false},null,2));
- assert.deepEqual(errors,[]);await writeFile(join(out,`${mode}-measurements.json`),JSON.stringify({environment:'local Chromium; actual listing page, gallery, actions and CSS; fixture data/Auth/navigation/Turnstile',report},null,2));console.log(JSON.stringify({status:'PASS',mode,report}));
+ if(mode==='after')for(const [width,height]of [[390,844],[393,852],[430,932],[440,956]]){
+  await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});await send('Page.navigate',{url});await until(`!!document.querySelector('.contact-message-button')`);
+  const cases=[{name:'tv-three',title:'Телевизор Samsung',keys:['brand','model','condition'],values:['Samsung','55 дюймов','Отличное']},{name:'other-one',title:'Стул',keys:['condition'],values:['Новый']},{name:'missing-values',title:'Объявление с частично заполненными данными',keys:['brand','model','year','condition'],values:['Toyota','',null,'С пробегом']},{name:'no-attributes-long-title',title:'Очень длинное название объявления '.repeat(6),keys:[],values:[]}];
+  for(const item of cases){
+   const patch={title:item.title,description:'Подробное описание товара. '.repeat(40),attributes:Object.fromEntries(item.keys.map((k,i)=>[k,item.values[i]]).filter(([,value])=>value!==null)),attributeDefinitions:item.keys.map(key=>({key,label:{ru:key,kk:key},dataType:'text',unit:null}))};await evaluate(`window.showListing(${JSON.stringify(patch)})`);await delay(100);
+   const result=await evaluate(`(()=>{const grid=document.querySelector('.characteristics-grid'),price=document.querySelector('.detail-price').getBoundingClientRect(),title=document.querySelector('.listing-mobile-title').getBoundingClientRect();return {cells:grid?.children.length||0,background:grid?getComputedStyle(grid).backgroundColor:null,horizontalScroll:document.documentElement.scrollWidth>innerWidth,priceAfterTitle:price.top>=title.bottom-1,descriptionCollapsed:document.querySelector('.listing-description').getBoundingClientRect().height<=56,overflow:[...document.querySelectorAll('.characteristics-grid dt,.characteristics-grid dd,.detail-price')].filter(e=>e.clientWidth&&e.scrollWidth>e.clientWidth+1).length}})()`);
+   assert.equal(result.cells,item.values.filter(x=>x!=null&&x!=='').length);assert.equal(result.horizontalScroll,false);assert.equal(result.priceAfterTitle,true);assert.equal(result.descriptionCollapsed,true);assert.equal(result.overflow,0);if(result.cells)assert.equal(result.background,'rgb(255, 255, 255)');scenarios.push({width,case:item.name,...result});
+  }
+ }
+ let safeArea='not run in baseline';
+ if(mode==='after'){
+  const protocol=await json('http://127.0.0.1:'+port+'/json/protocol');
+  if(protocol.domains.find(d=>d.domain==='Emulation')?.commands.some(c=>c.name==='setSafeAreaInsetsOverride')){
+   await send('Emulation.setSafeAreaInsetsOverride',{insets:{bottom:34}});
+   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await send('Page.navigate',{url});await until(`!!document.querySelector('.contact-message-button')`);
+   const inset=await evaluate(`(()=>{const dock=document.querySelector('.listing-contact-dock');return {dockPadding:parseFloat(getComputedStyle(dock).paddingBottom),pagePadding:parseFloat(getComputedStyle(document.querySelector('.listing-page')).paddingBottom),buttonBottom:document.querySelector('.listing-contact-actions').getBoundingClientRect().bottom,height:innerHeight}})()`);
+   assert.equal(inset.dockPadding,44);assert.equal(inset.pagePadding,138);assert.ok(inset.buttonBottom<=inset.height-34);safeArea={environment:'Chromium emulated bottom inset 34px',...inset};await send('Emulation.setSafeAreaInsetsOverride',{insets:{bottom:0}});
+  }else safeArea='CSS env rules verified; browser inset override unavailable';
+ }
+ await writeFile(join(out,'interaction-results.json'),JSON.stringify({mode,interactions,scenarios,safeArea,httpErrors,errors,realProductionWrites:false},null,2));
+ assert.deepEqual(errors,[]);assert.deepEqual(httpErrors,[]);await writeFile(join(out,`${mode}-measurements.json`),JSON.stringify({environment:'local Chromium; actual listing page, gallery, actions and CSS; fixture data/Auth/navigation/Turnstile',report},null,2));console.log(JSON.stringify({status:'PASS',mode,report}));
  await send('Browser.close').catch(()=>{});
 }finally{socket?.close();child.kill();server.close();}

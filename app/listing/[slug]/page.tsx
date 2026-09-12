@@ -94,7 +94,7 @@ async function ListingPageContent({ params }: ListingPageProps) {
             <h2>{listing.title}</h2>
             <span className="listing-price-label"><Tag size={15} aria-hidden="true" />{t("publish.price")}</span>
             <div className="detail-price">{listing.priceLabel}</div>
-            <ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} />
+            <div className="listing-secondary-actions"><ListingActions listingId={listing.id} listingSlug={`${listing.id}-${listing.slug}`} title={listing.title} contactPhone={listing.contactPhone} /></div>
           </article>
           <Link className="seller-card" href={`/seller/${listing.sellerId}`}><div className="avatar"><UserRound size={22} /></div><div><strong>{listing.sellerName}</strong><small>{t("listing.openSeller")}</small></div><ChevronRight className="listing-seller-chevron" size={20} aria-hidden="true" /></Link>
         </aside>
