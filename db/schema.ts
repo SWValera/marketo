@@ -187,11 +187,13 @@ export const categoryAttributeOptions = pgTable("category_attribute_options", {
   labelRu: text("label_ru").notNull(),
   labelKk: text("label_kk").notNull(),
   parentOptionId: uuid("parent_option_id"),
+  metadata: jsonb("metadata").notNull().default({}),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 }, (table) => [
+  check("category_attribute_options_metadata_object", sql`jsonb_typeof(${table.metadata}) = 'object'`),
   unique("category_attribute_options_attribute_value_unique").on(table.attributeId, table.value),
   unique("category_attribute_options_attribute_sort_unique").on(table.attributeId, table.sortOrder),
   unique("category_attribute_options_attribute_id_id_unique").on(table.attributeId, table.id),

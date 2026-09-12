@@ -15,7 +15,7 @@ const attributeRouteSource = await readFile(new URL("../app/api/reference/catego
 const optionRouteSource = await readFile(new URL("../app/api/reference/attributes/[id]/options/route.ts", import.meta.url), "utf8");
 
 test("attribute and deferred-option payloads share the catalog release version", () => {
-  assert.match(referenceSelectSource, /params\.set\("v", CATEGORY_REFERENCE_VERSION\)/);
+  assert.match(referenceSelectSource, /new URLSearchParams\(\{ v: CATEGORY_REFERENCE_VERSION,/);
   for (const source of [attributeRouteSource, optionRouteSource]) {
     assert.match(source, /CATEGORY_REFERENCE_VERSION/);
     assert.match(source, /x-marketo-reference-version/);

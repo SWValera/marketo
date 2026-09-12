@@ -126,3 +126,9 @@ export const EMPTY_CATEGORIES: CategoryReferenceData = {
 export function emptyCategoryAttributes(categoryId = ""): CategoryAttributeReferenceData {
   return { categoryId, attributes: [] };
 }
+
+export type ReferenceOptionsPage = {
+  options: ReferenceAttributeOption[];
+  selectedOptions: ReferenceAttributeOption[];
+  hasMore: boolean;
+};

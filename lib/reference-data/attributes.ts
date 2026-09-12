@@ -8,6 +8,10 @@ type AttributeValidation = {
   max?: number;
   step?: number;
   maxLength?: number;
+  fallbackOption?: string;
+  requiredForNewListingsSince?: string;
+  requiredWhenSince?: string;
+  placeholder?: { ru: string; kk: string };
   visibleWhen?: { key: string; values: string[] };
   requiredWhen?: { key: string; values: string[] };
 };
@@ -22,14 +26,19 @@ export function isAttributeVisible(attribute: ReferenceCategoryAttribute, values
   if (!attribute.visible) return false;
   const condition = getAttributeValidation(attribute).visibleWhen;
   if (!condition?.key || !condition.values?.length) return true;
-  return condition.values.includes(String(values[condition.key] ?? ""));
+  const selected = values[condition.key];
+  return (Array.isArray(selected) ? selected : [String(selected ?? "")]).some(value => condition.values.includes(value));
 }
 
-export function isAttributeRequired(attribute: ReferenceCategoryAttribute, values: AttributeValues) {
+export function isAttributeRequired(attribute: ReferenceCategoryAttribute, values: AttributeValues, createdAt?: string) {
   if (attribute.required) return true;
-  const condition = getAttributeValidation(attribute).requiredWhen;
-  if (!condition?.key || !condition.values?.length) return false;
-  return condition.values.includes(String(values[condition.key] ?? ""));
+  const validation = getAttributeValidation(attribute);
+  const appliesSince = (since?: string) => !since || !createdAt || Date.parse(createdAt) >= Date.parse(since);
+  if (validation.requiredForNewListingsSince && appliesSince(validation.requiredForNewListingsSince)) return true;
+  const condition = validation.requiredWhen;
+  if (!condition?.key || !condition.values?.length || !appliesSince(validation.requiredWhenSince)) return false;
+  const selected = values[condition.key];
+  return (Array.isArray(selected) ? selected : [String(selected ?? "")]).some(value => condition.values.includes(value));
 }
 
 export function sanitizeAttributeFilters(
@@ -92,7 +101,7 @@ export function clearDependentValues<T extends ReferenceAttributeValue>(
       const dependencyChanged = attribute.dependsOnKey === parentKey;
       const condition = getAttributeValidation(attribute).visibleWhen;
       const conditionChanged = condition?.key === parentKey;
-      const conditionSatisfied = !conditionChanged || Boolean(condition.values?.includes(String(next[parentKey] ?? "")));
+      const conditionSatisfied = !conditionChanged || (Array.isArray(next[parentKey]) ? next[parentKey] as string[] : [String(next[parentKey] ?? "")]).some(value => condition.values?.includes(value));
       if (!dependencyChanged && conditionSatisfied) continue;
       if (next[attribute.key] !== undefined) delete next[attribute.key];
       delete next[attribute.key + "_min"];
@@ -101,4 +110,12 @@ export function clearDependentValues<T extends ReferenceAttributeValue>(
     }
   }
   return next;
+}
+
+// A deferred parent has no eagerly serialized options. Its stable value is
+// sufficient for the server to resolve the existing catalog relationship.
+export function getDependentParentValue(attribute: ReferenceCategoryAttribute, values: AttributeValues) {
+  if (!attribute.dependsOnKey) return undefined;
+  const value = values[attribute.dependsOnKey];
+  return typeof value === "string" && value ? value : undefined;
 }

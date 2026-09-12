@@ -1,3 +1,19 @@
+import { tabletProcessorOptions } from "./device-chip-options.ts";
+import { contextualModelCode } from "./model-code-policy.ts";
+import { wearableFamilies, consoleFamilies } from "./wearable-console-options.ts";
+import { subjectSpecificProfiles } from "./subject-specific-profiles.ts";
+import { mixedIdentityFields } from "./mixed-identity-options.ts";
+import { sportsProfiles } from "./sports-profiles.ts";
+import { conditionalHardwareFields } from "./conditional-hardware-options.ts";
+import { clothingSizeFields, shoeSizeFields, clothingMaterialFields, productColor } from "./clothing-options.ts";
+import { computerComponentFields, storageFields, memoryCapacityOptions, storageType } from "./computer-component-options.ts";
+import { televisionFamilies } from "./television-model-options.ts";
+import { categoryManufacturerGroups } from "./category-manufacturer-groups.ts";
+import { vehicleGenerationFields, NEW_CATALOG_REQUIREMENTS_SINCE } from "./vehicle-generation-options.ts";
+import { textFieldExamples } from "./text-field-examples.ts";
+import { manufacturerFields, manufacturerOptions } from "./manufacturer-options.ts";
+import { familyModelFields, laptopFamilies, desktopFamilies } from "./computer-model-options.ts";
+import { processorOptions, graphicsOptions } from "./hardware-options.ts";
 import { passengerVehicleBrands } from "./vehicle-brands.ts";
 import {
   passengerVehicleModels,
@@ -17,6 +33,7 @@ export type SeedAttributeOption = {
   value: string;
   label: SeedLocalizedText;
   parentValue?: string;
+  metadata?: Record<string, unknown>;
 };
 export type SeedAttributeDefinition = {
   key: string;
@@ -43,7 +60,7 @@ const select = (
   config: Partial<SeedAttributeDefinition> = {},
 ): SeedAttributeDefinition => ({ key, label: tx(ru, kk), dataType: "select", filterable: true, filterMode: "exact", options, ...config });
 const text = (key: string, ru: string, kk: string, config: Partial<SeedAttributeDefinition> = {}): SeedAttributeDefinition =>
-  ({ key, label: tx(ru, kk), dataType: "text", ...config });
+  ({ key, label: tx(ru, kk), dataType: "text", ...config, validation: { placeholder: textFieldExamples[key], ...config.validation } });
 const number = (key: string, ru: string, kk: string, unitRu?: string, unitKk?: string, config: Partial<SeedAttributeDefinition> = {}): SeedAttributeDefinition =>
   ({ key, label: tx(ru, kk), dataType: "number", unit: unitRu && unitKk ? tx(unitRu, unitKk) : undefined, filterable: true, filterMode: "range", ...config });
 const bool = (key: string, ru: string, kk: string, config: Partial<SeedAttributeDefinition> = {}): SeedAttributeDefinition =>
@@ -145,6 +162,8 @@ const DEVICE_SPECS: SeedAttributeDefinition[] = [
 
 const TABLET_DEVICE_SPECS: SeedAttributeDefinition[] = [
   ...DEVICE_SPECS,
+  select("cpu", "Процессор", "Процессор", tabletProcessorOptions, { searchable: true, optionsLoadMode: "deferred", validation: { fallbackOption: "other-cpu" } }),
+  text("cpu_other", "Другой процессор", "Басқа процессор", { validation: { maxLength: 120, placeholder: { ru: "Обозначение из настроек или спецификации планшета", kk: "Планшет параметрлеріндегі немесе сипаттамасындағы белгілеу" }, visibleWhen: { key: "cpu", values: ["other-cpu"] }, requiredWhen: { key: "cpu", values: ["other-cpu"] } } }),
   text("model_code", "Заводской номер модели", "Зауыттық модель нөмірі", {
     searchable: true,
     validation: { maxLength: 80 },
@@ -260,13 +279,7 @@ const REGULATED_SAFETY: SeedAttributeDefinition[] = [
 const PASSENGER_BRANDS: SeedAttributeOption[] = passengerVehicleBrands;
 const SMARTPHONE_BRANDS: SeedAttributeOption[] = smartphoneBrands;
 const WATCH_BRANDS: SeedAttributeOption[] = [
-  ...SMARTPHONE_BRANDS.filter((option) => option.value !== "other"),
-  op("garmin", "Garmin", "Garmin"),
-  op("amazfit", "Amazfit", "Amazfit"),
-  op("fitbit", "Fitbit", "Fitbit"),
-  op("suunto", "Suunto", "Suunto"),
-  op("polar", "Polar", "Polar"),
-  op("haylou", "Haylou", "Haylou"),
+  ...Object.keys(wearableFamilies).map(value => op(value, value === "amazfit" ? "Amazfit" : value[0].toUpperCase() + value.slice(1))),
   op("other", "Другая марка", "Басқа марка"),
 ];
 const dependentSelect = (
@@ -324,13 +337,8 @@ const passengerCarProfile = (
 };
 
 const passengerCarExchangeProfile = (): SeedAttributeDefinition[] =>
-  passengerCarProfile().flatMap((attribute) => {
-    if (attribute.key === "brand") return [BRAND_TEXT];
-    if (attribute.key === "model") return [MODEL_TEXT];
-    if (attribute.key === "brand_other" || attribute.key === "model_other") return [];
-    if (attribute.key === "condition") return [CONDITION];
-    return [attribute];
-  });
+  passengerCarProfile().map(attribute => attribute.key === "condition" ? CONDITION : attribute.key === "brand"
+    ? { ...attribute, required: false, validation: { ...attribute.validation, requiredForNewListingsSince: NEW_CATALOG_REQUIREMENTS_SINCE } } : attribute);
 
 const motorcycleProfile = (
   reference: MotorcycleReference,
@@ -370,6 +378,8 @@ const COMMERCIAL_PROPERTY_BASE: SeedAttributeDefinition[] = [
 ];
 
 const profiles = {
+  ...sportsProfiles,
+  ...subjectSpecificProfiles,
   productCore: PRODUCT_CORE,
   goods: PRODUCT_CORE,
   goodsBrand: [BRAND_TEXT, MODEL_TEXT, ...PRODUCT_CORE, WARRANTY],
@@ -421,32 +431,39 @@ const profiles = {
   motorcycleBuggy: motorcycleProfile(motorcycleReferences.buggy),
   motorcycleSnowmobile: motorcycleProfile(motorcycleReferences.snowmobile),
   motorcycleExchange: [
-    BRAND_TEXT, MODEL_TEXT, YEAR,
+    select("brand", "Марка", "Маркасы", [...new Map(Object.values(motorcycleReferences).flatMap(ref => ref.brands).map(option => [option.value, option])).values()]), OTHER_BRAND,
+    dependentSelect("model", "Модель", "Моделі", "brand", [...new Map(Object.values(motorcycleReferences).flatMap(ref => ref.models).map(option => [option.value, option])).values()]), OTHER_MODEL, YEAR,
     number("mileage", "Пробег", "Жүрісі", "км", "км", { validation: { min: 0 } }),
     number("engine_volume", "Объём двигателя", "Қозғалтқыш көлемі", "см³", "см³", { validation: { min: 25, max: 3000 } }),
     select("motorcycle_class", "Класс", "Сыныбы", [op("road", "Дорожный", "Жолдық"), op("sport", "Спортивный", "Спорттық"), op("touring", "Туристический", "Туристік"), op("cruiser", "Круизер", "Круизер"), op("enduro", "Эндуро", "Эндуро"), op("cross", "Кроссовый", "Кросс"), op("scooter", "Скутер", "Скутер"), op("atv", "Квадроцикл", "Квадроцикл"), op("snowmobile", "Снегоход", "Қар көлігі")]),
     CONDITION, bool("documents", "Есть документы", "Құжаттары бар"),
   ],
-  commercialVehicle: [BRAND_TEXT, MODEL_TEXT, YEAR, number("mileage", "Пробег", "Жүрісі", "км", "км"), select("fuel", "Топливо", "Отын", [op("diesel", "Дизель", "Дизель"), op("petrol", "Бензин", "Бензин"), op("gas", "Газ", "Газ"), op("electric", "Электро", "Электр")]), select("transmission", "Коробка передач", "Беріліс қорабы", [op("manual", "Механика", "Механика"), op("automatic", "Автомат", "Автомат"), op("robot", "Робот", "Робот")]), number("payload", "Грузоподъёмность", "Жүк көтерімділігі", "кг", "кг"), CONDITION],
+  commercialVehicle: [...manufacturerFields("commercial"), MODEL_TEXT, YEAR, number("mileage", "Пробег", "Жүрісі", "км", "км"), select("fuel", "Топливо", "Отын", [op("diesel", "Дизель", "Дизель"), op("petrol", "Бензин", "Бензин"), op("gas", "Газ", "Газ"), op("electric", "Электро", "Электр")]), select("transmission", "Коробка передач", "Беріліс қорабы", [op("manual", "Механика", "Механика"), op("automatic", "Автомат", "Автомат"), op("robot", "Робот", "Робот")]), number("payload", "Грузоподъёмность", "Жүк көтерімділігі", "кг", "кг"), CONDITION],
   passengerCommercial: [number("seats", "Количество мест", "Орын саны", "мест", "орын", { validation: { min: 2, max: 100 } })],
-  trailer: [select("trailer_type", "Тип прицепа", "Тіркеме түрі", [op("flatbed", "Бортовой", "Бортты"), op("curtain", "Тентованный", "Тентті"), op("refrigerator", "Рефрижератор", "Рефрижератор"), op("tipper", "Самосвальный", "Өзі түсіретін"), op("tank", "Цистерна", "Цистерна"), op("car", "Легковой", "Жеңіл көлікке"), op("other", "Другой", "Басқа")], { required: true }), YEAR, number("payload", "Грузоподъёмность", "Жүк көтерімділігі", "кг", "кг"), number("axles", "Количество осей", "Ось саны"), CONDITION],
-  machinery: [select("machinery_type", "Тип техники", "Техника түрі", [op("excavator", "Экскаватор", "Экскаватор"), op("loader", "Погрузчик", "Тиегіш"), op("crane", "Кран", "Кран"), op("bulldozer", "Бульдозер", "Бульдозер"), op("grader", "Грейдер", "Грейдер"), op("tractor", "Трактор", "Трактор"), op("combine", "Комбайн", "Комбайн"), op("other", "Другая", "Басқа")]), BRAND_TEXT, MODEL_TEXT, YEAR, number("engine_hours", "Моточасы", "Мотосағат", "ч", "сағ"), number("power", "Мощность", "Қуаты", "л.с.", "а.к."), number("operating_weight", "Рабочая масса", "Жұмыс салмағы", "кг", "кг"), CONDITION],
-  transportSimple: [BRAND_TEXT, MODEL_TEXT, YEAR, CONDITION],
-  watercraft: [BRAND_TEXT, MODEL_TEXT, YEAR, number("length", "Длина", "Ұзындығы", "м", "м"), number("engine_power", "Мощность двигателя", "Қозғалтқыш қуаты", "л.с.", "а.к."), select("hull_material", "Материал корпуса", "Корпус материалы", [op("inflatable", "ПВХ / надувной", "ПВХ / үрлемелі"), op("aluminum", "Алюминий", "Алюминий"), op("fiberglass", "Стеклопластик", "Шыныпластик"), op("steel", "Сталь", "Болат"), op("wood", "Дерево", "Ағаш")]), CONDITION],
-  aircraft: [BRAND_TEXT, MODEL_TEXT, YEAR, number("flight_hours", "Налёт", "Ұшу сағаттары", "ч", "сағ"), number("seats", "Количество мест", "Орын саны"), bool("airworthiness", "Есть документы лётной годности", "Ұшуға жарамдылық құжаттары бар"), CONDITION],
-  electricPersonalTransport: [BRAND_TEXT, MODEL_TEXT, number("motor_power", "Мощность", "Қуаты", "Вт", "Вт"), number("range", "Запас хода", "Жүріс қоры", "км", "км"), number("max_speed", "Максимальная скорость", "Ең жоғары жылдамдық", "км/ч", "км/сағ"), CONDITION],
+  trailer: [...manufacturerFields("trailer"), MODEL_TEXT,select("trailer_type", "Тип прицепа", "Тіркеме түрі", [op("flatbed", "Бортовой", "Бортты"), op("curtain", "Тентованный", "Тентті"), op("refrigerator", "Рефрижератор", "Рефрижератор"), op("tipper", "Самосвальный", "Өзі түсіретін"), op("tank", "Цистерна", "Цистерна"), op("car", "Легковой", "Жеңіл көлікке"), op("other", "Другой", "Басқа")], { required: true }), YEAR, number("payload", "Грузоподъёмность", "Жүк көтерімділігі", "кг", "кг"), number("axles", "Количество осей", "Ось саны"), CONDITION],
+  machinery: [select("machinery_type", "Тип техники", "Техника түрі", [op("excavator", "Экскаватор", "Экскаватор"), op("loader", "Погрузчик", "Тиегіш"), op("crane", "Кран", "Кран"), op("bulldozer", "Бульдозер", "Бульдозер"), op("grader", "Грейдер", "Грейдер"), op("tractor", "Трактор", "Трактор"), op("combine", "Комбайн", "Комбайн"), op("other", "Другая", "Басқа")]), ...manufacturerFields("machinery"), MODEL_TEXT, YEAR, number("engine_hours", "Моточасы", "Мотосағат", "ч", "сағ"), number("power", "Мощность", "Қуаты", "л.с.", "а.к."), number("operating_weight", "Рабочая масса", "Жұмыс салмағы", "кг", "кг"), CONDITION],
+  transportSimple: [...manufacturerFields("commercial"), MODEL_TEXT, YEAR, CONDITION],
+  watercraft: [...manufacturerFields("watercraft"), MODEL_TEXT, YEAR, number("length", "Длина", "Ұзындығы", "м", "м"), number("engine_power", "Мощность двигателя", "Қозғалтқыш қуаты", "л.с.", "а.к."), select("hull_material", "Материал корпуса", "Корпус материалы", [op("inflatable", "ПВХ / надувной", "ПВХ / үрлемелі"), op("aluminum", "Алюминий", "Алюминий"), op("fiberglass", "Стеклопластик", "Шыныпластик"), op("steel", "Сталь", "Болат"), op("wood", "Дерево", "Ағаш")]), CONDITION],
+  outboardMotor: [...manufacturerFields("watercraft"), MODEL_TEXT, YEAR, CONDITION,
+    number("engine_power", "Мощность", "Қуаты", "л.с.", "а.к.", { validation: { min: 0.1, max: 1000 } }),
+    number("engine_hours", "Моточасы", "Мотосағат", "ч", "сағ", { validation: { min: 0, max: 100000 } }),
+    select("motor_cycle", "Тип двигателя", "Қозғалтқыш түрі", [op("2-stroke", "Двухтактный", "Екі тактілі"), op("4-stroke", "Четырёхтактный", "Төрт тактілі"), op("electric", "Электрический", "Электрлік")]),
+    select("shaft_length", "Длина дейдвуда", "Дейдвуд ұзындығы", [op("s", "S — короткий", "S — қысқа"), op("l", "L — длинный", "L — ұзын"), op("xl", "XL", "XL"), op("xxl", "XXL", "XXL")]),
+    select("control_type", "Управление", "Басқару", [op("tiller", "Румпельное", "Румпельді"), op("remote", "Дистанционное", "Қашықтан")])],
+  aircraft: [...manufacturerFields("aircraft"), MODEL_TEXT, YEAR, number("flight_hours", "Налёт", "Ұшу сағаттары", "ч", "сағ"), number("seats", "Количество мест", "Орын саны"), bool("airworthiness", "Есть документы лётной годности", "Ұшуға жарамдылық құжаттары бар"), CONDITION],
+  electricPersonalTransport: [...manufacturerFields("scooter"), MODEL_TEXT, number("motor_power", "Мощность", "Қуаты", "Вт", "Вт"), number("range", "Запас хода", "Жүріс қоры", "км", "км"), number("max_speed", "Максимальная скорость", "Ең жоғары жылдамдық", "км/ч", "км/сағ"), CONDITION],
 
-  autoPart: [select("part_type", "Тип детали", "Бөлшек түрі", [op("original", "Оригинальная", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"), op("used-original", "Оригинальная Б/у", "Қолданылған түпнұсқа")], { required: true }), BRAND_TEXT, text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }), select("compatible_brand", "Совместимая марка", "Үйлесімді марка", PASSENGER_BRANDS), dependentSelect("compatible_model", "Совместимая модель", "Үйлесімді модель", "compatible_brand", passengerVehicleModels, false), OTHER_COMPATIBLE_MODEL, select("position", "Сторона / позиция", "Жағы / орны", [op("front", "Передняя", "Алдыңғы"), op("rear", "Задняя", "Артқы"), op("left", "Левая", "Сол"), op("right", "Правая", "Оң"), op("universal", "Универсальная", "Әмбебап")]), CONDITION],
+  autoPart: [select("part_type", "Тип детали", "Бөлшек түрі", [op("original", "Оригинальная", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"), op("used-original", "Оригинальная Б/у", "Қолданылған түпнұсқа")], { required: true }), ...manufacturerFields("parts"), text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }), select("compatible_brand", "Совместимая марка", "Үйлесімді марка", PASSENGER_BRANDS), dependentSelect("compatible_model", "Совместимая модель", "Үйлесімді модель", "compatible_brand", passengerVehicleModels, false), OTHER_COMPATIBLE_MODEL, select("position", "Сторона / позиция", "Жағы / орны", [op("front", "Передняя", "Алдыңғы"), op("rear", "Задняя", "Артқы"), op("left", "Левая", "Сол"), op("right", "Правая", "Оң"), op("universal", "Универсальная", "Әмбебап")]), CONDITION],
   motoPart: [
     select("part_type", "Тип детали", "Бөлшек түрі", [op("original", "Оригинальная", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"), op("used-original", "Оригинальная Б/у", "Қолданылған түпнұсқа")], { required: true }),
-    BRAND_TEXT, text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }),
+    ...manufacturerFields("parts"), text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }),
     text("compatible_make_text", "Марка мотоцикла", "Мотоцикл маркасы", { filterable: true, searchable: true, filterMode: "search" }),
     text("compatible_model_text", "Модель мотоцикла", "Мотоцикл моделі", { filterable: true, searchable: true, filterMode: "search" }),
     select("position", "Сторона / позиция", "Жағы / орны", [op("front", "Передняя", "Алдыңғы"), op("rear", "Задняя", "Артқы"), op("left", "Левая", "Сол"), op("right", "Правая", "Оң"), op("universal", "Универсальная", "Әмбебап")]), CONDITION,
   ],
   commercialPart: [
     select("part_type", "Тип детали", "Бөлшек түрі", [op("original", "Оригинальная", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"), op("used-original", "Оригинальная Б/у", "Қолданылған түпнұсқа")], { required: true }),
-    BRAND_TEXT, text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }),
+    ...manufacturerFields("parts"), text("part_number", "OEM / артикул", "OEM / артикул", { searchable: true }),
     select("compatible_vehicle_type", "Тип техники", "Техника түрі", [op("truck", "Грузовик", "Жүк көлігі"), op("bus", "Автобус", "Автобус"), op("construction", "Спецтехника", "Арнайы техника"), op("agricultural", "Сельхозтехника", "Ауыл шаруашылық техникасы"), op("trailer", "Прицеп", "Тіркеме")]),
     text("compatible_make_text", "Совместимая марка", "Үйлесімді марка", { filterable: true, searchable: true, filterMode: "search" }),
     text("compatible_model_text", "Совместимая модель", "Үйлесімді модель", { filterable: true, searchable: true, filterMode: "search" }), CONDITION,
@@ -457,9 +474,9 @@ const profiles = {
     text("available_parts", "Доступные узлы и детали", "Қолжетімді тораптар мен бөлшектер", { searchable: true, required: true, validation: { maxLength: 800 } }),
     bool("documents", "Документы на автомобиль", "Автомобиль құжаттары"),
   ],
-  tires: [select("product_type", "Тип", "Түрі", [op("tire", "Шины", "Шина"), op("wheel", "Диски", "Диск"), op("set", "Колёса в сборе", "Жинақталған дөңгелек")], { required: true }), select("season", "Сезон", "Маусым", [op("summer", "Летние", "Жазғы"), op("winter", "Зимние", "Қысқы"), op("all-season", "Всесезонные", "Барлық маусымдық")]), number("tire_width", "Ширина", "Ені", "мм", "мм"), number("tire_profile", "Профиль", "Профиль", "%", "%"), number("diameter", "Диаметр", "Диаметрі", "R", "R"), text("load_index", "Индекс нагрузки", "Жүктеме индексі"), number("quantity", "Количество", "Саны", "шт.", "дана"), BRAND_TEXT, CONDITION],
-  wheels: [select("wheel_type", "Тип диска", "Диск түрі", [op("alloy", "Литой", "Құйма"), op("steel", "Штампованный", "Штампталған"), op("forged", "Кованый", "Соғылған")], { required: true }), number("diameter", "Диаметр", "Диаметрі", "R", "R"), number("width", "Ширина", "Ені", "J", "J"), text("bolt_pattern", "Разболтовка", "Болт үлгісі", { filterable: true, filterMode: "search" }), number("offset", "Вылет", "Шығуы", "ET", "ET"), BRAND_TEXT, CONDITION],
-  fluids: [select("product_type", "Тип продукта", "Өнім түрі", [op("engine-oil", "Моторное масло", "Мотор майы"), op("transmission-oil", "Трансмиссионное масло", "Трансмиссия майы"), op("antifreeze", "Антифриз", "Антифриз"), op("brake-fluid", "Тормозная жидкость", "Тежегіш сұйықтығы"), op("other", "Другое", "Басқа")], { required: true }), BRAND_TEXT, text("viscosity", "Вязкость", "Тұтқырлығы", { filterable: true, filterMode: "search" }), number("volume", "Объём", "Көлемі", "л", "л"), text("approval", "Допуски / назначение", "Рұқсаттары / мақсаты", { searchable: true })],
+  tires: [select("product_type", "Тип", "Түрі", [op("tire", "Шины", "Шина"), op("wheel", "Диски", "Диск"), op("set", "Колёса в сборе", "Жинақталған дөңгелек")], { required: true }), select("season", "Сезон", "Маусым", [op("summer", "Летние", "Жазғы"), op("winter", "Зимние", "Қысқы"), op("all-season", "Всесезонные", "Барлық маусымдық")]), number("tire_width", "Ширина", "Ені", "мм", "мм"), number("tire_profile", "Профиль", "Профиль", "%", "%"), number("diameter", "Диаметр", "Диаметрі", "R", "R"), text("load_index", "Индекс нагрузки", "Жүктеме индексі"), number("quantity", "Количество", "Саны", "шт.", "дана"), ...manufacturerFields("tires"), CONDITION],
+  wheels: [select("wheel_type", "Тип диска", "Диск түрі", [op("alloy", "Литой", "Құйма"), op("steel", "Штампованный", "Штампталған"), op("forged", "Кованый", "Соғылған")], { required: true }), number("diameter", "Диаметр", "Диаметрі", "R", "R"), number("width", "Ширина", "Ені", "J", "J"), text("bolt_pattern", "Разболтовка", "Болт үлгісі", { filterable: true, filterMode: "search" }), number("offset", "Вылет", "Шығуы", "ET", "ET"), ...manufacturerFields("wheels"), CONDITION],
+  fluids: [select("product_type", "Тип продукта", "Өнім түрі", [op("engine-oil", "Моторное масло", "Мотор майы"), op("transmission-oil", "Трансмиссионное масло", "Трансмиссия майы"), op("antifreeze", "Антифриз", "Антифриз"), op("brake-fluid", "Тормозная жидкость", "Тежегіш сұйықтығы"), op("other", "Другое", "Басқа")], { required: true }), ...manufacturerFields("fluids"), text("viscosity", "Вязкость", "Тұтқырлығы", { filterable: true, filterMode: "search" }), number("volume", "Объём", "Көлемі", "л", "л"), text("approval", "Допуски / назначение", "Рұқсаттары / мақсаты", { searchable: true })],
 
   flatSale: [select("rooms", "Количество комнат", "Бөлме саны", [op("studio", "Студия", "Студия"), op("1", "1", "1"), op("2", "2", "2"), op("3", "3", "3"), op("4", "4", "4"), op("5+", "5 и больше", "5 және одан көп")], { required: true }), number("total_area", "Общая площадь", "Жалпы ауданы", "м²", "м²", { required: true }), number("living_area", "Жилая площадь", "Тұрғын ауданы", "м²", "м²"), number("kitchen_area", "Площадь кухни", "Асүй ауданы", "м²", "м²"), number("floor", "Этаж", "Қабат", undefined, undefined, { required: true }), number("floors_total", "Этажность дома", "Үй қабаттылығы"), YEAR, select("building_type", "Тип дома", "Үй түрі", [op("brick", "Кирпичный", "Кірпіш"), op("panel", "Панельный", "Панельді"), op("monolith", "Монолитный", "Монолитті"), op("other", "Другой", "Басқа")]), select("renovation", "Ремонт", "Жөндеу", [op("none", "Без ремонта", "Жөндеусіз"), op("cosmetic", "Косметический", "Косметикалық"), op("good", "Хороший", "Жақсы"), op("designer", "Дизайнерский", "Дизайнерлік")]), select("bathroom", "Санузел", "Санитарлық торап", [op("combined", "Совмещённый", "Біріктірілген"), op("separate", "Раздельный", "Бөлек"), op("multiple", "Два и больше", "Екі және одан көп")]), select("balcony", "Балкон / лоджия", "Балкон / лоджия", [op("none", "Нет", "Жоқ"), op("balcony", "Балкон", "Балкон"), op("loggia", "Лоджия", "Лоджия"), op("both", "Балкон и лоджия", "Балкон және лоджия")]), select("market", "Рынок жилья", "Тұрғын үй нарығы", [op("new", "Новостройка", "Жаңа құрылыс"), op("secondary", "Вторичное жильё", "Қайталама тұрғын үй")]), bool("mortgage", "Подходит под ипотеку", "Ипотекаға жарайды")],
   rentTerms: [select("rental_period", "Срок аренды", "Жалдау мерзімі", [op("monthly", "Помесячно", "Ай сайын"), op("long", "Долгосрочно", "Ұзақ мерзімге")]), number("deposit", "Залог", "Кепілақы", "₸", "₸"), select("utilities", "Коммунальные услуги", "Коммуналдық төлемдер", [op("included", "Включены", "Кірістірілген"), op("separate", "Оплачиваются отдельно", "Бөлек төленеді"), op("partial", "Частично включены", "Ішінара кірістірілген")]), bool("furnished", "С мебелью", "Жиһазбен"), bool("appliances", "С бытовой техникой", "Тұрмыстық техникамен"), bool("children_allowed", "Можно с детьми", "Балалармен болады"), bool("pets_allowed", "Можно с животными", "Жануарлармен болады")],
@@ -493,8 +510,8 @@ const profiles = {
   electricalService: [select("object_type", "Объект", "Нысан", [op("flat", "Квартира", "Пәтер"), op("house", "Дом", "Үй"), op("commercial", "Коммерческий", "Коммерциялық"), op("industrial", "Промышленный", "Өнеркәсіптік")]), select("network_voltage", "Сеть", "Желі", [op("220", "220 В", "220 В"), op("380", "380 В", "380 В"), op("low-voltage", "Слаботочная", "Әлсіз ток")]), bool("licensed", "Есть допуск / лицензия", "Рұқсаты / лицензиясы бар")],
   hvacService: [select("equipment_scope", "Тип оборудования", "Жабдық түрі", [op("domestic", "Бытовое", "Тұрмыстық"), op("commercial", "Коммерческое", "Коммерциялық"), op("industrial", "Промышленное", "Өнеркәсіптік")]), number("equipment_count", "Количество единиц", "Жабдық саны"), bool("refrigerant_available", "Хладагент в наличии", "Салқындатқыш зат бар")],
   householdService: [select("provider_type", "Исполнитель", "Орындаушы", [op("private", "Частный мастер", "Жеке шебер"), op("company", "Компания", "Компания")]), bool("same_day", "Возможно в день заказа", "Тапсырыс күні мүмкін")],
-  applianceRepairService: [BRAND_TEXT, MODEL_TEXT, bool("at_customer", "Ремонт у клиента", "Клиентте жөндеу"), bool("parts_available", "Запчасти в наличии", "Қосалқы бөлшектер бар")],
-  deviceRepairService: [BRAND_TEXT, MODEL_TEXT, bool("data_recovery", "Сохранение / восстановление данных", "Деректерді сақтау / қалпына келтіру"), bool("parts_available", "Запчасти в наличии", "Қосалқы бөлшектер бар")],
+  applianceRepairService: [ bool("at_customer", "Ремонт у клиента", "Клиентте жөндеу"), bool("parts_available", "Запчасти в наличии", "Қосалқы бөлшектер бар")],
+  deviceRepairService: [ bool("data_recovery", "Сохранение / восстановление данных", "Деректерді сақтау / қалпына келтіру"), bool("parts_available", "Запчасти в наличии", "Қосалқы бөлшектер бар")],
   autoService: [select("vehicle_scope", "Транспорт", "Көлік", [op("passenger", "Легковой", "Жеңіл"), op("commercial", "Коммерческий", "Коммерциялық"), op("motorcycle", "Мототехника", "Мототехника"), op("special", "Спецтехника", "Арнайы техника")]), select("compatible_brand", "Марка авто", "Көлік маркасы", PASSENGER_BRANDS), bool("mobile_service", "Выездной сервис", "Жылжымалы сервис"), bool("parts_available", "Запчасти в наличии", "Қосалқы бөлшектер бар")],
   wellnessService: [select("audience", "Для кого", "Кімге", [op("women", "Женщины", "Әйелдер"), op("men", "Мужчины", "Ерлер"), op("children", "Дети", "Балалар"), op("all", "Все", "Барлығы")]), bool("certified", "Есть профильное образование / сертификат", "Бейінді білімі / сертификаты бар")],
   itService: [select("service_platform", "Платформа", "Платформа", [op("web", "Web", "Web"), op("mobile", "iOS / Android", "iOS / Android"), op("desktop", "Desktop", "Desktop"), op("cloud", "Cloud / DevOps", "Cloud / DevOps"), op("mixed", "Несколько", "Бірнеше")]), bool("remote_available", "Удалённая работа", "Қашықтан жұмыс"), bool("contract_available", "Работа по договору", "Келісімшартпен жұмыс")],
@@ -513,7 +530,8 @@ const profiles = {
   smartWatch: [
     select("wearable_type", "Тип устройства", "Құрылғы түрі", [op("smart-watch", "Смарт-часы", "Смарт-сағат"), op("fitness-band", "Фитнес-браслет", "Фитнес-білезік")], { required: true }),
     select("brand", "Бренд", "Бренд", WATCH_BRANDS, { required: true }),
-    text("watch_model", "Модель", "Модель", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 120 } }),
+    OTHER_BRAND,
+    ...familyModelFields(wearableFamilies, "watch_model").map(field => field.key === "watch_model" ? { ...field, required: true } : field),
     number("case_size", "Размер корпуса", "Корпус өлшемі", "мм", "мм", { validation: { min: 15, max: 80 } }),
     select("compatible_os", "Совместимая ОС", "Үйлесімді ОЖ", [op("android", "Android", "Android"), op("ios", "iOS", "iOS"), op("both", "Android и iOS", "Android және iOS"), op("standalone", "Работают автономно", "Дербес жұмыс істейді")]),
     bool("gps", "GPS", "GPS"), bool("nfc", "NFC", "NFC"), bool("cellular", "Поддержка SIM / eSIM", "SIM / eSIM қолдауы"),
@@ -528,7 +546,7 @@ const profiles = {
   tablet: [select("brand", "Бренд", "Бренд", tabletBrands, { required: true }), OTHER_BRAND, dependentSelect("model", "Модель", "Модель", "brand", tabletModels), OTHER_MODEL, select("storage", "Память", "Жад", [op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64", "64 ГБ", "64 ГБ"), op("128", "128 ГБ", "128 ГБ"), op("256", "256 ГБ", "256 ГБ"), op("512", "512 ГБ", "512 ГБ"), op("1024", "1 ТБ", "1 ТБ"), op("2048", "2 ТБ", "2 ТБ")]), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), select("connectivity", "Связь", "Байланыс", [op("wifi", "Wi-Fi", "Wi-Fi"), op("cellular", "Wi-Fi + Cellular", "Wi-Fi + Cellular")]), bool("stylus_included", "Стилус в комплекте", "Стилус жинақта"), CONDITION, WARRANTY],
   ereader: [select("brand", "Бренд", "Бренд", ereaderBrands, { required: true }), OTHER_BRAND, dependentSelect("model", "Модель", "Модель", "brand", ereaderModels), OTHER_MODEL, number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), bool("color_screen", "Цветной экран", "Түсті экран"), bool("backlight", "Подсветка", "Артқы жарық"), bool("waterproof", "Защита от воды", "Судан қорғау"), CONDITION],
   graphicsTablet: [
-    BRAND_TEXT, MODEL_TEXT,
+    ...manufacturerFields("graphicsTablet"), MODEL_TEXT,
     select("graphics_tablet_type", "Тип графического планшета", "Графикалық планшет түрі", [
       op("pen-tablet", "Перьевой без экрана", "Экрансыз қаламды"),
       op("pen-display", "Интерактивный дисплей", "Интерактивті дисплей"),
@@ -562,8 +580,10 @@ const profiles = {
       op("motherboard", "Системная плата", "Жүйелік тақша"), op("buttons", "Кнопки / шлейф", "Түймелер / шлейф"),
       op("other", "Другое", "Басқа"),
     ], { required: true }),
-    text("compatible_brand", "Совместимый бренд", "Үйлесімді бренд", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 80 } }),
-    text("compatible_model", "Совместимая модель", "Үйлесімді модель", { required: true, filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 120 } }),
+    select("compatible_brand", "Совместимый бренд", "Үйлесімді бренд", tabletBrands, { required: true }),
+    text("compatible_brand_other", "Укажите совместимый бренд", "Үйлесімді брендті көрсетіңіз", { validation: { maxLength: 80, placeholder: { ru: "Производитель совместимого планшета", kk: "Үйлесімді планшеттің өндірушісі" }, visibleWhen: { key: "compatible_brand", values: ["other"] }, requiredWhen: { key: "compatible_brand", values: ["other"] } } }),
+    { ...dependentSelect("compatible_model", "Совместимая модель", "Үйлесімді модель", "compatible_brand", tabletModels), required: true },
+    text("compatible_model_other", "Укажите совместимую модель", "Үйлесімді модельді көрсетіңіз", { validation: { maxLength: 120, placeholder: { ru: "Модель и ревизия совместимого планшета", kk: "Үйлесімді планшеттің моделі мен нұсқасы" }, visibleWhen: { key: "compatible_model", values: ["other-model"] }, requiredWhen: { key: "compatible_model", values: ["other-model"] } } }),
     select("part_origin", "Происхождение", "Шығу тегі", [
       op("original", "Оригинал", "Түпнұсқа"), op("analogue", "Аналог", "Баламасы"),
       op("used-original", "Оригинал Б/у", "Қолданылған түпнұсқа"),
@@ -576,12 +596,13 @@ const profiles = {
     number("battery_health", "Состояние аккумулятора", "Аккумулятор күйі", "%", "%", { validation: { min: 0, max: 100 } }),
     select("repair_history", "История ремонта", "Жөндеу тарихы", [op("none", "Не ремонтировался", "Жөнделмеген"), op("repaired", "Был в ремонте", "Жөндеуде болған"), op("unknown", "Неизвестно", "Белгісіз")]), WARRANTY,
   ],
-  laptop: [BRAND_TEXT, MODEL_TEXT, text("cpu", "Процессор", "Процессор", { filterable: true, searchable: true, filterMode: "search" }), select("ram", "Оперативная память", "Жедел жад", [op("4", "4 ГБ", "4 ГБ"), op("8", "8 ГБ", "8 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64+", "64 ГБ и больше", "64 ГБ және көп")]), select("storage_type", "Накопитель", "Жинақтауыш", [op("ssd", "SSD", "SSD"), op("hdd", "HDD", "HDD"), op("both", "SSD + HDD", "SSD + HDD")]), number("storage_capacity", "Объём накопителя", "Жинақтауыш көлемі", "ГБ", "ГБ"), text("gpu", "Видеокарта", "Бейне карта", { filterable: true, searchable: true, filterMode: "search" }), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), CONDITION],
-  computer: [BRAND_TEXT, MODEL_TEXT, text("cpu", "Процессор", "Процессор", { filterable: true, searchable: true, filterMode: "search" }), select("ram", "Оперативная память", "Жедел жад", [op("8", "8 ГБ", "8 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64+", "64 ГБ и больше", "64 ГБ және көп")]), text("gpu", "Видеокарта", "Бейне карта", { filterable: true, searchable: true, filterMode: "search" }), number("storage_capacity", "Объём накопителя", "Жинақтауыш көлемі", "ГБ", "ГБ"), CONDITION],
-  component: [select("component_type", "Тип комплектующего", "Құрамдас бөлік түрі", [op("cpu", "Процессор", "Процессор"), op("gpu", "Видеокарта", "Бейне карта"), op("ram", "Оперативная память", "Жедел жад"), op("motherboard", "Материнская плата", "Аналық тақша"), op("storage", "Накопитель", "Жинақтауыш"), op("psu", "Блок питания", "Қуат көзі"), op("case", "Корпус", "Корпус"), op("cooling", "Охлаждение", "Салқындату")], { required: true }), BRAND_TEXT, MODEL_TEXT, CONDITION],
-  display: [BRAND_TEXT, number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), select("resolution", "Разрешение", "Ажыратымдылық", [op("hd", "HD", "HD"), op("full-hd", "Full HD", "Full HD"), op("2k", "2K / QHD", "2K / QHD"), op("4k", "4K", "4K"), op("8k", "8K", "8K")]), select("panel", "Тип панели", "Панель түрі", [op("ips", "IPS", "IPS"), op("va", "VA", "VA"), op("oled", "OLED", "OLED"), op("qled", "QLED", "QLED"), op("mini-led", "Mini LED", "Mini LED")]), number("refresh_rate", "Частота", "Жиілігі", "Гц", "Гц"), CONDITION],
+  laptop: [...manufacturerFields("laptop"), ...familyModelFields(laptopFamilies), select("cpu", "Процессор", "Процессор", processorOptions("laptop"), { searchable: true, optionsLoadMode: "deferred", validation: { fallbackOption: "other-cpu" } }), text("cpu_other", "Укажите процессор", "Процессорды көрсетіңіз", { validation: { maxLength: 120, visibleWhen: { key: "cpu", values: ["other-cpu"] }, requiredWhen: { key: "cpu", values: ["other-cpu"] } } }), select("ram", "Оперативная память", "Жедел жад", [op("4", "4 ГБ", "4 ГБ"), op("8", "8 ГБ", "8 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64+", "64 ГБ и больше", "64 ГБ және көп")]), select("storage_type", "Накопитель", "Жинақтауыш", [op("ssd", "SSD", "SSD"), op("hdd", "HDD", "HDD"), op("both", "SSD + HDD", "SSD + HDD")]), number("storage_capacity", "Объём накопителя", "Жинақтауыш көлемі", "ГБ", "ГБ"), select("gpu", "Видеокарта", "Бейне карта", graphicsOptions("laptop"), { searchable: true, optionsLoadMode: "deferred", validation: { fallbackOption: "other-gpu" } }), text("gpu_other", "Укажите видеокарту", "Бейне картаны көрсетіңіз", { validation: { maxLength: 120, visibleWhen: { key: "gpu", values: ["other-gpu"] }, requiredWhen: { key: "gpu", values: ["other-gpu"] } } }), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), CONDITION],
+  computer: [...manufacturerFields("desktop"), ...familyModelFields(desktopFamilies), select("cpu", "Процессор", "Процессор", processorOptions("desktop"), { searchable: true, optionsLoadMode: "deferred", validation: { fallbackOption: "other-cpu" } }), text("cpu_other", "Укажите процессор", "Процессорды көрсетіңіз", { validation: { maxLength: 120, visibleWhen: { key: "cpu", values: ["other-cpu"] }, requiredWhen: { key: "cpu", values: ["other-cpu"] } } }), select("ram", "Оперативная память", "Жедел жад", [op("8", "8 ГБ", "8 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64+", "64 ГБ и больше", "64 ГБ және көп")]), select("gpu", "Видеокарта", "Бейне карта", graphicsOptions("desktop"), { searchable: true, optionsLoadMode: "deferred", validation: { fallbackOption: "other-gpu" } }), text("gpu_other", "Укажите видеокарту", "Бейне картаны көрсетіңіз", { validation: { maxLength: 120, visibleWhen: { key: "gpu", values: ["other-gpu"] }, requiredWhen: { key: "gpu", values: ["other-gpu"] } } }), number("storage_capacity", "Объём накопителя", "Жинақтауыш көлемі", "ГБ", "ГБ"), CONDITION],
+  component: computerComponentFields,
+  storageDevice: storageFields,
+  display: [...manufacturerFields("monitor"), number("screen_size", "Диагональ", "Диагональ", "дюйм", "дюйм"), select("resolution", "Разрешение", "Ажыратымдылық", [op("hd", "HD", "HD"), op("full-hd", "Full HD", "Full HD"), op("2k", "2K / QHD", "2K / QHD"), op("4k", "4K", "4K"), op("8k", "8K", "8K")]), select("panel", "Тип панели", "Панель түрі", [op("ips", "IPS", "IPS"), op("va", "VA", "VA"), op("oled", "OLED", "OLED"), op("qled", "QLED", "QLED"), op("mini-led", "Mini LED", "Mini LED")]), number("refresh_rate", "Частота", "Жиілігі", "Гц", "Гц"), CONDITION],
   projector: [
-    BRAND_TEXT, MODEL_TEXT,
+    ...manufacturerFields("projector"), MODEL_TEXT,
     number("screen_size", "Диагональ проекции", "Проекция диагоналі", "дюйм", "дюйм"),
     select("resolution", "Разрешение", "Ажыратымдылық", [op("hd", "HD", "HD"), op("full-hd", "Full HD", "Full HD"), op("2k", "2K / QHD", "2K / QHD"), op("4k", "4K", "4K"), op("8k", "8K", "8K")]),
     select("projector_technology", "Технология проекции", "Проекция технологиясы", [op("lcd", "LCD", "LCD"), op("dlp", "DLP", "DLP"), op("lcos", "LCoS", "LCoS"), op("led", "LED", "LED"), op("laser", "Лазерная", "Лазерлік")]),
@@ -594,10 +615,12 @@ const profiles = {
     bool("smart_projector", "Smart-проектор", "Smart-проектор"),
     CONDITION,
   ],
-  tv: [bool("smart_tv", "Smart TV", "Smart TV")],
-  camera: [BRAND_TEXT, MODEL_TEXT, select("camera_type", "Тип камеры", "Камера түрі", [op("dslr", "Зеркальная", "Айналы"), op("mirrorless", "Беззеркальная", "Айнасыз"), op("compact", "Компактная", "Шағын"), op("instant", "Моментальная", "Жедел")]), text("mount", "Байонет", "Байонет", { filterable: true, filterMode: "search" }), CONDITION],
+  tv: [...manufacturerFields("television"), ...familyModelFields(televisionFamilies),
+    select("tv_os", "ОС телевизора", "Теледидар ОЖ", [op("tizen", "Tizen"), op("webos", "webOS"), op("android-tv", "Android TV"), op("google-tv", "Google TV"), op("vidaa", "VIDAA"), op("roku", "Roku TV"), op("fire-tv", "Fire TV"), op("salute", "Салют ТВ", "Салют ТВ"), op("other", "Другая", "Басқа"), op("none", "Без Smart TV", "Smart TV жоқ")]),
+    select("hdr", "Поддержка HDR", "HDR қолдауы", [op("none", "Нет", "Жоқ"), op("hdr10", "HDR10"), op("hdr10plus", "HDR10+"), op("dolby-vision", "Dolby Vision"), op("hlg", "HLG"), op("multiple", "Несколько стандартов", "Бірнеше стандарт")], { dataType: "multiselect" }),bool("smart_tv", "Smart TV", "Smart TV")],
+  camera: [...manufacturerFields("camera"), MODEL_TEXT, select("camera_type", "Тип камеры", "Камера түрі", [op("dslr", "Зеркальная", "Айналы"), op("mirrorless", "Беззеркальная", "Айнасыз"), op("compact", "Компактная", "Шағын"), op("instant", "Моментальная", "Жедел")]), text("mount", "Байонет", "Байонет", { filterable: true, filterMode: "search" }), CONDITION],
   videoCamera: [
-    BRAND_TEXT, MODEL_TEXT,
+    ...manufacturerFields("camera"), MODEL_TEXT,
     select("video_camera_type", "Тип видеокамеры", "Бейнекамера түрі", [op("camcorder", "Видеокамера", "Бейнекамера"), op("cinema", "Кинокамера", "Кинокамера"), op("action", "Экшн-камера", "Экшн-камера"), op("360", "Камера 360°", "360° камера")], { required: true }),
     select("video_resolution", "Максимальное разрешение видео", "Ең жоғары бейне ажыратымдылығы", [op("full-hd", "Full HD", "Full HD"), op("2k", "2K", "2K"), op("4k", "4K", "4K"), op("6k", "6K", "6K"), op("8k", "8K", "8K")]),
     number("frame_rate", "Максимальная частота кадров", "Ең жоғары кадр жиілігі", "кадр/с", "кадр/с", { validation: { min: 1, max: 2_000 } }),
@@ -611,9 +634,9 @@ const profiles = {
     bool("waterproof", "Водозащита", "Судан қорғау"),
     select("mounting_type", "Крепление в комплекте", "Жинақтағы бекітпе", [op("none", "Нет", "Жоқ"), op("helmet", "На шлем", "Дулығаға"), op("chest", "На грудь", "Кеудеге"), op("handlebar", "На руль", "Рульге"), op("universal", "Универсальное", "Әмбебап")]),
   ],
-  lens: [BRAND_TEXT, MODEL_TEXT, text("mount", "Байонет", "Байонет", { filterable: true, filterMode: "search", required: true }), number("focal_length", "Фокусное расстояние", "Фокус қашықтығы", "мм", "мм"), CONDITION],
+  lens: [...manufacturerFields("lens"), MODEL_TEXT, text("mount", "Байонет", "Байонет", { filterable: true, filterMode: "search", required: true }), number("focal_length", "Фокусное расстояние", "Фокус қашықтығы", "мм", "мм"), CONDITION],
   appliance: [
-    BRAND_TEXT, MODEL_TEXT, YEAR, CONDITION, WARRANTY,
+    ...manufacturerFields("appliance"), MODEL_TEXT, YEAR, CONDITION, WARRANTY,
     number("power", "Мощность", "Қуаты", "Вт", "Вт", { validation: { min: 1, max: 100_000 } }),
     text("dimensions", "Размеры", "Өлшемдері", { searchable: true, validation: { maxLength: 120 } }), DELIVERY,
   ],
@@ -803,23 +826,86 @@ const profiles = {
     bool("night_vision", "Ночное видение", "Түнгі көру", { validation: visibleWhen("baby_device_type", ["video-monitor"]) }),
     bool("smart_sync", "Синхронизация со смартфоном", "Смартфонмен синхрондау"),
   ],
-  audio: [select("audio_type", "Тип", "Түрі", [op("headphones", "Наушники", "Құлаққап"), op("speaker", "Колонка", "Динамик"), op("system", "Акустическая система", "Акустикалық жүйе"), op("amplifier", "Усилитель / ресивер", "Күшейткіш / ресивер")]), BRAND_TEXT, MODEL_TEXT, select("connection", "Подключение", "Қосылу", [op("wired", "Проводное", "Сымды"), op("wireless", "Беспроводное", "Сымсыз"), op("both", "Оба варианта", "Екі нұсқа")]), CONDITION],
-  gaming: [select("platform", "Платформа", "Платформа", [op("playstation", "PlayStation", "PlayStation"), op("xbox", "Xbox", "Xbox"), op("nintendo", "Nintendo", "Nintendo"), op("pc", "PC", "PC"), op("other", "Другая", "Басқа")]), BRAND_TEXT, MODEL_TEXT, CONDITION],
+  audio: [select("audio_type", "Тип", "Түрі", [op("headphones", "Наушники", "Құлаққап"), op("speaker", "Колонка", "Динамик"), op("system", "Акустическая система", "Акустикалық жүйе"), op("amplifier", "Усилитель / ресивер", "Күшейткіш / ресивер")]), ...manufacturerFields("audio"), MODEL_TEXT, select("connection", "Подключение", "Қосылу", [op("wired", "Проводное", "Сымды"), op("wireless", "Беспроводное", "Сымсыз"), op("both", "Оба варианта", "Екі нұсқа")]), CONDITION],
+  gameConsole: [
+    ...manufacturerFields("gaming").map(field => field.key === "brand" ? { ...field, options: field.options?.filter(option => option.value in consoleFamilies || ["other", "unbranded"].includes(option.value)) } : field), ...familyModelFields(consoleFamilies), CONDITION, WARRANTY,
+    select("platform", "Платформа", "Платформа", [op("playstation", "PlayStation"), op("xbox", "Xbox"), op("nintendo", "Nintendo"), op("pc", "PC"), op("other", "Другая", "Басқа")]),
+  ],
+  videoGame: [
+    select("platform", "Платформа", "Платформа", [op("playstation", "PlayStation"), op("xbox", "Xbox"), op("nintendo", "Nintendo"), op("pc", "PC"), op("other", "Другая", "Басқа")]),
+    text("game_title", "Название игры", "Ойын атауы", { required: true, searchable: true }),
+    text("publisher", "Издатель", "Баспагер", { searchable: true }), text("edition", "Издание", "Басылым", { searchable: true }),
+    select("media_type", "Носитель", "Тасымалдағыш", [op("disc", "Диск", "Диск"), op("cartridge", "Картридж", "Картридж"), op("code", "Код активации", "Іске қосу коды")]), CONDITION,
+  ],
+  gaming: [select("platform", "Платформа", "Платформа", [op("playstation", "PlayStation", "PlayStation"), op("xbox", "Xbox", "Xbox"), op("nintendo", "Nintendo", "Nintendo"), op("pc", "PC", "PC"), op("other", "Другая", "Басқа")]), ...manufacturerFields("gaming"), MODEL_TEXT, CONDITION],
 
-  furniture: [select("furniture_type", "Тип мебели", "Жиһаз түрі", [op("sofa", "Диван", "Диван"), op("bed", "Кровать", "Кереует"), op("wardrobe", "Шкаф", "Шкаф"), op("table", "Стол", "Үстел"), op("chair", "Стул / кресло", "Орындық / кресло"), op("kitchen", "Кухонная мебель", "Асүй жиһазы"), op("other", "Другое", "Басқа")]), select("material", "Материал", "Материалы", [op("wood", "Дерево", "Ағаш"), op("mdf", "МДФ / ЛДСП", "МДФ / ЛДСП"), op("metal", "Металл", "Металл"), op("glass", "Стекло", "Шыны"), op("mixed", "Комбинированный", "Аралас")]), text("dimensions", "Размеры", "Өлшемдері"), CONDITION, DELIVERY],
-  lighting: [select("lighting_type", "Тип", "Түрі", [op("chandelier", "Люстра", "Аспашам"), op("lamp", "Светильник", "Шам"), op("floor", "Торшер", "Еден шамы"), op("outdoor", "Уличное", "Сыртқы")]), select("light_source", "Источник света", "Жарық көзі", [op("led", "LED", "LED"), op("bulb", "Лампа", "Шам"), op("integrated", "Встроенный LED", "Кіріктірілген LED")]), number("power", "Мощность", "Қуаты", "Вт", "Вт"), CONDITION],
+  furniture: [...manufacturerFields("furniture"), MODEL_TEXT, select("furniture_type", "Тип мебели", "Жиһаз түрі", [op("sofa", "Диван", "Диван"), op("bed", "Кровать", "Кереует"), op("wardrobe", "Шкаф", "Шкаф"), op("table", "Стол", "Үстел"), op("chair", "Стул / кресло", "Орындық / кресло"), op("kitchen", "Кухонная мебель", "Асүй жиһазы"), op("other", "Другое", "Басқа")]), select("material", "Материал", "Материалы", [op("wood", "Дерево", "Ағаш"), op("mdf", "МДФ / ЛДСП", "МДФ / ЛДСП"), op("metal", "Металл", "Металл"), op("glass", "Стекло", "Шыны"), op("mixed", "Комбинированный", "Аралас")]), number("width", "Ширина", "Ені", "см", "см", { validation: { min: 0.1, max: 10000 } }), number("height", "Высота", "Биіктігі", "см", "см", { validation: { min: 0.1, max: 10000 } }), number("depth", "Глубина", "Тереңдігі", "см", "см", { validation: { min: 0.1, max: 10000 } }), CONDITION, DELIVERY],
+  lighting: [...manufacturerFields("lighting"), select("lighting_type", "Тип", "Түрі", [op("chandelier", "Люстра", "Аспашам"), op("lamp", "Светильник", "Шам"), op("floor", "Торшер", "Еден шамы"), op("outdoor", "Уличное", "Сыртқы")]), select("light_source", "Источник света", "Жарық көзі", [op("led", "LED", "LED"), op("bulb", "Лампа", "Шам"), op("integrated", "Встроенный LED", "Кіріктірілген LED")]), number("power", "Мощность", "Қуаты", "Вт", "Вт"), CONDITION],
+  plant: [
+    text("plant_species", "Вид растения", "Өсімдік түрі", { required: true, searchable: true, filterable: true, filterMode: "search", validation: { maxLength: 120, placeholder: { ru: "Например: фикус, яблоня", kk: "Мысалы: фикус, алма ағашы" } } }),
+    text("plant_variety", "Сорт", "Сұрып", { searchable: true, validation: { maxLength: 120, placeholder: { ru: "Сорт с этикетки, если известен", kk: "Белгілі болса, жапсырмадағы сұрып" } } }),
+    number("plant_height", "Высота растения", "Өсімдік биіктігі", "см", "см", { validation: { min: 0.1, max: 3000 } }),
+    number("pot_volume", "Объём горшка", "Құмыра көлемі", "л", "л", { validation: { min: 0.01, max: 1000 } }),
+    select("plant_form", "Посадочный материал", "Отырғызу материалы", [op("potted", "В горшке", "Құмырада"), op("seedling", "Саженец", "Көшет"), op("rooted-cutting", "Укоренённый черенок", "Тамырланған қалемше"), op("cutting", "Черенок", "Қалемше"), op("bare-root", "Открытая корневая система", "Ашық тамыр жүйесі")]),
+    number("quantity", "Количество", "Саны", "шт.", "дана", { validation: { min: 1, max: 1000000 } }), DELIVERY,
+  ],
+  agriculturalAttachment: [
+    ...manufacturerFields("machinery"), MODEL_TEXT, CONDITION,
+    number("working_width", "Рабочая ширина", "Жұмыс ені", "м", "м", { validation: { min: 0.1, max: 100 } }),
+    number("required_power", "Требуемая мощность трактора", "Трактордың қажетті қуаты", "л.с.", "а.к.", { validation: { min: 1, max: 2000 } }),
+    select("attachment_mount", "Крепление", "Бекітпе", [op("mounted", "Навесное", "Аспалы"), op("trailed", "Прицепное", "Тіркемелі"), op("semi-mounted", "Полунавесное", "Жартылай аспалы"), op("stationary", "Стационарное", "Тұрақты")]),
+    text("compatible_tractor", "Совместимая техника", "Үйлесімді техника", { searchable: true, validation: { maxLength: 150, placeholder: { ru: "Модели тракторов / тип сцепки", kk: "Трактор модельдері / тіркеу түрі" } } }),
+  ],
+  aircraftPart: [
+    ...manufacturerFields("aircraft"), CONDITION,
+    text("part_number", "Part number / артикул", "Part number / артикул", { searchable: true, validation: { maxLength: 100 } }),
+    text("compatible_aircraft", "Совместимое воздушное судно", "Үйлесімді әуе кемесі", { searchable: true, validation: { maxLength: 150, placeholder: { ru: "Модель воздушного судна по документации", kk: "Құжаттама бойынша әуе кемесінің моделі" } } }),
+    bool("documents", "Документы на деталь", "Бөлшек құжаттары"),
+  ],
   gardenGoods: [select("product_type", "Тип товара", "Тауар түрі", [op("tool", "Инструмент", "Құрал"), op("equipment", "Техника", "Техника"), op("plant", "Растение / семена", "Өсімдік / тұқым"), op("irrigation", "Полив", "Суару"), op("decor", "Декор", "Әшекей")]), BRAND_TEXT, select("purpose", "Назначение", "Мақсаты", [op("home", "Для дома", "Үйге"), op("garden", "Для сада", "Бақшаға"), op("farm", "Для хозяйства", "Шаруашылыққа")]), CONDITION],
-  tool: [select("tool_type", "Тип инструмента", "Құрал түрі", [op("drill", "Дрель / шуруповёрт", "Бұрғы / бұрауыш"), op("saw", "Пила", "Ара"), op("grinder", "Шлифмашина", "Тегістегіш"), op("compressor", "Компрессор", "Компрессор"), op("hand", "Ручной инструмент", "Қол құралы"), op("other", "Другой", "Басқа")]), select("power_source", "Питание", "Қуат көзі", [op("mains", "Сеть", "Желі"), op("battery", "Аккумулятор", "Аккумулятор"), op("petrol", "Бензин", "Бензин"), op("manual", "Ручной", "Қолмен")]), number("power", "Мощность", "Қуаты", "Вт", "Вт"), BRAND_TEXT, CONDITION],
+  tool: [select("tool_type", "Тип инструмента", "Құрал түрі", [op("drill", "Дрель / шуруповёрт", "Бұрғы / бұрауыш"), op("saw", "Пила", "Ара"), op("grinder", "Шлифмашина", "Тегістегіш"), op("compressor", "Компрессор", "Компрессор"), op("hand", "Ручной инструмент", "Қол құралы"), op("other", "Другой", "Басқа")]), select("power_source", "Питание", "Қуат көзі", [op("mains", "Сеть", "Желі"), op("battery", "Аккумулятор", "Аккумулятор"), op("petrol", "Бензин", "Бензин"), op("manual", "Ручной", "Қолмен")]), number("power", "Мощность", "Қуаты", "Вт", "Вт"), ...manufacturerFields("tool"), CONDITION],
 
-  clothing: [BRAND_TEXT, text("size", "Размер", "Өлшем", { filterable: true, filterMode: "search", required: true }), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс"), op("all", "Всесезон", "Барлық маусым")]), text("material", "Материал", "Материалы", { filterable: true, filterMode: "search" }), CONDITION],
-  shoes: [BRAND_TEXT, number("size", "Размер", "Өлшем"), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс")]), CONDITION],
-  bags: [BRAND_TEXT, select("bag_type", "Тип", "Түрі", [op("bag", "Сумка", "Сөмке"), op("backpack", "Рюкзак", "Арқа сөмке"), op("briefcase", "Портфель", "Портфель"), op("suitcase", "Чемодан", "Чемодан")]), text("material", "Материал", "Материалы"), CONDITION],
-  jewelry: [BRAND_TEXT, select("item_type", "Тип", "Түрі", [op("watch", "Часы", "Сағат"), op("ring", "Кольцо", "Сақина"), op("earrings", "Серьги", "Сырға"), op("chain", "Цепочка", "Шынжыр"), op("bracelet", "Браслет", "Білезік")]), select("material", "Материал", "Материалы", [op("gold", "Золото", "Алтын"), op("silver", "Серебро", "Күміс"), op("steel", "Сталь", "Болат"), op("costume", "Бижутерия", "Бижутерия")]), CONDITION],
+  clothing: [...manufacturerFields("clothing"), text("size", "Размер", "Өлшем", { filterable: true, filterMode: "search", required: true }), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс"), op("all", "Всесезон", "Барлық маусым")]), text("material", "Материал", "Материалы", { filterable: true, filterMode: "search" }), CONDITION],
+  shoes: [...manufacturerFields("shoes"), number("size", "Размер", "Өлшем"), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс")]), CONDITION],
+  bags: [...manufacturerFields("bags"), select("bag_type", "Тип", "Түрі", [op("bag", "Сумка", "Сөмке"), op("backpack", "Рюкзак", "Арқа сөмке"), op("briefcase", "Портфель", "Портфель"), op("suitcase", "Чемодан", "Чемодан")]), text("material", "Материал", "Материалы"), CONDITION],
+  jewelry: [...manufacturerFields("jewelry"), select("item_type", "Тип", "Түрі", [op("watch", "Часы", "Сағат"), op("ring", "Кольцо", "Сақина"), op("earrings", "Серьги", "Сырға"), op("chain", "Цепочка", "Шынжыр"), op("bracelet", "Браслет", "Білезік")]), select("material", "Материал", "Материалы", [op("gold", "Золото", "Алтын"), op("silver", "Серебро", "Күміс"), op("steel", "Сталь", "Болат"), op("costume", "Бижутерия", "Бижутерия")]), CONDITION],
 
-  kidsClothing: [select("age_group", "Возраст", "Жас тобы", [op("0-1", "До 1 года", "1 жасқа дейін"), op("1-3", "1–3 года", "1–3 жас"), op("3-6", "3–6 лет", "3–6 жас"), op("7-12", "7–12 лет", "7–12 жас"), op("teen", "Подросткам", "Жасөспірімдерге")]), text("size", "Размер", "Өлшем", { filterable: true, filterMode: "search" }), select("gender", "Пол", "Жынысы", [op("girl", "Для девочки", "Қыз балаға"), op("boy", "Для мальчика", "Ұл балаға"), op("unisex", "Унисекс", "Унисекс")]), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс")]), CONDITION],
-  stroller: [BRAND_TEXT, MODEL_TEXT, select("stroller_type", "Тип коляски", "Арба түрі", [op("carrycot", "Люлька", "Бесік арба"), op("stroller", "Прогулочная", "Серуендік"), op("transformer", "Трансформер", "Трансформер"), op("2in1", "2 в 1", "2-де 1"), op("3in1", "3 в 1", "3-те 1"), op("twins", "Для двойни", "Егіздерге")]), select("age_group", "Возраст", "Жас", [op("0-6m", "0–6 месяцев", "0–6 ай"), op("6-36m", "6–36 месяцев", "6–36 ай")]), CONDITION],
-  carSeat: [BRAND_TEXT, select("weight_group", "Группа / вес", "Топ / салмақ", [op("0", "0 (до 10 кг)", "0 (10 кг дейін)"), op("0+", "0+ (до 13 кг)", "0+ (13 кг дейін)"), op("1", "1 (9–18 кг)", "1 (9–18 кг)"), op("2-3", "2/3 (15–36 кг)", "2/3 (15–36 кг)"), op("universal", "Универсальная", "Әмбебап")]), bool("isofix", "ISOFIX", "ISOFIX"), CONDITION],
-  toy: [select("toy_type", "Тип игрушки", "Ойыншық түрі", [op("educational", "Развивающая", "Дамытушы"), op("doll", "Кукла", "Қуыршақ"), op("construction", "Конструктор", "Құрастырғыш"), op("vehicle", "Машинка / транспорт", "Машина / көлік"), op("soft", "Мягкая", "Жұмсақ"), op("board", "Настольная", "Үстел ойыны")]), select("age_group", "Возраст", "Жас", [op("0-1", "До 1 года", "1 жасқа дейін"), op("1-3", "1–3 года", "1–3 жас"), op("3-6", "3–6 лет", "3–6 жас"), op("7+", "7 лет и старше", "7 жастан жоғары")]), CONDITION],
+  kidsShoes: [
+    ...manufacturerFields("shoes"),
+    select("size", "Размер EU", "EU өлшемі", Array.from({ length: 28 }, (_, index) => op(String(index + 16), String(index + 16))), { filterable: true }),
+    number("foot_length", "Длина стопы", "Табан ұзындығы", "см", "см", { validation: { min: 5, max: 35, step: 0.1 } }),
+    select("gender", "Пол", "Жынысы", [op("girl", "Для девочки", "Қыз балаға"), op("boy", "Для мальчика", "Ұл балаға"), op("unisex", "Унисекс", "Унисекс")]),
+    select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс"), op("all", "Всесезон", "Барлық маусым")]),
+    CONDITION,
+  ],
+  kidsRide: [
+    ...manufacturerFields("scooter"), MODEL_TEXT,
+    number("min_child_age", "Возраст ребёнка от", "Баланың ең төмен жасы", "лет", "жас", { validation: { min: 0, max: 18 } }),
+    number("max_load", "Максимальная нагрузка", "Ең жоғары жүктеме", "кг", "кг", { validation: { min: 1, max: 200 } }),
+    CONDITION,
+  ],
+  kidsScooter: [
+    select("wheel_count", "Количество колёс", "Дөңгелек саны", [op("2", "2"), op("3", "3"), op("4", "4")]),
+    number("wheel_diameter", "Диаметр колёс", "Дөңгелек диаметрі", "мм", "мм", { validation: { min: 30, max: 500 } }),
+    bool("folding", "Складной", "Жиналмалы"), bool("adjustable_handlebar", "Регулируемый руль", "Реттелетін руль"),
+  ],
+  kidsBalanceBike: [
+    number("wheel_size", "Размер колёс", "Дөңгелек өлшемі", "дюйм", "дюйм", { validation: { min: 6, max: 20 } }),
+    number("seat_height", "Высота сиденья", "Орындық биіктігі", "см", "см", { validation: { min: 10, max: 100 } }),
+  ],
+  kidsElectricCar: [
+    select("battery_voltage", "Напряжение аккумулятора", "Аккумулятор кернеуі", [op("6", "6 В"), op("12", "12 В"), op("24", "24 В"), op("36", "36 В"), op("48", "48 В")]),
+    select("seats", "Количество мест", "Орын саны", [op("1", "1"), op("2", "2")]),
+    bool("remote_control", "Пульт управления", "Басқару пульті"),
+  ],
+  kidsSled: [
+    select("sled_type", "Тип", "Түрі", [op("sled", "Санки", "Шана"), op("snow-scooter", "Снегокат", "Қар самокаты"), op("tubing", "Тюбинг", "Тюбинг"), op("snow-slider", "Ледянка", "Мұз сырғанағы")]),
+    select("material", "Материал", "Материал", [op("metal", "Металл", "Металл"), op("wood", "Дерево", "Ағаш"), op("plastic", "Пластик", "Пластик"), op("pvc", "ПВХ", "ПВХ")]),
+  ],
+  kidsClothing: [...manufacturerFields("clothing"), select("age_group", "Возраст", "Жас тобы", [op("0-1", "До 1 года", "1 жасқа дейін"), op("1-3", "1–3 года", "1–3 жас"), op("3-6", "3–6 лет", "3–6 жас"), op("7-12", "7–12 лет", "7–12 жас"), op("teen", "Подросткам", "Жасөспірімдерге")]), text("size", "Размер", "Өлшем", { filterable: true, filterMode: "search" }), select("gender", "Пол", "Жынысы", [op("girl", "Для девочки", "Қыз балаға"), op("boy", "Для мальчика", "Ұл балаға"), op("unisex", "Унисекс", "Унисекс")]), select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("demi", "Демисезон", "Маусымаралық"), op("winter", "Зима", "Қыс")]), CONDITION],
+  stroller: [...manufacturerFields("kids"), MODEL_TEXT, select("stroller_type", "Тип коляски", "Арба түрі", [op("carrycot", "Люлька", "Бесік арба"), op("stroller", "Прогулочная", "Серуендік"), op("transformer", "Трансформер", "Трансформер"), op("2in1", "2 в 1", "2-де 1"), op("3in1", "3 в 1", "3-те 1"), op("twins", "Для двойни", "Егіздерге")]), select("age_group", "Возраст", "Жас", [op("0-6m", "0–6 месяцев", "0–6 ай"), op("6-36m", "6–36 месяцев", "6–36 ай")]), CONDITION],
+  carSeat: [...manufacturerFields("kids"), select("weight_group", "Группа / вес", "Топ / салмақ", [op("0", "0 (до 10 кг)", "0 (10 кг дейін)"), op("0+", "0+ (до 13 кг)", "0+ (13 кг дейін)"), op("1", "1 (9–18 кг)", "1 (9–18 кг)"), op("2-3", "2/3 (15–36 кг)", "2/3 (15–36 кг)"), op("universal", "Универсальная", "Әмбебап")]), bool("isofix", "ISOFIX", "ISOFIX"), CONDITION],
+  toy: [...manufacturerFields("toy"), select("toy_type", "Тип игрушки", "Ойыншық түрі", [op("educational", "Развивающая", "Дамытушы"), op("doll", "Кукла", "Қуыршақ"), op("construction", "Конструктор", "Құрастырғыш"), op("vehicle", "Машинка / транспорт", "Машина / көлік"), op("soft", "Мягкая", "Жұмсақ"), op("board", "Настольная", "Үстел ойыны")]), select("age_group", "Возраст", "Жас", [op("0-1", "До 1 года", "1 жасқа дейін"), op("1-3", "1–3 года", "1–3 жас"), op("3-6", "3–6 лет", "3–6 жас"), op("7+", "7 лет и старше", "7 жастан жоғары")]), CONDITION],
 
   bookMedia: [
     text("author", "Автор", "Автор", { filterable: true, searchable: true, filterMode: "search", validation: { maxLength: 160 } }),
@@ -837,7 +923,7 @@ const profiles = {
     select("authenticity", "Подлинность", "Түпнұсқалық", [op("certified", "Подтверждена", "Расталған"), op("seller", "По заявлению продавца", "Сатушы мәлімдемесі бойынша"), op("replica", "Копия / реплика", "Көшірме / реплика"), op("unknown", "Неизвестно", "Белгісіз")]),
     text("material", "Материал", "Материалы", { filterable: true, searchable: true, filterMode: "search" }), CONDITION,
   ],
-  outdoorGear: [
+  outdoorGear: [...manufacturerFields("outdoor"),
     text("gear_type", "Тип снаряжения", "Жабдық түрі", { filterable: true, searchable: true, filterMode: "search" }),
     select("season", "Сезон", "Маусым", [op("summer", "Лето", "Жаз"), op("winter", "Зима", "Қыс"), op("three-season", "Три сезона", "Үш маусым"), op("all", "Всесезон", "Барлық маусым")]),
     number("capacity", "Вместимость", "Сыйымдылығы"), text("dimensions", "Размеры", "Өлшемдері", { searchable: true }),
@@ -846,13 +932,13 @@ const profiles = {
   fishingGear: [
     select("fishing_type", "Вид рыбалки", "Балық аулау түрі", [op("spinning", "Спиннинг", "Спиннинг"), op("feeder", "Фидер", "Фидер"), op("float", "Поплавочная", "Қалқымалы"), op("winter", "Зимняя", "Қысқы"), op("sea", "Морская", "Теңіздік"), op("other", "Другая", "Басқа")]),
     text("gear_type", "Тип снасти", "Жабдық түрі", { filterable: true, searchable: true, filterMode: "search" }),
-    BRAND_TEXT, number("length", "Длина", "Ұзындығы", "м", "м", { validation: { min: 0.01, max: 100, step: 0.01 } }),
+    ...manufacturerFields("fishing"), number("length", "Длина", "Ұзындығы", "м", "м", { validation: { min: 0.01, max: 100, step: 0.01 } }),
     text("material", "Материал", "Материалы", { filterable: true, searchable: true, filterMode: "search" }), CONDITION,
   ],
   huntingGear: [
     text("gear_type", "Тип снаряжения", "Жабдық түрі", { filterable: true, searchable: true, filterMode: "search" }),
     select("purpose", "Назначение", "Мақсаты", [op("clothing", "Одежда / обувь", "Киім / аяқ киім"), op("optics", "Оптика", "Оптика"), op("decoy", "Манки / приманки", "Алдағыш / жем"), op("tool", "Инструмент", "Құрал"), op("storage", "Хранение", "Сақтау")]),
-    BRAND_TEXT, text("size", "Размер / калибр", "Өлшем / калибр", { filterable: true, searchable: true, filterMode: "search" }),
+    ...manufacturerFields("outdoor"), text("size", "Размер / калибр", "Өлшем / калибр", { filterable: true, searchable: true, filterMode: "search" }),
     text("material", "Материал", "Материалы", { filterable: true, searchable: true, filterMode: "search" }), CONDITION,
   ],
   handmadeMaterial: [
@@ -862,9 +948,9 @@ const profiles = {
     number("quantity", "Количество", "Саны", undefined, undefined, { validation: { min: 0.01, max: 1_000_000 } }),
     select("sale_unit", "Единица продажи", "Сату бірлігі", [op("piece", "Штука", "Дана"), op("set", "Набор", "Жинақ"), op("meter", "Метр", "Метр"), op("gram", "Грамм", "Грамм"), op("kilogram", "Килограмм", "Килограмм"), op("package", "Упаковка", "Қаптама")]), CONDITION,
   ],
-  bicycle: [BRAND_TEXT, select("bicycle_type", "Тип велосипеда", "Велосипед түрі", [op("mountain", "Горный", "Тау"), op("road", "Шоссейный", "Шоссе"), op("city", "Городской", "Қалалық"), op("bmx", "BMX", "BMX"), op("kids", "Детский", "Балаларға"), op("electric", "Электровелосипед", "Электр велосипед")]), number("wheel_size", "Размер колёс", "Дөңгелек өлшемі", "дюйм", "дюйм"), text("frame_size", "Размер рамы", "Жақтау өлшемі", { filterable: true, filterMode: "search" }), select("frame_material", "Материал рамы", "Жақтау материалы", [op("steel", "Сталь", "Болат"), op("aluminum", "Алюминий", "Алюминий"), op("carbon", "Карбон", "Карбон")]), CONDITION],
-  instrument: [select("instrument_type", "Тип инструмента", "Аспап түрі", [op("guitar", "Гитара", "Гитара"), op("keyboard", "Клавишный", "Пернелі"), op("drums", "Ударный", "Ұрмалы"), op("wind", "Духовой", "Үрмелі"), op("strings", "Струнный", "Ішекті"), op("studio", "Студийное оборудование", "Студиялық жабдық")]), BRAND_TEXT, MODEL_TEXT, CONDITION],
-  sportsGoods: [text("sport", "Вид спорта", "Спорт түрі", { filterable: true, searchable: true, filterMode: "search" }), text("product_type", "Тип товара", "Тауар түрі", { filterable: true, searchable: true, filterMode: "search" }), BRAND_TEXT, CONDITION],
+  bicycle: [...manufacturerFields("bicycle"), select("bicycle_type", "Тип велосипеда", "Велосипед түрі", [op("mountain", "Горный", "Тау"), op("road", "Шоссейный", "Шоссе"), op("city", "Городской", "Қалалық"), op("bmx", "BMX", "BMX"), op("kids", "Детский", "Балаларға"), op("electric", "Электровелосипед", "Электр велосипед")]), number("wheel_size", "Размер колёс", "Дөңгелек өлшемі", "дюйм", "дюйм"), text("frame_size", "Размер рамы", "Жақтау өлшемі", { filterable: true, filterMode: "search" }), select("frame_material", "Материал рамы", "Жақтау материалы", [op("steel", "Сталь", "Болат"), op("aluminum", "Алюминий", "Алюминий"), op("carbon", "Карбон", "Карбон")]), CONDITION],
+  instrument: [select("instrument_type", "Тип инструмента", "Аспап түрі", [op("guitar", "Гитара", "Гитара"), op("keyboard", "Клавишный", "Пернелі"), op("drums", "Ударный", "Ұрмалы"), op("wind", "Духовой", "Үрмелі"), op("strings", "Струнный", "Ішекті"), op("studio", "Студийное оборудование", "Студиялық жабдық")]), ...manufacturerFields("instrument"), MODEL_TEXT, CONDITION],
+  sportsGoods: [text("sport", "Вид спорта", "Спорт түрі", { filterable: true, searchable: true, filterMode: "search" }), text("product_type", "Тип товара", "Тауар түрі", { filterable: true, searchable: true, filterMode: "search" }), ...manufacturerFields("sports"), CONDITION],
   ticket: [text("event", "Событие", "Іс-шара", { searchable: true, required: true }), date("event_date", "Дата", "Күні", { required: true }), number("quantity", "Количество", "Саны", "шт.", "дана"), text("seat", "Сектор / место", "Сектор / орын")],
 
   liveAnimalDetails: [
@@ -873,7 +959,7 @@ const profiles = {
     select("health_status", "Состояние здоровья", "Денсаулық күйі", [op("healthy", "Здоров(а)", "Дені сау"), op("special-needs", "Особые потребности", "Ерекше күтім қажет"), op("treatment", "На лечении", "Емделуде"), op("unknown", "Неизвестно", "Белгісіз")], { required: true }),
     bool("microchipped", "Есть микрочип", "Микрочип бар"), bool("delivery", "Возможна доставка", "Жеткізу мүмкін"),
   ],
-  animalSupply: [
+  animalSupply: [...manufacturerFields("petSupply"),
     select("animal_type", "Для какого животного", "Қай жануарға", [op("cat", "Кошки", "Мысықтар"), op("dog", "Собаки", "Иттер"), op("bird", "Птицы", "Құстар"), op("fish", "Рыбы", "Балықтар"), op("rodent", "Грызуны", "Кеміргіштер"), op("reptile", "Рептилии", "Бауырымен жорғалаушылар"), op("farm", "Сельхозживотные", "Ауыл шаруашылық жануарлары"), op("universal", "Универсальный", "Әмбебап")]),
     text("supply_type", "Тип товара / оборудования", "Тауар / жабдық түрі", { filterable: true, searchable: true, filterMode: "search", required: true }),
     number("capacity", "Объём / вместимость", "Көлемі / сыйымдылығы", "л", "л", { validation: { min: 0.1, max: 1_000_000 } }),
@@ -891,7 +977,7 @@ const profiles = {
   farmAnimal: [select("animal_species", "Вид", "Түрі", [op("cattle", "Крупный рогатый скот", "Ірі қара"), op("horse", "Лошади", "Жылқы"), op("sheep-goat", "Овцы / козы", "Қой / ешкі"), op("pig", "Свиньи", "Шошқа"), op("poultry", "Птица", "Құс"), op("other", "Другой", "Басқа")], { required: true }), text("breed", "Порода", "Тұқымы", { filterable: true, searchable: true, filterMode: "search" }), number("age_months", "Возраст", "Жасы", "мес.", "ай"), select("gender", "Пол", "Жынысы", [op("male", "Самец", "Еркек"), op("female", "Самка", "Ұрғашы")]), select("purpose", "Назначение", "Мақсаты", [op("breeding", "Разведение", "Асылдандыру"), op("dairy", "Молочное", "Сүт"), op("meat", "Мясное", "Ет"), op("work", "Рабочее", "Жұмыс")]), bool("documents", "Документы", "Құжаттары бар")],
   lostPet: [select("notice_type", "Объявление", "Хабарландыру", [op("lost", "Потерялось", "Жоғалды"), op("found", "Найдено", "Табылды")], { required: true }), text("animal_species", "Вид животного", "Жануар түрі", { filterable: true, searchable: true, filterMode: "search", required: true }), text("breed", "Порода", "Тұқымы", { searchable: true }), select("gender", "Пол", "Жынысы", [op("male", "Самец", "Еркек"), op("female", "Самка", "Ұрғашы"), op("unknown", "Неизвестно", "Белгісіз")]), date("event_date", "Дата", "Күні"), text("district", "Район", "Аудан", { searchable: true }), text("features", "Особые приметы", "Ерекше белгілері", { searchable: true })],
 
-  buildingMaterial: [text("material", "Материал / состав", "Материал / құрам", { filterable: true, searchable: true, filterMode: "search" }), text("size_spec", "Размер / маркировка", "Өлшем / таңбалау", { filterable: true, searchable: true, filterMode: "search" }), number("quantity", "Количество", "Саны"), select("sale_unit", "Единица продажи", "Сату бірлігі", [op("piece", "Штука", "Дана"), op("meter", "Метр", "Метр"), op("square-meter", "М²", "М²"), op("cubic-meter", "М³", "М³"), op("kilogram", "Кг", "Кг"), op("ton", "Тонна", "Тонна"), op("package", "Упаковка", "Қаптама")]), CONDITION, DELIVERY],
+  buildingMaterial: [...manufacturerFields("construction"), text("material", "Материал / состав", "Материал / құрам", { filterable: true, searchable: true, filterMode: "search" }), text("size_spec", "Размер / маркировка", "Өлшем / таңбалау", { filterable: true, searchable: true, filterMode: "search" }), number("quantity", "Количество", "Саны"), select("sale_unit", "Единица продажи", "Сату бірлігі", [op("piece", "Штука", "Дана"), op("meter", "Метр", "Метр"), op("square-meter", "М²", "М²"), op("cubic-meter", "М³", "М³"), op("kilogram", "Кг", "Кг"), op("ton", "Тонна", "Тонна"), op("package", "Упаковка", "Қаптама")]), CONDITION, DELIVERY],
   rentalBicycleScooter: [
     select("rental_vehicle_type", "Тип транспорта", "Көлік түрі", [op("bicycle", "Велосипед", "Велосипед"), op("scooter", "Самокат", "Самокат")], { required: true }),
     select("bicycle_type", "Тип велосипеда", "Велосипед түрі", [op("mountain", "Горный", "Тау"), op("road", "Шоссейный", "Шоссе"), op("city", "Городской", "Қалалық"), op("bmx", "BMX", "BMX"), op("kids", "Детский", "Балаларға"), op("electric", "Электровелосипед", "Электр велосипед")], { validation: visibleWhen("rental_vehicle_type", ["bicycle"]) }),
@@ -970,9 +1056,8 @@ const profiles = {
   ],
   rentalComputerProjector: [
     select("rental_equipment_type", "Тип оборудования", "Жабдық түрі", [op("computer", "Компьютер", "Компьютер"), op("projector", "Проектор", "Проектор")], { required: true }),
-    text("cpu", "Процессор", "Процессор", { filterable: true, searchable: true, filterMode: "search", validation: visibleWhen("rental_equipment_type", ["computer"]) }),
+    ...conditionalHardwareFields("rental_equipment_type", { computer: "desktop" }),
     select("ram", "Оперативная память", "Жедел жад", [op("8", "8 ГБ", "8 ГБ"), op("16", "16 ГБ", "16 ГБ"), op("32", "32 ГБ", "32 ГБ"), op("64+", "64 ГБ и больше", "64 ГБ және көп")], { validation: visibleWhen("rental_equipment_type", ["computer"]) }),
-    text("gpu", "Видеокарта", "Бейне карта", { filterable: true, searchable: true, filterMode: "search", validation: visibleWhen("rental_equipment_type", ["computer"]) }),
     number("storage_capacity", "Объём накопителя", "Жинақтауыш көлемі", "ГБ", "ГБ", { validation: visibleWhen("rental_equipment_type", ["computer"]) }),
     number("screen_size", "Диагональ проекции", "Проекция диагоналі", "дюйм", "дюйм", { validation: visibleWhen("rental_equipment_type", ["projector"]) }),
     select("resolution", "Разрешение", "Ажыратымдылық", [op("hd", "HD", "HD"), op("full-hd", "Full HD", "Full HD"), op("2k", "2K / QHD", "2K / QHD"), op("4k", "4K", "4K"), op("8k", "8K", "8K")], { validation: visibleWhen("rental_equipment_type", ["projector"]) }),
@@ -1019,7 +1104,7 @@ const profiles = {
     bool("utilities", "Коммуникации", "Коммуникациялар бар", { validation: visibleWhen("exchange_property_type", ["commercial"]) }),
   ],
   rentalGoods: [select("billing_period", "Тариф", "Тариф", [op("hour", "За час", "Сағатына"), op("day", "За сутки", "Тәулігіне"), op("week", "За неделю", "Аптасына"), op("month", "За месяц", "Айына"), op("agreement", "Договорной", "Келісімді")], { required: true }), number("minimum_term", "Минимальный срок", "Ең аз мерзім"), number("deposit", "Залог", "Кепіл", "₸", "₸"), bool("documents_required", "Нужны документы", "Құжаттар қажет"), bool("delivery", "Доставка", "Жеткізу"), bool("operator_included", "Оператор / водитель включён", "Оператор / жүргізуші кіреді"), CONDITION],
-  equipment: [BRAND_TEXT, MODEL_TEXT, YEAR, CONDITION, number("power", "Мощность", "Қуаты", "кВт", "кВт"), text("capacity", "Производительность / характеристики", "Өнімділігі / сипаттамалары", { searchable: true })],
+  equipment: [...manufacturerFields("industrial"), MODEL_TEXT, YEAR, CONDITION, number("power", "Мощность", "Қуаты", "кВт", "кВт"), text("capacity", "Производительность / характеристики", "Өнімділігі / сипаттамалары", { searchable: true })],
   businessCommercials: [
     select("operating_status", "Статус бизнеса", "Бизнес мәртебесі", [op("active", "Работает", "Жұмыс істейді"), op("suspended", "Приостановлен", "Тоқтатылған"), op("startup", "Запуск / стартап", "Іске қосу / стартап"), op("closed", "Не работает", "Жұмыс істемейді")], { required: true }),
     select("legal_form", "Организационная форма", "Ұйымдық нысаны", [op("ip", "ИП", "ЖК"), op("too", "ТОО", "ЖШС"), op("ao", "АО", "АҚ"), op("farm", "КХ / фермерское хозяйство", "ШҚ / фермерлік шаруашылық"), op("individual", "Физлицо", "Жеке тұлға"), op("other", "Другая", "Басқа")]),
@@ -1067,9 +1152,9 @@ const profileAssignments: Record<string, CategorySchemaProfile[]> = {
   "household-services": ["serviceBase"], "appliance-repair": ["serviceBase", "repairService"], "auto-services": ["serviceBase", "repairService"], "transport-services": ["serviceBase", "transportService"], "beauty-health-services": ["serviceBase", "beautyService"], "education-services": ["serviceBase", "educationService"], "it-services": ["serviceBase", "professionalService"], "photo-video-services": ["serviceBase", "professionalService"], "legal-services": ["serviceBase", "professionalService"], "accounting-services": ["serviceBase", "professionalService"], "event-services": ["serviceBase", "professionalService"], "cleaning-services": ["serviceBase", "cleaningService"], "pet-services": ["serviceBase", "professionalService"], "furniture-services": ["serviceBase", "repairService"], "agro-services": ["serviceBase", "professionalService"], "business-services": ["serviceBase", "professionalService"],
 
   electronics: ["goodsBrand"], "phones-accessories": ["goodsBrand"], smartphones: ["smartphone", "deviceSpecs"], "mobile-phones": ["smartphone", "deviceSpecs"], "phone-cases": ["goodsBrand"], "phone-chargers": ["goodsBrand"], "screen-protectors": ["goodsBrand"], "smart-watches": ["smartWatch"],
-  computers: ["computer"], laptops: ["laptop", "computerDeviceSpecs"], "desktop-computers": ["computer"], "all-in-one": ["computer", "display", "computerDeviceSpecs"], "computer-components": ["component"], monitors: ["display"], "computer-peripherals": ["goodsBrand"], "storage-devices": ["component"], "network-equipment": ["goodsBrand"],
+  computers: ["computer"], laptops: ["laptop", "computerDeviceSpecs"], "desktop-computers": ["computer"], "all-in-one": ["computer", "display", "computerDeviceSpecs"], "computer-components": ["component"], monitors: ["display"], "computer-peripherals": ["goodsBrand"], "storage-devices": ["storageDevice"], "network-equipment": ["goodsBrand"],
   "photo-video": ["camera"], cameras: ["camera"], lenses: ["lens"], "video-cameras": ["videoCamera"], "action-cameras": ["videoCamera", "actionCamera"], "photo-accessories": ["goodsBrand"],
-  "tv-video": ["display"], televisions: ["display", "tv"], projectors: ["projector"], "tv-boxes": ["goodsBrand"], "media-players": ["goodsBrand"], audio: ["audio"], headphones: ["audio"], "portable-speakers": ["audio"], "speaker-systems": ["audio"], amplifiers: ["audio"], gaming: ["gaming"], "game-consoles": ["gaming"], "video-games": ["gaming"], "gaming-accessories": ["gaming"], "tablets-ereaders": ["smartphone"], "home-appliances": ["appliance"], "kitchen-appliances": ["appliance"], "climate-equipment": ["appliance"], "personal-care-electronics": ["appliance"],
+  "tv-video": ["display"], televisions: ["display", "tv"], projectors: ["projector"], "tv-boxes": ["goodsBrand"], "media-players": ["goodsBrand"], audio: ["audio"], headphones: ["audio"], "portable-speakers": ["audio"], "speaker-systems": ["audio"], amplifiers: ["audio"], gaming: ["gaming"], "game-consoles": ["gameConsole"], "video-games": ["videoGame"], "gaming-accessories": ["gaming"], "tablets-ereaders": ["smartphone"], "home-appliances": ["appliance"], "kitchen-appliances": ["appliance"], "climate-equipment": ["appliance"], "personal-care-electronics": ["appliance"],
 
   "home-garden": ["goods"], furniture: ["furniture"], interior: ["goods"], lighting: ["lighting"], textiles: ["goods"], dishes: ["goods"], "household-goods": ["goods"], "household-chemicals": ["goods"], "indoor-plants": ["gardenGoods"], garden: ["gardenGoods"], "garden-tools": ["tool"], "office-supplies": ["goods"], "food-drinks": ["goods"],
   personal: ["clothing"], "women-clothing": ["clothing"], "men-clothing": ["clothing"], "underwear-swimwear": ["clothing"], workwear: ["clothing"], "women-shoes": ["shoes"], "men-shoes": ["shoes"], headwear: ["clothing"], bags: ["bags"], "fashion-accessories": ["bags"], "watches-jewelry": ["jewelry"], wedding: ["clothing"], "beauty-products": ["goodsBrand"],
@@ -1093,7 +1178,87 @@ export function resolveCategoryAttributeSchema(slug: string, rootSlug: string): 
   for (const profileName of profileNames) {
     for (const attribute of profiles[profileName]) effective.set(attribute.key, attribute);
   }
-  return { profileNames, attributes: [...effective.values()] };
+  if (profileNames.includes("laptop") || profileNames.includes("computer")) {
+    const ram = effective.get("ram");
+    if (ram) effective.set("ram", { ...ram, options: [...(ram.options ?? []), ...memoryCapacityOptions.filter(option => !ram.options?.some(existing => existing.value === option.value))] });
+    effective.set("storage_type", storageType);
+    for (const attribute of storageFields.filter(field => ["storage_capacity", "storage_capacity_other"].includes(field.key))) {
+      const previous = effective.get(attribute.key);
+      effective.set(attribute.key, { ...attribute, validation: { ...attribute.validation, ...(previous?.validation?.visibleWhen ? { visibleWhen: previous.validation.visibleWhen } : {}) } });
+    }
+    const brandFields = manufacturerFields(profileNames.includes("laptop") ? "laptop" : "desktop");
+    for (const attribute of brandFields) effective.set(attribute.key, attribute);
+  }
+  if (profileNames.includes("smartphone") && !effective.has("charging_port")) {
+    effective.set("charging_port", select("charging_port", "Разъём зарядки", "Зарядтау ұясы", [op("usb-c", "USB-C"), op("lightning", "Lightning"), op("micro-usb", "Micro-USB"), op("other", "Другой", "Басқа")]));
+  }
+  if (profileNames.includes("clothing") || profileNames.includes("kidsClothing")) {
+    for (const attribute of [...clothingSizeFields(profileNames.includes("kidsClothing")), ...clothingMaterialFields]) {
+      const previous = effective.get(attribute.key);
+      effective.set(attribute.key, { ...attribute, validation: { ...attribute.validation, ...(previous?.validation?.visibleWhen ? { visibleWhen: previous.validation.visibleWhen } : {}) } });
+    }
+  }
+  if (profileNames.includes("shoes") || profileNames.includes("kidsShoes")) {
+    for (const attribute of shoeSizeFields(profileNames.includes("kidsShoes"))) effective.set(attribute.key, attribute);
+  }
+  if (profileNames.some(profile => ["clothing", "kidsClothing", "shoes", "kidsShoes", "furniture", "stroller", "carSeat", "bicycle", "appliance", "tablet"].includes(profile)) && !effective.has("color")) effective.set("color", productColor);
+  if (profileNames.includes("freePhoneComputer")) {
+    for (const attribute of conditionalHardwareFields("free_device_type", { laptop: "laptop", desktop: "desktop" })) effective.set(attribute.key, attribute);
+  }
+  if (profileNames.includes("rentalComputerProjector")) {
+    for (const attribute of conditionalHardwareFields("rental_equipment_type", { computer: "desktop" })) effective.set(attribute.key, attribute);
+  }
+  const manufacturerGroup = categoryManufacturerGroups[slug];
+  if (manufacturerGroup) for (const attribute of manufacturerFields(manufacturerGroup)) effective.set(attribute.key, attribute);
+  const phoneReference = { brands: smartphoneBrands, models: smartphoneModels };
+  const tabletReference = { brands: tabletBrands, models: tabletModels };
+  const laptopReference = { brands: manufacturerOptions("laptop"), models: familyModelFields(laptopFamilies)[0].options ?? [] };
+  const desktopReference = { brands: manufacturerOptions("desktop"), models: familyModelFields(desktopFamilies)[0].options ?? [] };
+  if (profileNames.includes("exchangeMobileDevice")) {
+    for (const field of mixedIdentityFields("mobile_device_type", { phone: phoneReference, tablet: tabletReference })) effective.set(field.key, field);
+  }
+  if (profileNames.includes("freePhoneComputer")) {
+    for (const field of mixedIdentityFields("free_device_type", { phone: phoneReference, tablet: tabletReference, laptop: laptopReference, desktop: desktopReference, accessory: { brands: manufacturerOptions("mobileAccessory"), models: [] } })) effective.set(field.key, field);
+  }
+  if (profileNames.includes("dismantling")) {
+    const moto = { brands: [...new Map(Object.values(motorcycleReferences).flatMap(ref => ref.brands).map(o => [o.value, o])).values()], models: [...new Map(Object.values(motorcycleReferences).flatMap(ref => ref.models).map(o => [o.value, o])).values()] };
+    for (const field of mixedIdentityFields("vehicle_type", { car: { brands: PASSENGER_BRANDS, models: passengerVehicleModels }, moto, commercial: { brands: manufacturerOptions("commercial"), models: [] }, special: { brands: manufacturerOptions("machinery"), models: [] } })) effective.set(field.key, field);
+  }
+  const codeModel = effective.get("model");
+  const codeBrand = effective.get("brand");
+  if (codeModel && codeBrand) effective.set("model", contextualModelCode(codeModel, codeBrand, profileNames));
+  const model = effective.get("model");
+  if (effective.has("generation") && model?.dataType === "select") {
+    for (const attribute of vehicleGenerationFields(model.options ?? [])) effective.set(attribute.key, attribute);
+    for (const key of ["brand", "model", "year"]) {
+      const attribute = effective.get(key);
+      if (attribute) effective.set(key, { ...attribute, validation: { ...attribute.validation, requiredForNewListingsSince: NEW_CATALOG_REQUIREMENTS_SINCE } });
+    }
+  }
+  const compatibleModel = effective.get("compatible_model");
+  if (profileNames.includes("autoPart") && compatibleModel?.dataType === "select") {
+    for (const attribute of vehicleGenerationFields(compatibleModel.options ?? [], true)) effective.set(attribute.key, attribute);
+  }
+  // Persist parent values before dependent options in the existing publish RPC.
+  const ordered: SeedAttributeDefinition[] = [];
+  const visited = new Set<string>();
+  const active = new Set<string>();
+  const visit = (field: SeedAttributeDefinition) => {
+    if (visited.has(field.key)) return;
+    // Keep malformed definitions available to the catalog validator so it can
+    // report all errors; no missing parent is invented or replaced.
+    if (active.has(field.key)) return;
+    active.add(field.key);
+    const validation = field.validation as { visibleWhen?: { key: string }; requiredWhen?: { key: string } } | undefined;
+    for (const parent of [field.dependsOnKey, validation?.visibleWhen?.key, validation?.requiredWhen?.key]) {
+      if (!parent) continue;
+      const definition = effective.get(parent);
+      if (definition) visit(definition);
+    }
+    active.delete(field.key); visited.add(field.key); ordered.push(field);
+  };
+  for (const field of effective.values()) visit(field);
+  return { profileNames, attributes: ordered };
 }
 
 export const categorySchemaProfiles = profiles;

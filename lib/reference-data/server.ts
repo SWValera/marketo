@@ -1,3 +1,5 @@
+import { resolveAttributeOptionParent } from "@/lib/data/supabase/categories";
+import type { ReferenceOptionsPage } from "@/lib/reference-data/types";
 import { requestCache as cache } from "@/lib/http/read-scope";
 import {
   getCategoryAttributes,
@@ -71,7 +73,7 @@ const attributeCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<
   maxEntries: ATTRIBUTE_CACHE_MAX_ENTRIES,
   ttlMilliseconds: envelopeTtl,
 });
-const optionCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<ReferenceAttributeOption[]>>({
+const optionCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<ReferenceOptionsPage>>({
   shareInFlight: false,
   maxEntries: OPTION_CACHE_MAX_ENTRIES,
   ttlMilliseconds: envelopeTtl,
@@ -178,31 +180,46 @@ export const getCategoryAttributeReferences = cache(async (
   });
 });
 
+const OPTION_PAGE_SIZE = 60;
+const EMPTY_OPTIONS_PAGE: ReferenceOptionsPage = { options: [], selectedOptions: [], hasMore: false };
+
 export const getCategoryAttributeOptionReferences = cache(async (
   attributeId: string,
   parentOptionId?: string,
   query: string = "",
-): Promise<ReferenceDataEnvelope<ReferenceAttributeOption[]>> => {
+  page: { parentValue?: string; offset?: number; selected?: string[]; fallback?: string } = {},
+): Promise<ReferenceDataEnvelope<ReferenceOptionsPage>> => {
   const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase("ru");
-  const cacheKey = `${attributeId}:${parentOptionId ?? "root"}:${normalizedQuery}`;
+  const selected = [...new Set([...(page.selected ?? []), ...(page.fallback ? [page.fallback] : [])])].sort();
+  const offset = Math.max(0, Math.min(page.offset ?? 0, 10000));
+  const cacheKey = JSON.stringify([attributeId, parentOptionId, page.parentValue, normalizedQuery, offset, selected]);
   return optionCache.getOrLoad(cacheKey, async () => {
-    if (!tryGetServerSupabasePublicConfig()) return unavailable([]);
+    if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_OPTIONS_PAGE);
     try {
-      const rows = await listAttributeOptions(createSupabasePublicServerClient(), [attributeId], {
-        parentOptionId,
-        query: normalizedQuery,
-        limit: 300,
+      const client = createSupabasePublicServerClient();
+      // The value path also handles a deferred model -> generation after reload.
+      const parent = page.parentValue
+        ? await resolveAttributeOptionParent(client, attributeId, page.parentValue)
+        : parentOptionId;
+      if (page.parentValue && !parent) return ready(EMPTY_OPTIONS_PAGE);
+      const [rows, selectedRows] = await Promise.all([
+        listAttributeOptions(client, [attributeId], {
+          parentOptionId: parent ?? undefined, query: normalizedQuery, offset, limit: OPTION_PAGE_SIZE + 1,
+        }),
+        selected.length ? listAttributeOptions(client, [attributeId], {
+          parentOptionId: parent ?? undefined, values: selected, limit: selected.length,
+        }) : Promise.resolve([]),
+      ]);
+      const mapOption = (option: typeof rows[number]): ReferenceAttributeOption => ({
+        id: option.id, attributeId: option.attribute_id, parentOptionId: option.parent_option_id,
+        value: option.value, label: { ru: option.label_ru, kk: option.label_kk }, sortOrder: option.sort_order,
       });
-      return ready<ReferenceAttributeOption[]>(rows.map((option) => ({
-        id: option.id,
-        attributeId: option.attribute_id,
-        parentOptionId: option.parent_option_id,
-        value: option.value,
-        label: { ru: option.label_ru, kk: option.label_kk },
-        sortOrder: option.sort_order,
-      })));
+      return ready({
+        options: rows.slice(0, OPTION_PAGE_SIZE).map(mapOption),
+        selectedOptions: selectedRows.map(mapOption), hasMore: rows.length > OPTION_PAGE_SIZE,
+      });
     } catch {
-      return failed([]);
+      return failed(EMPTY_OPTIONS_PAGE);
     }
   });
 });

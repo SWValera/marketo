@@ -179,7 +179,7 @@ on conflict (slug) do update set
       ]);
       (attribute.options ?? []).forEach((option, optionIndex) => optionRows.push([
         node.slug, attribute.key, option.value, option.label.ru, option.label.kk,
-        option.parentValue ?? null, (optionIndex + 1) * 10,
+        option.parentValue ?? null, (optionIndex + 1) * 10, JSON.stringify(option.metadata ?? {}),
       ]));
     }
 
@@ -202,14 +202,14 @@ create temporary table marketo_seed_attributes (
 create temporary table marketo_seed_options (
   category_slug text not null, attribute_key text not null, value text not null,
   label_ru text not null, label_kk text not null, parent_value text,
-  sort_order integer not null, primary key (category_slug, attribute_key, value)
+  sort_order integer not null, metadata jsonb not null, primary key (category_slug, attribute_key, value)
 ) on commit drop;
 `);
 for (const chunk of chunks(attributeRows)) {
   add(`insert into marketo_seed_attributes values\n${chunk.map((row) => `(${row.map((value, index) => index === 7 || index === 8 || index === 9 || index === 10 || index === 15 ? b(value) : index === 11 ? `${q(value)}::jsonb` : q(value)).join(", ")})`).join(",\n")};`);
 }
 for (const chunk of chunks(optionRows)) {
-  add(`insert into marketo_seed_options values\n${chunk.map((row) => `(${row.map(q).join(", ")})`).join(",\n")};`);
+  add(`insert into marketo_seed_options values\n${chunk.map((row) => `(${row.map((value, index) => index === 7 ? `${q(value)}::jsonb` : q(value)).join(", ")})`).join(",\n")};`);
 }
 add(`
 insert into public.category_attributes (
@@ -237,17 +237,17 @@ on conflict (category_id, key) do update set
   sort_order = excluded.sort_order, is_active = true;
 
 insert into public.category_attribute_options (
-  attribute_id, value, label_ru, label_kk, parent_option_id, sort_order, is_active
+  attribute_id, value, label_ru, label_kk, parent_option_id, sort_order, is_active, metadata
 )
 select attribute.id, seed.value, seed.label_ru, seed.label_kk, null,
-  seed.sort_order, true
+  seed.sort_order, true, seed.metadata
 from marketo_seed_options as seed
 join public.categories as category on category.slug = seed.category_slug
 join public.category_attributes as attribute
   on attribute.category_id = category.id and attribute.key = seed.attribute_key
 on conflict (attribute_id, value) do update set
   label_ru = excluded.label_ru, label_kk = excluded.label_kk,
-  parent_option_id = null, sort_order = excluded.sort_order, is_active = true;
+  parent_option_id = null, sort_order = excluded.sort_order, is_active = true, metadata = excluded.metadata;
 
 update public.category_attribute_options as child_option
 set parent_option_id = parent_option.id

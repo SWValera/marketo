@@ -53,3 +53,21 @@ on all 29 public tables and rejects credential-like source values.
 6. Category-tree, attribute and option-dictionary updates are versioned catalog
    data releases under `artifacts/catalog/releases`, never rewrites or additions
    under `supabase/migrations`; see `docs/CATALOG_DATA_POLICY.md`.
+
+## Catalog normalization 2026-09-13
+
+The current ordered sequence is 0001–0032. The checksum manifest covers 32
+migrations and the reference seed (33 SQL files). Historical rows above describe
+their original releases; they are not the current file count.
+
+- 0028: profile lifecycle registration.
+- 0029: listing contact messaging settings.
+- 0030: protected phone reveal.
+- 0031: account deletion and associated active-account guards.
+- 0032_catalog_reference_metadata.sql: additive option metadata, explicit fallback
+  keys, creation-date-aware requirements in the existing submission contract.
+  Existing ownership, active-profile, category and RLS guards remain enforced.
+
+Catalog values are a separate generated release, with reviewed scalar transforms
+in supabase/catalog-releases/2026-09-13.1-type-transforms.json. Use the release
+procedure in docs/CATALOG_NORMALIZATION_2026-09-13.md; do not seed production.

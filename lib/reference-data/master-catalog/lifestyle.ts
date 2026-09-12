@@ -28,11 +28,11 @@ export const homeGardenCatalogOverlays: MasterCatalogNode[] = [overlay("home-gar
     ["home-laundry-detergents", "Средства для стирки", "Кір жуу құралдары"], ["home-dish-detergents", "Средства для посуды", "Ыдыс жуу құралдары"], ["home-surface-cleaners", "Чистящие средства", "Тазартқыш құралдар"], ["home-air-fresheners", "Освежители и ароматизаторы", "Ауа сергіткіштер мен хош иістендіргіштер"], ["home-pest-control", "Средства от насекомых и грызунов", "Жәндіктер мен кеміргіштерге қарсы құралдар"],
   ], ["consumableLot", "regulatedSafety"]), ["consumableLot", "regulatedSafety"]),
   branch("indoor-plants", "Комнатные растения", "Бөлме өсімдіктері", items([
-    ["home-live-plants", "Живые растения", "Тірі өсімдіктер"], ["home-seedlings-cuttings", "Рассада и черенки", "Көшеттер мен қалемшелер"], ["home-pots-planters", "Горшки и кашпо", "Құмыралар мен кашпо"], ["home-plant-care", "Грунты и уход", "Топырақ пен күтім"],
+    ["home-live-plants", "Живые растения", "Тірі өсімдіктер", ["plant"]], ["home-seedlings-cuttings", "Рассада и черенки", "Көшеттер мен қалемшелер", ["plant"]], ["home-pots-planters", "Горшки и кашпо", "Құмыралар мен кашпо"], ["home-plant-care", "Грунты и уход", "Топырақ пен күтім"],
   ], ["gardenGoods"]), ["gardenGoods"]),
   branch("garden", "Сад и огород", "Бақша және көконіс бағы", items([
     ["garden-seeds", "Семена", "Тұқымдар", ["consumableLot", "regulatedSafety"]],
-    ["garden-seedlings", "Саженцы", "Көшеттер"],
+    ["garden-seedlings", "Саженцы", "Көшеттер", ["plant"]],
     ["garden-fertilizers-soil", "Удобрения и грунт", "Тыңайтқыштар мен топырақ", ["consumableLot", "regulatedSafety"]],
     ["garden-irrigation", "Полив", "Суару"], ["garden-greenhouses", "Теплицы и парники", "Жылыжайлар"], ["garden-fences-decor", "Ограждения и декор", "Қоршаулар мен безендіру"], ["garden-pools", "Бассейны и аксессуары", "Хауыздар мен аксессуарлар"],
   ], ["gardenGoods"]), ["gardenGoods"]),
@@ -76,13 +76,13 @@ export const fashionCatalogOverlays: MasterCatalogNode[] = [overlay("personal", 
     ["fashion-wristwatches", "Наручные часы", "Қол сағаттары"], ["fashion-rings", "Кольца", "Сақиналар"], ["fashion-earrings", "Серьги", "Сырғалар"], ["fashion-chains-necklaces", "Цепочки и колье", "Шынжырлар мен алқалар"], ["fashion-bracelets", "Браслеты", "Білезіктер"], ["fashion-costume-jewelry", "Бижутерия", "Бижутерия"],
   ], ["jewelry"]), ["jewelry"]),
   branch("wedding", "Всё для свадьбы", "Үйлену тойына арналған тауарлар", items([
-    ["wedding-dresses", "Свадебные платья", "Үйлену көйлектері"], ["wedding-suits", "Свадебные костюмы", "Үйлену костюмдері"], ["wedding-accessories", "Свадебные аксессуары", "Үйлену аксессуарлары"], ["wedding-decor-goods", "Декор и атрибутика", "Безендіру және атрибуттар"],
+    ["wedding-dresses", "Свадебные платья", "Үйлену көйлектері"], ["wedding-suits", "Свадебные костюмы", "Үйлену костюмдері"], ["wedding-accessories", "Свадебные аксессуары", "Үйлену аксессуарлары", ["goodsBrand"]], ["wedding-decor-goods", "Декор и атрибутика", "Безендіру және атрибуттар", ["goodsBrand"]],
   ], ["clothing"]), ["clothing"]),
   branch("beauty-products", "Красота и здоровье", "Сұлулық және денсаулық", items([
     ["beauty-makeup", "Макияж", "Макияж"], ["beauty-face-care", "Уход за лицом", "Бет күтімі"], ["beauty-hair-care", "Уход за волосами", "Шаш күтімі"], ["beauty-body-care", "Уход за телом", "Дене күтімі"], ["beauty-perfume", "Парфюмерия", "Парфюмерия"], ["beauty-manicure-products", "Маникюр и педикюр", "Маникюр және педикюр"], ["beauty-health-goods", "Товары для здоровья", "Денсаулық тауарлары"],
   ], ["consumableLot", "regulatedSafety"]), ["consumableLot", "regulatedSafety"]),
   branch("workwear", "Спецодежда и спецобувь", "Арнайы киім мен арнайы аяқ киім", items([
-    ["workwear-clothing", "Рабочая одежда", "Жұмыс киімі"], ["workwear-footwear", "Рабочая обувь", "Жұмыс аяқ киімі"], ["workwear-medical", "Медицинская одежда", "Медициналық киім"], ["workwear-ppe", "Средства индивидуальной защиты", "Жеке қорғаныс құралдары"],
+    ["workwear-clothing", "Рабочая одежда", "Жұмыс киімі"], ["workwear-footwear", "Рабочая обувь", "Жұмыс аяқ киімі", ["shoes"]], ["workwear-medical", "Медицинская одежда", "Медициналық киім"], ["workwear-ppe", "Средства индивидуальной защиты", "Жеке қорғаныс құралдары"],
   ], ["clothing"]), ["clothing"]),
 ])];
 
@@ -92,7 +92,7 @@ export const kidsCatalogOverlays: MasterCatalogNode[] = [overlay("kids", [
   ], ["kidsClothing"]), ["kidsClothing"]),
   branch("kids-shoes", "Детская обувь", "Балалар аяқ киімі", items([
     ["kids-boots", "Сапоги и ботинки", "Етіктер мен бәтеңкелер"], ["kids-sneakers", "Кроссовки и кеды", "Кроссовкалар мен кедалар"], ["kids-sandals", "Сандалии", "Сандалилер"], ["kids-first-steps-shoes", "Обувь для первых шагов", "Алғашқы қадамға арналған аяқ киім"], ["kids-home-shoes", "Домашняя обувь", "Үй аяқ киімі"],
-  ], ["kidsClothing"]), ["kidsClothing"]),
+  ], ["kidsShoes"]), ["kidsShoes"]),
   branch("strollers", "Коляски", "Бала арбалары", items([
     ["stroller-carrycots", "Коляски-люльки", "Бесік арбалар"], ["stroller-walking", "Прогулочные коляски", "Серуен арбалары"], ["stroller-modular", "Коляски 2 в 1 и 3 в 1", "2-де 1 және 3-те 1 арбалар"], ["stroller-twins", "Коляски для двойни", "Егіздерге арналған арбалар"],
     ["stroller-accessories", "Аксессуары для колясок", "Арба аксессуарлары", ["productCore"]],
@@ -129,13 +129,13 @@ export const kidsCatalogOverlays: MasterCatalogNode[] = [overlay("kids", [
     ["baby-carriers", "Слинги и рюкзаки-переноски", "Слингтер мен тасымалдау сөмкелері", ["bags", "regulatedSafety"]],
   ])),
   branch("kids-transport", "Детский транспорт", "Балалар көлігі", items([
-    ["kids-bicycles", "Детские велосипеды", "Балалар велосипедтері"], ["kids-scooters", "Самокаты", "Самокаттар"], ["kids-balance-bikes", "Беговелы", "Тепе-теңдік велосипедтері"], ["kids-electric-cars", "Электромобили", "Электр машиналар"], ["kids-sledges", "Санки и снегокаты", "Шаналар мен қар самокаттары"],
+    ["kids-bicycles", "Детские велосипеды", "Балалар велосипедтері"], ["kids-scooters", "Самокаты", "Самокаттар", ["kidsRide", "kidsScooter"]], ["kids-balance-bikes", "Беговелы", "Тепе-теңдік велосипедтері", ["kidsRide", "kidsBalanceBike"]], ["kids-electric-cars", "Электромобили", "Электр машиналар", ["kidsRide", "kidsElectricCar"]], ["kids-sledges", "Санки и снегокаты", "Шаналар мен қар самокаттары", ["kidsRide", "kidsSled"]],
   ], ["bicycle"]), ["bicycle"]),
 ])];
 
 export const hobbyCatalogOverlays: MasterCatalogNode[] = [overlay("hobby", [
   branch("sports", "Спорт и фитнес", "Спорт және фитнес", items([
-    ["sports-fitness-equipment", "Тренажёры и фитнес", "Жаттықтырғыштар мен фитнес"], ["sports-team", "Командные виды спорта", "Командалық спорт"], ["sports-racket", "Теннис, бадминтон и сквош", "Теннис, бадминтон және сквош"], ["sports-combat", "Единоборства", "Жекпе-жек"], ["sports-winter", "Зимний спорт", "Қысқы спорт"], ["sports-water", "Водный спорт", "Су спорты"], ["sports-skates-skateboards", "Ролики и скейтборды", "Роликтер мен скейтбордтар"], ["sports-protection", "Спортивная защита", "Спорттық қорғаныс"],
+    ["sports-fitness-equipment", "Тренажёры и фитнес", "Жаттықтырғыштар мен фитнес", ["fitnessEquipment"]], ["sports-team", "Командные виды спорта", "Командалық спорт", ["teamSports"]], ["sports-racket", "Теннис, бадминтон и сквош", "Теннис, бадминтон және сквош", ["racketSports"]], ["sports-combat", "Единоборства", "Жекпе-жек", ["combatSports"]], ["sports-winter", "Зимний спорт", "Қысқы спорт", ["winterSports"]], ["sports-water", "Водный спорт", "Су спорты", ["waterSports"]], ["sports-skates-skateboards", "Ролики и скейтборды", "Роликтер мен скейтбордтар", ["skatingSports"]], ["sports-protection", "Спортивная защита", "Спорттық қорғаныс", ["sportProtection"]],
   ], ["sportsGoods"]), ["sportsGoods"]),
   branch("bicycles", "Велосипеды", "Велосипедтер", items([
     ["bicycles-mountain", "Горные велосипеды", "Тау велосипедтері"], ["bicycles-road", "Шоссейные и гравийные", "Шоссе және гравий велосипедтері"], ["bicycles-city", "Городские велосипеды", "Қалалық велосипедтер"], ["bicycles-bmx", "BMX и трюковые", "BMX және трюктік"], ["bicycles-electric", "Электровелосипеды", "Электр велосипедтер"], ["bicycles-parts", "Запчасти и аксессуары", "Қосалқы бөлшектер мен аксессуарлар"],
@@ -174,14 +174,14 @@ export const animalCatalogOverlays: MasterCatalogNode[] = [overlay("animals", [
     ["pet-parrots", "Попугаи", "Тотықұстар", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-songbirds", "Певчие и декоративные птицы", "Әнші және сәндік құстар", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-pigeons", "Голуби", "Көгершіндер", ["smallAnimal", "liveAnimalDetails"]],
-    ["pet-bird-cages", "Клетки и аксессуары", "Торлар мен аксессуарлар", ["animalSupply"]],
+    ["pet-bird-cages", "Клетки и аксессуары", "Торлар мен аксессуарлар", ["petCage"]],
   ], ["smallAnimal", "liveAnimalDetails"]), ["smallAnimal", "liveAnimalDetails"]),
   branch("fish-aquariums", "Рыбы и аквариумы", "Балықтар мен аквариумдар", items([
     ["pet-freshwater-fish", "Пресноводные рыбы", "Тұщы су балықтары", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-marine-fish", "Морские рыбы и кораллы", "Теңіз балықтары мен маржандар", ["smallAnimal", "liveAnimalDetails"]],
-    ["pet-aquariums", "Аквариумы и тумбы", "Аквариумдар мен тұғырлар", ["animalSupply"]],
-    ["pet-aquarium-equipment", "Аквариумное оборудование", "Аквариум жабдығы", ["animalSupply"]],
-    ["pet-aquarium-decor", "Грунт, растения и декор", "Топырақ, өсімдіктер және безендіру", ["animalSupply"]],
+    ["pet-aquariums", "Аквариумы и тумбы", "Аквариумдар мен тұғырлар", ["aquariumTank"]],
+    ["pet-aquarium-equipment", "Аквариумное оборудование", "Аквариум жабдығы", ["aquariumEquipment"]],
+    ["pet-aquarium-decor", "Грунт, растения и декор", "Топырақ, өсімдіктер және безендіру", ["aquariumDecor"]],
   ], ["smallAnimal", "liveAnimalDetails"]), ["smallAnimal", "liveAnimalDetails"]),
   branch("rodents", "Грызуны", "Кеміргіштер", items([
     ["pet-hamsters", "Хомяки", "Аламандар", ["smallAnimal", "liveAnimalDetails"]],
@@ -189,25 +189,25 @@ export const animalCatalogOverlays: MasterCatalogNode[] = [overlay("animals", [
     ["pet-rabbits", "Декоративные кролики", "Сәндік қояндар", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-rats-mice", "Крысы и мыши", "Егеуқұйрықтар мен тышқандар", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-chinchillas", "Шиншиллы и дегу", "Шиншиллалар мен дегу", ["smallAnimal", "liveAnimalDetails"]],
-    ["pet-rodent-cages", "Клетки и аксессуары", "Торлар мен аксессуарлар", ["animalSupply"]],
+    ["pet-rodent-cages", "Клетки и аксессуары", "Торлар мен аксессуарлар", ["petCage"]],
   ], ["smallAnimal", "liveAnimalDetails"]), ["smallAnimal", "liveAnimalDetails"]),
   branch("reptiles", "Рептилии", "Бауырымен жорғалаушылар", items([
     ["pet-turtles", "Черепахи", "Тасбақалар", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-lizards", "Ящерицы", "Кесірткелер", ["smallAnimal", "liveAnimalDetails"]],
     ["pet-snakes", "Змеи", "Жыландар", ["smallAnimal", "liveAnimalDetails"]],
-    ["pet-terrariums", "Террариумы и оборудование", "Террариумдар мен жабдық", ["animalSupply"]],
+    ["pet-terrariums", "Террариумы и оборудование", "Террариумдар мен жабдық", ["terrariumEquipment"]],
   ], ["smallAnimal", "liveAnimalDetails"]), ["smallAnimal", "liveAnimalDetails"]),
   branch("farm-animals", "Сельскохозяйственные животные", "Ауыл шаруашылығы жануарлары", items([
     ["farm-cattle", "Крупный рогатый скот", "Ірі қара"], ["farm-horses", "Лошади", "Жылқы"], ["farm-sheep-goats", "Овцы и козы", "Қой мен ешкі"], ["farm-pigs", "Свиньи", "Шошқалар"], ["farm-poultry", "Домашняя птица", "Үй құстары"], ["farm-rabbits", "Кролики", "Қояндар"], ["farm-bees", "Пчёлы и пчелопакеты", "Аралар мен ара пакеттері"],
   ], ["farmAnimal", "liveAnimalDetails"]), ["farmAnimal", "liveAnimalDetails"]),
   branch("pet-supplies", "Товары для животных", "Жануарларға арналған тауарлар", items([
     ["pet-food", "Корм", "Жем", ["consumableLot", "petConsumable", "regulatedSafety"]],
-    ["pet-beds-houses", "Лежанки и домики", "Төсектер мен үйшіктер", ["animalSupply"]],
-    ["pet-carriers", "Переноски и клетки", "Тасымалдағыштар мен торлар", ["animalSupply"]],
-    ["pet-collars-leashes", "Ошейники, поводки и амуниция", "Қарғыбаулар, жетектер мен жабдық", ["animalSupply"]],
-    ["pet-toys-training", "Игрушки и дрессировка", "Ойыншықтар мен үйрету", ["animalSupply"]],
-    ["pet-grooming-hygiene", "Груминг и гигиена", "Груминг және гигиена", ["animalSupply", "regulatedSafety"]],
-    ["pet-veterinary-goods", "Ветеринарные товары", "Ветеринарлық тауарлар", ["animalSupply", "regulatedSafety"]],
+    ["pet-beds-houses", "Лежанки и домики", "Төсектер мен үйшіктер", ["petBed"]],
+    ["pet-carriers", "Переноски и клетки", "Тасымалдағыштар мен торлар", ["petCarrier"]],
+    ["pet-collars-leashes", "Ошейники, поводки и амуниция", "Қарғыбаулар, жетектер мен жабдық", ["petHarness"]],
+    ["pet-toys-training", "Игрушки и дрессировка", "Ойыншықтар мен үйрету", ["petToy"]],
+    ["pet-grooming-hygiene", "Груминг и гигиена", "Груминг және гигиена", ["petGrooming", "regulatedSafety"]],
+    ["pet-veterinary-goods", "Ветеринарные товары", "Ветеринарлық тауарлар", ["petVeterinary", "regulatedSafety"]],
   ], ["animalSupply"]), ["animalSupply"]),
 ])];
 
@@ -219,7 +219,7 @@ export const businessCatalogOverlays: MasterCatalogNode[] = [overlay("business",
     ["business-metalworking", "Металлообработка", "Металл өңдеу"], ["business-woodworking", "Деревообработка", "Ағаш өңдеу"], ["business-plastics", "Оборудование для пластика", "Пластикке арналған жабдық"], ["business-textile", "Швейное и текстильное", "Тігін және тоқыма жабдығы"], ["business-packaging-lines", "Фасовочное и упаковочное", "Орау және қаптау жабдығы"], ["business-compressors-pumps", "Компрессоры и промышленные насосы", "Компрессорлар мен өнеркәсіптік сорғылар"], ["business-generators", "Генераторы и энергетика", "Генераторлар мен энергетика"],
   ], ["equipment"]), ["equipment"]),
   branch("food-equipment", "Оборудование для общепита", "Қоғамдық тамақтану жабдығы", items([
-    ["business-cooking-equipment", "Тепловое оборудование", "Жылу жабдығы"], ["business-refrigeration", "Холодильное оборудование", "Тоңазытқыш жабдығы"], ["business-dishwashing", "Посудомоечное оборудование", "Ыдыс жуу жабдығы"], ["business-bakery", "Пекарское и кондитерское", "Наубайхана және кондитер жабдығы"], ["business-coffee-bar", "Кофейное и барное", "Кофе және бар жабдығы"], ["business-food-processing", "Пищевое производство", "Тамақ өндірісі"], ["business-restaurant-furniture", "Мебель для HoReCa", "HoReCa жиһазы"],
+    ["business-cooking-equipment", "Тепловое оборудование", "Жылу жабдығы"], ["business-refrigeration", "Холодильное оборудование", "Тоңазытқыш жабдығы"], ["business-dishwashing", "Посудомоечное оборудование", "Ыдыс жуу жабдығы"], ["business-bakery", "Пекарское и кондитерское", "Наубайхана және кондитер жабдығы"], ["business-coffee-bar", "Кофейное и барное", "Кофе және бар жабдығы"], ["business-food-processing", "Пищевое производство", "Тамақ өндірісі"], ["business-restaurant-furniture", "Мебель для HoReCa", "HoReCa жиһазы", ["furniture"]],
   ], ["equipment"]), ["equipment"]),
   branch("agro-equipment", "Фермерское оборудование", "Ферма жабдығы", items([
     ["business-livestock-equipment", "Животноводство", "Мал шаруашылығы"], ["business-poultry-equipment", "Птицеводство", "Құс шаруашылығы"], ["business-dairy-equipment", "Молочное оборудование", "Сүт жабдығы"], ["business-feed-equipment", "Кормопроизводство", "Жем өндірісі"], ["business-greenhouse-equipment", "Тепличное оборудование", "Жылыжай жабдығы"], ["business-irrigation-equipment", "Полив и орошение", "Суару жабдығы"], ["business-beekeeping-equipment", "Пчеловодство", "Омарташылық"],
@@ -255,7 +255,7 @@ export const businessCatalogOverlays: MasterCatalogNode[] = [overlay("business",
 export const communityCatalogOverlays: MasterCatalogNode[] = [
   overlay("free", [
     branch("free-home", "Для дома", "Үйге арналған", items([
-      ["free-furniture", "Мебель", "Жиһаз", ["free", "furniture"]], ["free-dishes-household", "Посуда и хозтовары", "Ыдыс және үй тауарлары", ["free", "goods"]], ["free-textiles", "Текстиль", "Тоқыма", ["free", "goods"]], ["free-plants", "Растения", "Өсімдіктер", ["free", "gardenGoods"]]
+      ["free-furniture", "Мебель", "Жиһаз", ["free", "furniture"]], ["free-dishes-household", "Посуда и хозтовары", "Ыдыс және үй тауарлары", ["free", "goods"]], ["free-textiles", "Текстиль", "Тоқыма", ["free", "goods"]], ["free-plants", "Растения", "Өсімдіктер", ["free", "plant"]]
     ], ["free"]), ["free"]),
     branch("free-clothes", "Одежда и обувь", "Киім және аяқ киім", items([
       ["free-women-clothing", "Женское", "Әйелдерге", ["free", "clothing"]], ["free-men-clothing", "Мужское", "Ерлерге", ["free", "clothing"]], ["free-shoes", "Обувь", "Аяқ киім", ["free", "shoes"]]

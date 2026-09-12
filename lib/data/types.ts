@@ -100,6 +100,7 @@ export type OwnerDraftBundle = {
   images: OwnerDraftImage[];
   rejectionReasonCode: string | null;
   rejectedAt: string | null;
+  createdAt: string;
   updatedAt: string;
 };
 

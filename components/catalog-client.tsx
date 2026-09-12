@@ -38,6 +38,7 @@ import { localeTag, localize } from "@/lib/i18n/config";
 import {
   clearDependentValues,
   getDependentParentOptionId,
+  getDependentParentValue,
   isAttributeVisible,
 } from "@/lib/reference-data/attributes";
 
@@ -340,7 +341,7 @@ export function CatalogClient({
         {attributeState.status === "error" ? <p className="filter-reference-state is-error">{t("reference.attributesUnavailable")}</p> : null}
         {visibleCategoryAttributes.map((attribute) => {
           if (attribute.dataType === "select" || attribute.dataType === "multiselect") {
-            return <label key={attribute.id}>{localize(attribute.label, locale)}<ReferenceSelect attribute={attribute} emptyMode="filter" value={String(dynamicFilters[attribute.key] ?? "")} parentOptionId={getDependentParentOptionId(attribute, attributeState.data.attributes, dynamicFilters)} onChange={(value) => setDynamicFilters((current) => clearDependentValues(attribute.key, value, attributeState.data.attributes, current))} /></label>;
+            return <label key={attribute.id}>{localize(attribute.label, locale)}<ReferenceSelect attribute={attribute} emptyMode="filter" value={String(dynamicFilters[attribute.key] ?? "")} parentOptionId={getDependentParentOptionId(attribute, attributeState.data.attributes, dynamicFilters)} parentValue={getDependentParentValue(attribute, dynamicFilters)} onChange={(value) => setDynamicFilters((current) => clearDependentValues(attribute.key, value, attributeState.data.attributes, current))} /></label>;
           }
           if (attribute.dataType === "boolean") {
             return <label key={attribute.id}>{localize(attribute.label, locale)}<select value={dynamicFilters[attribute.key] ?? ""} onChange={(event) => setDynamicFilters((current) => clearDependentValues(attribute.key, event.target.value, attributeState.data.attributes, current))}><option value="">{t("common.notImportant")}</option><option value="true">{t("common.yes")}</option><option value="false">{t("common.no")}</option></select></label>;

@@ -35,6 +35,10 @@ const expectedMigrations = [
   "0026_catalog_navigation_ux.sql",
   "0027_conditional_required_attributes.sql",
   "0028_profile_lifecycle_registration.sql",
+  "0029_listing_contacts_messaging.sql",
+  "0030_protected_listing_phone.sql",
+  "0031_account_deletion.sql",
+  "0032_catalog_reference_metadata.sql",
 ];
 
 const immutableMigrationHashes = {

@@ -173,12 +173,12 @@ export async function getCategoryAttributes(client: JevuSupabaseClient, category
 export async function listAttributeOptions(
   client: JevuSupabaseClient,
   attributeIds: string[],
-  filters: { parentOptionId?: string; query?: string; limit?: number } = {},
+  filters: { parentOptionId?: string; query?: string; limit?: number; offset?: number; values?: string[] } = {},
 ) {
   if (attributeIds.length === 0) return [];
   const rows = [];
   const pageSize = Math.min(Math.max(filters.limit ?? 500, 1), 500);
-  for (let from = 0; ; from += pageSize) {
+  for (let from = filters.offset ?? 0; ; from += pageSize) {
     let request = client
       .from("category_attribute_options")
       .select("id, attribute_id, parent_option_id, value, label_ru, label_kk, sort_order")
@@ -189,6 +189,7 @@ export async function listAttributeOptions(
     } else {
       request = request.is("parent_option_id", null);
     }
+    if (filters.values) request = request.in("value", filters.values);
     const safeQuery = filters.query?.normalize("NFKC").replace(/[^\p{L}\p{N}\s().+-]/gu, " ").replace(/\s+/g, " ").trim();
     if (safeQuery) request = request.or(`label_ru.ilike.%${safeQuery}%,label_kk.ilike.%${safeQuery}%`);
     const { data, error } = await request
@@ -217,4 +218,19 @@ export async function searchCategories(client: JevuSupabaseClient, query: string
     .limit(Math.min(limit, 50));
   if (error) throw error;
   return data;
+}
+
+/** Resolve only the actual parent attribute in the same category. */
+export async function resolveAttributeOptionParent(client: JevuSupabaseClient, attributeId: string, value: string) {
+  const { data: attribute, error } = await client.from("category_attributes")
+    .select("category_id, depends_on_key").eq("id", attributeId).eq("is_active", true).maybeSingle();
+  if (error) throw error;
+  if (!attribute?.depends_on_key) return null;
+  const { data: parent, error: parentError } = await client.from("category_attribute_options")
+    .select("id, category_attributes!category_attribute_options_attribute_id_fkey!inner(category_id, key)")
+    .eq("category_attributes.category_id", attribute.category_id)
+    .eq("category_attributes.key", attribute.depends_on_key)
+    .eq("value", value).eq("is_active", true).maybeSingle();
+  if (parentError) throw parentError;
+  return parent?.id ?? null;
 }

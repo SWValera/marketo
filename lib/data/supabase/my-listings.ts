@@ -230,7 +230,7 @@ export async function getMyListingDraftBundle(
   const userId = await currentUserId(client);
   const result = await client
     .from("listings")
-    .select("id, slug, category_id, settlement_id, title, description, price_minor, currency_code, status, updated_at, owner_id, categories(id, slug), listing_contacts(*), listing_images(id, storage_key, sort_order)")
+    .select("id, slug, category_id, settlement_id, title, description, price_minor, currency_code, status, created_at, updated_at, owner_id, categories(id, slug), listing_contacts(*), listing_images(id, storage_key, sort_order)")
     .eq("id", listingId)
     .eq("owner_id", userId)
     .is("deleted_at", null)
@@ -247,6 +247,7 @@ export async function getMyListingDraftBundle(
     price_minor: number | string | null;
     currency_code: string;
     status: string;
+    created_at: string;
     updated_at: string;
     categories: unknown;
     listing_contacts: unknown;
@@ -316,6 +317,7 @@ export async function getMyListingDraftBundle(
       .map((image) => ({ id: image.id, url: protectedMediaUrl(image.storage_key) ?? "", sortOrder: image.sort_order })),
     rejectionReasonCode: latestFeedback?.reason_code ?? null,
     rejectedAt: latestFeedback?.rejected_at ?? null,
+    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

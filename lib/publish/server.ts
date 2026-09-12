@@ -123,7 +123,7 @@ function buildRpcAttributes(input: PublishDraftInput, attributes: ReferenceCateg
 export async function preparePublishDraft(
   client: JevuSupabaseClient,
   raw: unknown,
-  options: { requirePhotos?: boolean; photoCount?: number } = {},
+  options: { requirePhotos?: boolean; photoCount?: number; createdAt?: string } = {},
 ): Promise<
   | { success: true; value: PreparedPublishDraft }
   | { success: false; errors: PublishFieldErrors }
@@ -165,6 +165,7 @@ export async function preparePublishDraft(
     requirePhotos: options.requirePhotos,
     photoCount: options.photoCount,
     strictOptions: true,
+    createdAt: options.createdAt,
   });
   if (!categoryResult.data?.is_active || childResult.data.length > 0) addError(errors, "category", "invalid");
   if (!settlementResult.data?.is_active || !settlementResult.data.is_selectable) addError(errors, "city", "invalid");
@@ -205,7 +206,7 @@ export async function validateStoredListingForSubmit(client: JevuSupabaseClient,
     allowMessages: draft.allowMessages,
     allowPhone: draft.allowPhone ?? false,
     attributes: draft.attributes,
-  }, { requirePhotos: true, photoCount: draft.images.length });
+  }, { requirePhotos: true, photoCount: draft.images.length, createdAt: draft.createdAt });
   return prepared.success
     ? { status: "ready" as const, draft, prepared: prepared.value }
     : { status: "invalid" as const, errors: prepared.errors };

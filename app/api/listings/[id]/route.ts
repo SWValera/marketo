@@ -44,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const existing = await getMyListingDraftBundle(client, id);
     if (!existing) return NextResponse.json({ error: "listing_not_found" }, { status: 404 });
     const raw = await request.json().catch(() => null);
-    const prepared = await preparePublishDraft(client, raw);
+    const prepared = await preparePublishDraft(client, raw, { createdAt: existing.createdAt });
     if (!prepared.success) {
       return NextResponse.json({ error: "invalid_draft", details: prepared.errors }, { status: 400 });
     }

@@ -55,6 +55,7 @@ import {
   clearDependentValues,
   getAttributeValidation,
   getDependentParentOptionId,
+  getDependentParentValue,
   isAttributeRequired,
   isAttributeVisible,
 } from "@/lib/reference-data/attributes";
@@ -354,6 +355,7 @@ export function PublishForm({
     const allErrors = validatePublishDraft(buildDraftInput(), {
       priceMode: categoryPresentation.priceMode,
       attributes: categoryAttributes,
+      createdAt: initialDraft?.createdAt ?? recoveryServerDraft?.createdAt,
       photoCount: existingImages.length + photos.length,
       requirePhotos: true,
     });
@@ -720,7 +722,7 @@ export function PublishForm({
               {categoryAttributeState.status === "error" ? <p className="filter-reference-state is-error form-field-wide">{t("reference.attributesUnavailable")}</p> : null}
               {visibleCategoryAttributes.map((attribute) => {
                 const validation = getAttributeValidation(attribute);
-                const attributeRequired = isAttributeRequired(attribute, attributes);
+                const attributeRequired = isAttributeRequired(attribute, attributes, initialDraft?.createdAt ?? recoveryServerDraft?.createdAt);
                 const field = `attributes.${attribute.key}`;
                 if (attribute.dataType === "select" || attribute.dataType === "multiselect") {
                   const selected = attributes[attribute.key];
@@ -730,7 +732,7 @@ export function PublishForm({
                       attribute={attribute}
                       value={typeof selected === "string" ? selected : ""}
                       multipleValues={Array.isArray(selected) ? selected : []}
-                      parentOptionId={getDependentParentOptionId(attribute, categoryAttributes, attributes)}
+                      parentOptionId={getDependentParentOptionId(attribute, categoryAttributes, attributes)} parentValue={getDependentParentValue(attribute, attributes)}
                       onChange={(value) => updateAttribute(attribute.key, value)}
                       onMultipleChange={(value) => updateAttribute(attribute.key, value)}
                     />
@@ -771,7 +773,7 @@ export function PublishForm({
                 }
                 return <label className="form-field" key={attribute.id} ref={(node) => setFieldRef(field, node)}>
                   <span>{localize(attribute.label, locale)}{attribute.unit ? `, ${localize(attribute.unit, locale)}` : ""}{attributeRequired ? " *" : ""}</span>
-                  <input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" ? "number" : "text"} inputMode={attribute.dataType === "number" ? "decimal" : "text"} min={validation.min} max={validation.max} step={validation.step} maxLength={validation.maxLength} value={String(attributes[attribute.key] ?? "")} onChange={(event) => updateAttribute(attribute.key, event.target.value)} aria-invalid={Boolean(fieldErrors[field])} />
+                  <input type={attribute.dataType === "date" ? "date" : attribute.dataType === "number" ? "number" : "text"} inputMode={attribute.dataType === "number" ? "decimal" : "text"} min={validation.min} max={validation.max} step={validation.step} maxLength={validation.maxLength} placeholder={validation.placeholder ? localize(validation.placeholder, locale) : undefined} value={String(attributes[attribute.key] ?? "")} onChange={(event) => updateAttribute(attribute.key, event.target.value)} aria-invalid={Boolean(fieldErrors[field])} />
                   {fieldError(field)}
                 </label>;
               })}

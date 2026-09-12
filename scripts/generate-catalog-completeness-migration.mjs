@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { categoryOptions, categoryTree } from "../lib/catalog-config.ts";
@@ -7,6 +7,8 @@ import {
   CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT,
   CATEGORY_REFERENCE_VERSION,
 } from "../lib/reference-data/release.ts";
+
+import { catalogTypeTransformSql } from "./lib/catalog-type-transforms.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releasedMigrationsDirectory = resolve(projectRoot, "supabase/migrations");
@@ -24,7 +26,7 @@ if (releaseId !== CATEGORY_REFERENCE_VERSION) {
   );
 }
 const releaseSqlTag = `release_${releaseId.replaceAll(/[^a-z0-9]/gi, "_").toLowerCase()}`;
-const requiredSubmitListingFingerprint = "86357b7d7fd5d43a17f7182e40009406";
+const requiredSubmitListingFingerprint = "8920841ecf784751190b09e0a46e7910";
 const outputArgumentIndex = process.argv.indexOf("--output");
 if (outputArgumentIndex >= 0 && !process.argv[outputArgumentIndex + 1]) {
   throw new Error("--output requires a destination path.");
@@ -254,6 +256,7 @@ for (const category of categoryOptions) {
       labelRu: option.label.ru,
       labelKk: option.label.kk,
       parentValue: option.parentValue ?? null,
+      metadata: option.metadata ?? {},
       sortOrder: (optionIndex + 1) * 10,
     }));
   });
@@ -327,6 +330,11 @@ for (const [categorySlug, attributes] of attributesByCategory) {
     }
   }
 }
+
+const transformsIndex = process.argv.indexOf("--type-transforms");
+if (transformsIndex >= 0 && !process.argv[transformsIndex + 1]) throw new Error("--type-transforms requires a reviewed JSON plan.");
+const transforms = transformsIndex < 0 ? [] : JSON.parse(await readFile(resolve(projectRoot, process.argv[transformsIndex + 1]), "utf8"));
+const transformSql = catalogTypeTransformSql(transforms, attributeRows, optionRows);
 
 const sql = [];
 const add = (value) => sql.push(value.trim());
@@ -404,6 +412,7 @@ create temporary table marketo_catalog_0024_options (
   label_ru text not null,
   label_kk text not null,
   parent_value text,
+  metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(metadata) = 'object'),
   sort_order integer not null check (sort_order >= 0),
   primary key (category_slug, attribute_key, value),
   unique (category_slug, attribute_key, sort_order),
@@ -577,10 +586,11 @@ for (const chunk of chunks(optionRows)) {
     row.labelKk,
     row.parentValue,
     row.sortOrder,
+    row.metadata,
   ]);
   add(`
 insert into marketo_catalog_0024_options (
-  category_slug, attribute_key, value, label_ru, label_kk, parent_value, sort_order
+  category_slug, attribute_key, value, label_ru, label_kk, parent_value, sort_order, metadata
 )
 select
   payload.value ->> 0,
@@ -589,10 +599,41 @@ select
   payload.value ->> 3,
   payload.value ->> 4,
   payload.value ->> 5,
-  (payload.value ->> 6)::integer
+  (payload.value ->> 6)::integer,
+  payload.value -> 7
 from pg_catalog.jsonb_array_elements(${q(JSON.stringify(payload))}::jsonb) as payload(value);
 `);
 }
+
+// A source timestamp is sufficient for an empty seed database, but a live
+// release must preserve every pre-release draft, even if preparation took days.
+// Start the new-listing requirement after the deployment transition window.
+// Re-running this release reuses its persisted cutoff rather than moving it.
+add(`
+create temporary table marketo_catalog_requirement_cutoff on commit drop as
+select coalesce(
+  (select min(coalesce(validation ->> 'requiredForNewListingsSince', validation ->> 'requiredWhenSince')::timestamptz)
+   from public.category_attributes
+   where validation ->> 'requirementsRelease' = ${q(releaseId)}),
+  transaction_timestamp() + interval '2 hours'
+) as starts_at;
+update marketo_catalog_0024_attributes
+set validation = validation || jsonb_build_object('requirementsRelease', ${q(releaseId)})
+  || case when validation ? 'requiredForNewListingsSince' then jsonb_build_object('requiredForNewListingsSince', (select to_char(starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') from marketo_catalog_requirement_cutoff)) else '{}'::jsonb end
+  || case when validation ? 'requiredWhenSince' then jsonb_build_object('requiredWhenSince', (select to_char(starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') from marketo_catalog_requirement_cutoff)) else '{}'::jsonb end
+where validation ? 'requiredForNewListingsSince' or validation ? 'requiredWhenSince';
+`);
+
+// Fresh temporary relations have no autovacuum statistics. Populate them before
+// the multi-table guards so the planner can use actual catalog cardinalities.
+add(`
+analyze marketo_catalog_0024_categories;
+analyze marketo_catalog_0024_attributes;
+analyze marketo_catalog_0024_options;
+`);
+
+add(transformSql.setup);
+add(transformSql.preflight);
 
 add(`
 do $marketo_catalog_0024_preflight$
@@ -601,7 +642,7 @@ declare
   submit_listing_fingerprint text;
 begin
   if to_regprocedure('public.submit_listing(uuid)') is null then
-    raise exception '0024 requires migration 0027 before applying conditional catalog data';
+    raise exception '0024 requires migration 0032 before applying normalized catalog data';
   end if;
 
   select md5(
@@ -629,7 +670,7 @@ begin
   where procedure.oid = 'public.submit_listing(uuid)'::regprocedure;
 
   if submit_listing_fingerprint is distinct from '${requiredSubmitListingFingerprint}' then
-    raise exception '0024 requires the reviewed requiredWhen-aware submit_listing contract from migration 0027';
+    raise exception '0024 requires the reviewed submit_listing contract from migration 0032';
   end if;
 
   select count(*) into actual_count from marketo_catalog_0024_categories;
@@ -801,17 +842,6 @@ begin
 
   if exists (
     select 1
-    from public.category_attributes as existing
-    join public.categories as category on category.id = existing.category_id
-    join marketo_catalog_0024_attributes as target
-      on target.category_slug = category.slug and target.key = existing.key
-    where existing.data_type <> target.data_type
-  ) then
-    raise exception '0024 refuses to change the data type of an existing stable attribute key';
-  end if;
-
-  if exists (
-    select 1
     from marketo_catalog_0024_attributes as target
     join public.categories as category on category.slug = target.category_slug
     join public.listings as listing on listing.category_id = category.id
@@ -827,6 +857,8 @@ begin
     left join public.category_attributes as actual
       on actual.category_id = category.id and actual.key = target.key
     where jsonb_typeof(target.validation #> '{requiredWhen}') = 'object'
+      and (not (target.validation ? 'requiredWhenSince')
+        or listing.created_at >= (target.validation ->> 'requiredWhenSince')::timestamptz)
       and parent_option.value in (
         select required_item.value
         from pg_catalog.jsonb_array_elements_text(target.validation #> '{requiredWhen,values}') as required_item(value)
@@ -1023,7 +1055,7 @@ add(`
 -- Move every existing attribute in a managed category above both the current
 -- and target canonical ranges. The range is computed per category and guarded
 -- against integer overflow in the preflight block.
-with category_bounds as (
+with category_bounds as materialized (
   select
     category.id as category_id,
     greatest(
@@ -1152,7 +1184,7 @@ with target_attributes as (
   join public.categories as category on category.slug = target.category_slug
   join public.category_attributes as attribute
     on attribute.category_id = category.id and attribute.key = target.key
-), attribute_bounds as (
+), attribute_bounds as materialized (
   select
     target_attribute.attribute_id,
     greatest(
@@ -1181,7 +1213,7 @@ from shifted
 where shifted.id = option.id;
 
 insert into public.category_attribute_options (
-  attribute_id, value, label_ru, label_kk, parent_option_id, sort_order, is_active
+  attribute_id, value, label_ru, label_kk, parent_option_id, sort_order, is_active, metadata
 )
 select
   attribute.id,
@@ -1190,7 +1222,8 @@ select
   target.label_kk,
   null,
   target.sort_order,
-  true
+  true,
+  target.metadata
 from marketo_catalog_0024_options as target
 join public.categories as category on category.slug = target.category_slug
 join public.category_attributes as attribute
@@ -1199,6 +1232,7 @@ on conflict (attribute_id, value) do update set
   label_ru = excluded.label_ru,
   label_kk = excluded.label_kk,
   parent_option_id = null,
+  metadata = excluded.metadata,
   sort_order = excluded.sort_order,
   is_active = true;
 
@@ -1217,6 +1251,22 @@ join public.category_attribute_options as parent_option
 where target.parent_value is not null
   and child_option.attribute_id = child_attribute.id
   and child_option.value = target.value;
+
+-- The old tablets-ereaders text model retained 144 unused, inactive options
+-- with an obsolete brand parent. Preserve all IDs and labels; unlink only these
+-- demonstrably unused legacy rows (never active/persisted listing choices).
+update public.category_attribute_options as child
+set parent_option_id = null
+from public.category_attributes as attribute
+join public.categories as category on category.id = attribute.category_id
+where child.attribute_id = attribute.id
+  and category.slug = 'tablets-ereaders' and attribute.key = 'model'
+  and attribute.data_type = 'text' and attribute.depends_on_key is null
+  and not child.is_active and child.parent_option_id is not null
+  and not exists (select 1 from public.listing_attribute_option_values v where v.option_id = child.id);
+
+${transformSql.backfill}
+${transformSql.postflight}
 
 -- Soft-deactivate every option absent from the complete managed snapshot.
 update public.category_attribute_options as option
@@ -1411,6 +1461,7 @@ begin
        or not actual.is_active
        or actual.label_ru is distinct from target.label_ru
        or actual.label_kk is distinct from target.label_kk
+       or actual.metadata is distinct from target.metadata
        or actual.sort_order is distinct from target.sort_order
   ) then
     raise exception '0024 persisted option metadata differs from the source snapshot';

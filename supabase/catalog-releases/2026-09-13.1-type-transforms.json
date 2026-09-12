@@ -1,0 +1,4485 @@
+[
+  {
+    "category": "transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-sedan",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-suv",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-hatchback",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-wagon",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-minivan",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-coupe",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-cabriolet",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-pickup",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-liftback",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cars-other-body",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "commercial-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-tractor-units",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-flatbeds",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-dumpers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-vans",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-refrigerators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-tankers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-chassis",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "buses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "buses-city",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "buses-intercity",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "buses-school",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "minibuses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "minibuses-passenger",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "minibuses-cargo",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "minibuses-combi",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "special-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "construction-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "excavators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "backhoe-loaders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wheel-loaders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bulldozers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "mobile-cranes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tower-cranes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "concrete-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "road-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "road-graders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "road-rollers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "asphalt-pavers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "road-milling-machines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "road-sweepers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "warehouse-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "forklifts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "telehandlers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "stackers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pallet-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "municipal-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garbage-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sewer-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "aerial-platforms",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fire-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "snow-removal-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "drilling-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "drilling-rigs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pile-driving-machines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "compressor-stations",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "mining-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "mining-loaders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "crushing-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "quarry-dump-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agricultural-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tractors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tractors-wheeled",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tractors-mini",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tractors-crawler",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "harvesters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "combine-grain",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "combine-forage",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "combine-special",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-attachments",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-tillage",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-seeding",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-hay",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-sprayers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-irrigation",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-livestock",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agricultural-utility-vehicles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-inflatable-boats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-motorboats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-rowboats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-yachts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-jet-skis",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-outboard-engines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-trailers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-airplanes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-helicopters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-ultralight",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-gliders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "other-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "motorhomes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "go-karts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "go-karts",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "other-transport-unlisted",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "personal-electric-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electric-kick-scooters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electric-unicycles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "segways-hoverboards",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "golf-carts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engines-complete",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-block-head",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-pistons-crank",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-timing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-fuel-system",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-cooling",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-intake-turbo",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-exhaust",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-mounts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "transmission-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "gearboxes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "clutch-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "transfer-cases",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "driveshafts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "differentials",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cv-joints-axles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "suspension-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "shock-absorbers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "suspension-springs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "suspension-arms",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wheel-bearings-hubs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "steering-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "brake-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-bumpers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-doors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-fenders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-hoods-trunks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-glass",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-mirrors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "body-frames",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "auto-electrics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-starters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-alternators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-batteries",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-sensors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-ecu",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-wiring",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electrics-ignition",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "optics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "headlights",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rear-lights",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fog-lights",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-bulbs-led",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-seats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-trim",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-dashboard",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-climate",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "interior-airbags",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tires-wheels",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-tires",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wheel-rims",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "complete-wheels",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wheel-caps-spacers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-electronics-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-mats-covers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-roof-racks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-tools-emergency",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-tuning",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-care-products",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "oils-fluids",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "engine-oils",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "transmission-oils",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "coolants",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "brake-fluids",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fuel-additives",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "auto-chemicals",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-engine-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-frame-suspension",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-brakes-wheels",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-electrics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "moto-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "special-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "truck-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bus-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "construction-machinery-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agricultural-machinery-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "trailer-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "auto-dismantling",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "auto-dismantling",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "phone-cases",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "phone-chargers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "screen-protectors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "smart-watches",
+    "key": "watch_model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computers",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computers",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computers",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computers",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "laptops",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "laptops",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "laptops",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "laptops",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "laptops",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "desktop-computers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "desktop-computers",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "desktop-computers",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "desktop-computers",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "desktop-computers",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "all-in-one",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "all-in-one",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "all-in-one",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "all-in-one",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "all-in-one",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "computer-components",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "monitors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computer-peripherals",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "storage-devices",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "network-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "photo-video",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cameras",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "lenses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "video-cameras",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "action-cameras",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "photo-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tv-video",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "televisions",
+    "key": "brand",
+    "from": "text",
+    "to": "select",
+    "values": [
+      {
+        "text": "Самсунг",
+        "option": "samsung",
+        "expectedRows": 1
+      }
+    ]
+  },
+  {
+    "category": "projectors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tv-boxes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "media-players",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "audio",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "headphones",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "portable-speakers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "speaker-systems",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "amplifiers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "gaming",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "game-consoles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "game-consoles",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "gaming-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "graphics-tablets",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tablet-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tablet-parts",
+    "key": "compatible_brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tablet-parts",
+    "key": "compatible_model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "washing-machines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "drying-machines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "vacuum-cleaners",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "robot-vacuums",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "irons-steamers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sewing-machines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kitchen-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "refrigerators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "freezers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "cookers-hobs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "ovens",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "dishwashers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "microwave-ovens",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kitchen-hoods",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "small-kitchen-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "climate-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "air-conditioners",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "heaters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "humidifiers-purifiers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "household-fans",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "water-heaters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "personal-care-electronics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hair-styling-devices",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "shavers-trimmers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "epilators-care",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "electric-toothbrushes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "health-electronics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-mirrors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-clocks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-pictures-posters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-vases-figurines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-candles-decor",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-storage-organizers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-curtains-blinds",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-carpets",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-bed-linen",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-blankets-pillows",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-towels-bathrobes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-table-textiles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-pots-pans",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-tableware",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-tea-coffee-ware",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-knives-cutlery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-baking-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-storage-containers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-cleaning-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-laundry-drying",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-bathroom-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-bags-film-foil",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-repair-smallwares",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-laundry-detergents",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-dish-detergents",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-surface-cleaners",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-air-fresheners",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-pest-control",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-pots-planters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "home-plant-care",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-seeds",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-fertilizers-soil",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-irrigation",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-greenhouses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-fences-decor",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-pools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-hand-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-lawn-mowers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-chainsaws",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-cultivators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "garden-pumps",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "office-paper-notebooks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "office-writing-supplies",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "office-folders-archiving",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "office-presentation-supplies",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-farm-products",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-meat-fish",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-dairy-eggs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-fruit-vegetables",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-honey-preserves",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-bakery-sweets",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-tea-coffee",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-nonalcoholic-drinks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "personal",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "personal",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "personal",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-clothing",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-dresses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-dresses",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-dresses",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-outerwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-outerwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-outerwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-tops",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-tops",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-tops",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-trousers-jeans",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-trousers-jeans",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-trousers-jeans",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-skirts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-skirts",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-skirts",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-suits",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-suits",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-suits",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-knitwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-knitwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-knitwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-sportswear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-sportswear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-sportswear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "women-boots",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-boots",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "women-sneakers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-sneakers",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "women-shoes-heels",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-shoes-heels",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "women-sandals",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-sandals",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "women-home-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-home-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-clothing",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-outerwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-outerwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-outerwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-shirts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-shirts",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-shirts",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-tshirts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-tshirts",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-tshirts",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-trousers-jeans",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-trousers-jeans",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-trousers-jeans",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-suits",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-suits",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-suits",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-knitwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-knitwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-knitwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-sportswear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-sportswear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-sportswear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-boots",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-boots",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-sneakers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-sneakers",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-classic-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-classic-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-sandals",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-sandals",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "men-home-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-home-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "underwear-swimwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "underwear-swimwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "underwear-swimwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "women-underwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-underwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "women-underwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "men-underwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-underwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "men-underwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "swimwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "swimwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "swimwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "sleepwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sleepwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sleepwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "hosiery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hosiery",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hosiery",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "headwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "headwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "headwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "fashion-hats-caps",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-hats-caps",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-hats-caps",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "fashion-hats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-hats",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-hats",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "fashion-scarves",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-scarves",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-scarves",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "bags",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-women-bags",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-men-bags",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-backpacks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-suitcases",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-wallets",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-belts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-gloves",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-sunglasses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-ties",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-hair-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "watches-jewelry",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-wristwatches",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-rings",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-earrings",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-chains-necklaces",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-bracelets",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fashion-costume-jewelry",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "wedding-dresses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding-dresses",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding-dresses",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "wedding-suits",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding-suits",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding-suits",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "wedding-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "wedding-decor-goods",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-makeup",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-face-care",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-hair-care",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-body-care",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-perfume",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-manicure-products",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-health-goods",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "workwear-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-clothing",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "workwear-footwear",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-footwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-medical",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-medical",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-medical",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "workwear-ppe",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-ppe",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "workwear-ppe",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "kids",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "baby-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "girls-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "boys-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-outerwear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-school-uniform",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-sportswear",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-shoes",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-boots",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-sneakers",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-sandals",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-first-steps-shoes",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-home-shoes",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "strollers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "stroller-carrycots",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "stroller-walking",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "stroller-modular",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "stroller-twins",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-seats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "infant-carriers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "child-car-seats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "car-seat-boosters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "feeding-highchairs",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "feeding-breast-pumps",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "feeding-sterilizers-heaters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "school-backpacks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "baby-diapers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "baby-hygiene",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "baby-monitors-scales",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "baby-carriers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-bicycles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-scooters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-balance-bikes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-electric-cars",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "kids-sledges",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hobby",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-fitness-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-fitness-equipment",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-team",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-team",
+    "key": "sport",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-team",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-racket",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-racket",
+    "key": "sport",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-racket",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-combat",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-combat",
+    "key": "sport",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-combat",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-winter",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-winter",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-water",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-water",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-skates-skateboards",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-skates-skateboards",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-protection",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "sports-protection",
+    "key": "product_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-mountain",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-road",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-city",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-bmx",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-electric",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "bicycles-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-tents",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-sleeping-bags",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-backpacks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-cooking",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-furniture",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-navigation",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tourism-climbing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-rods",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-reels",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-lures",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-tackle",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-boats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "fishing-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting-optics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting-decoys",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting-knives",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "hunting-storage",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "musical-instruments",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-guitars",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-keyboards",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-drums",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-wind",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-bowed-folk",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-studio-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-dj-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "music-accessories",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "board-family-games",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "board-strategy-games",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "board-roleplaying-games",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "board-puzzles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "board-chess-checkers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-bird-cages",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-bird-cages",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquariums",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquariums",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquarium-equipment",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquarium-equipment",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquarium-decor",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-aquarium-decor",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-rodent-cages",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-rodent-cages",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-terrariums",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-terrariums",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-supplies",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-food",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-beds-houses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-beds-houses",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-beds-houses",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-carriers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-carriers",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-carriers",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-collars-leashes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-collars-leashes",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-collars-leashes",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-toys-training",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-toys-training",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-toys-training",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-grooming-hygiene",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-grooming-hygiene",
+    "key": "material",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-grooming-hygiene",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-veterinary-goods",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "pet-veterinary-goods",
+    "key": "supply_type",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "retail-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-showcases-counters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-shelving",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-cash-registers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-scales-retail",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-refrigerated-display",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-advertising-stands",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "industrial-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-metalworking",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-woodworking",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-plastics",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-textile",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-packaging-lines",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-compressors-pumps",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-generators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "food-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-cooking-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-refrigeration",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-dishwashing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-bakery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-coffee-bar",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-food-processing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-restaurant-furniture",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "agro-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-livestock-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-poultry-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-dairy-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-feed-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-greenhouse-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-irrigation-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-beekeeping-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "medical-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-diagnostic-medical",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-dental-medical",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-lab-medical",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-rehab-medical",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-medical-furniture",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-medical-consumables",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "beauty-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-hairdressing-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-nail-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-cosmetology-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-massage-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-tattoo-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-salon-furniture",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "office-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-office-printing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-office-telephony",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-office-shredders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-office-safes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-office-badges-time",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "tools-materials",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-power-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-hand-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-welding",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-abrasives-cutting",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-safety-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-metal-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-wood-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-plastic-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-textile-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-food-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-chemical-raw",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "business-recyclables",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-women-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-women-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-women-clothing",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "free-men-clothing",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-men-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-men-clothing",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "free-shoes",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-shoes",
+    "key": "size",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "free-kids-clothing",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-phones-computers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-phones-computers",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-phones-computers",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-phones-computers",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "free-home-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-cars",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-cars",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-cars",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-moto",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-moto",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-commercial-vehicles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-parts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-phones",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-phones",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-computers",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-computers",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-computers",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-computers",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-computers",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "exchange-gaming",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "exchange-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "construction-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "construction-power-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "construction-hand-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "welding-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "compressors-generators",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "ladders-scaffolding",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "measuring-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-power-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-construction-equipment",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-generators-compressors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-garden-tools",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-special-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-excavators-loaders",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-cranes-lifts",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-aerial-platforms",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-road-machinery",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-passenger-cars",
+    "key": "generation",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-minibuses-buses",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-trucks",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-bikes-scooters",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-sound-light",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-costumes-decor",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-costumes-decor",
+    "key": "size",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-costumes-decor",
+    "key": "material",
+    "from": "text",
+    "to": "multiselect"
+  },
+  {
+    "category": "rental-sports-tourism",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-photo-video",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-computers-projectors",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-computers-projectors",
+    "key": "model",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-computers-projectors",
+    "key": "cpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-computers-projectors",
+    "key": "gpu",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-computers-projectors",
+    "key": "storage_capacity",
+    "from": "number",
+    "to": "select"
+  },
+  {
+    "category": "rental-game-consoles",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-home-appliances",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-strollers-seats",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "rental-kids-transport",
+    "key": "brand",
+    "from": "text",
+    "to": "select"
+  },
+  {
+    "category": "computer-components",
+    "key": "chipset",
+    "from": "text",
+    "to": "select"
+  }
+]

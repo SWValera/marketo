@@ -80,7 +80,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:31},(_,index)=>String(index+1).padStart(4,'0')));
+    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:32},(_,index)=>String(index+1).padStart(4,'0')));
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -557,6 +557,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         CATEGORY_REFERENCE_VERSION,
         "--output",
         releasePath,
+        "--type-transforms",
+        fileURLToPath(new URL(`supabase/catalog-releases/${CATEGORY_REFERENCE_VERSION}-type-transforms.json`, root)),
       ], { cwd: fileURLToPath(root), env: generatorEnvironment });
       await db.exec(await readFile(releasePath, "utf8"));
       await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
@@ -584,8 +586,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       regions: 20,
       settlements: 90,
       categories: 1358,
-      attributes: 14345,
-      options: 116412,
+      attributes: categoryOptions.reduce((sum, c) => sum + resolveCategoryAttributeSchema(c.slug, c.rootSlug).attributes.length, 0),
+      options: categoryOptions.reduce((sum, c) => sum + resolveCategoryAttributeSchema(c.slug, c.rootSlug).attributes.reduce((n, a) => n + (a.options?.length ?? 0), 0), 0),
       premium_settings: 90,
       default_capacity_settings: 90,
       premium_accounts: 0,
@@ -648,7 +650,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
           left join public.category_attribute_options as parent_option on parent_option.id = option.parent_option_id
           left join public.category_attributes as parent_attribute on parent_attribute.id = parent_option.attribute_id
           where option.is_active and child_attribute.depends_on_key is not null
-            and option.value <> 'other-model'
+            and option.value <> coalesce(child_attribute.validation ->> 'fallbackOption', 'other-model')
             and (parent_option.id is null or parent_attribute.category_id <> child_attribute.category_id or parent_attribute.key <> child_attribute.depends_on_key)
         ) as broken_dependencies
     `);

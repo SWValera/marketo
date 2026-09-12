@@ -203,7 +203,7 @@ function validateDependentOption(
     return;
   }
   const parentOption = selectedOption(parent, parentValue);
-  if (!parentOption || (option.parentOptionId === null && option.value !== "other-model") || (option.parentOptionId !== null && option.parentOptionId !== parentOption.id)) {
+  if (!parentOption || (option.parentOptionId === null && option.value !== (getAttributeValidation(attribute).fallbackOption ?? "other-model")) || (option.parentOptionId !== null && option.parentOptionId !== parentOption.id)) {
     addError(errors, field, "dependent_option");
   }
 }
@@ -211,7 +211,7 @@ function validateDependentOption(
 export function validatePublishAttributes(
   values: PublishAttributeValues,
   attributes: ReferenceCategoryAttribute[],
-  options: { strictOptions?: boolean } = {},
+  options: { strictOptions?: boolean; createdAt?: string } = {},
 ) {
   const errors: PublishFieldErrors = {};
   const definitions = new Map(attributes.map((attribute) => [attribute.key, attribute]));
@@ -225,7 +225,7 @@ export function validatePublishAttributes(
     const field = `attributes.${attribute.key}`;
     const value = values[attribute.key];
     if (isPublishValueMissing(value)) {
-      if (isAttributeRequired(attribute, values)) addError(errors, field, "required");
+      if (isAttributeRequired(attribute, values, options.createdAt)) addError(errors, field, "required");
       continue;
     }
     const validation = getAttributeValidation(attribute);
@@ -292,6 +292,7 @@ export function validatePublishDraft(
     photoCount?: number;
     requirePhotos?: boolean;
     strictOptions?: boolean;
+    createdAt?: string;
   },
 ) {
   const errors: PublishFieldErrors = {};
@@ -322,6 +323,7 @@ export function validatePublishDraft(
 
   const attributeErrors = validatePublishAttributes(input.attributes, options.attributes, {
     strictOptions: options.strictOptions,
+    createdAt: options.createdAt,
   });
   for (const [field, codes] of Object.entries(attributeErrors)) {
     for (const code of codes) addError(errors, field, code);

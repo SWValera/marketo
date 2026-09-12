@@ -9,17 +9,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const url = new URL(request.url);
   const parentOptionId = url.searchParams.get("parent_option_id") ?? undefined;
   const query = (url.searchParams.get("q") ?? "").slice(0, 64);
+  const parentValue = url.searchParams.get("parent_value") || undefined;
+  const selected = (url.searchParams.get("selected") ?? "").split(",").filter(Boolean);
+  const fallback = url.searchParams.get("fallback") || undefined;
+  const offset = Number(url.searchParams.get("offset") ?? "0");
+  const stableValue = /^[a-zA-Z0-9][a-zA-Z0-9:._+/-]{0,99}$/;
+  if ((parentValue && !stableValue.test(parentValue)) || selected.length > 50
+    || selected.some(value => !stableValue.test(value)) || (fallback && !stableValue.test(fallback))
+    || !Number.isInteger(offset) || offset < 0 || offset > 10000) {
+    return NextResponse.json({ error: "invalid_reference_query" }, { status: 400 });
+  }
   const versioned = url.searchParams.get("v") === CATEGORY_REFERENCE_VERSION;
 
   if (!UUID.test(id) || (parentOptionId && !UUID.test(parentOptionId))) {
     return NextResponse.json({ error: "invalid_reference_id" }, { status: 400 });
   }
 
-  const result = await getCategoryAttributeOptionReferences(id, parentOptionId, query);
+  const result = await getCategoryAttributeOptionReferences(id, parentOptionId, query, { parentValue, selected, fallback, offset });
   if (result.status !== "ready") {
     return NextResponse.json({ error: "reference_data_unavailable" }, { status: 503 });
   }
-  return NextResponse.json({ options: result.data }, {
+  return NextResponse.json(result.data, {
     headers: {
       "cache-control": versioned
         ? "public, max-age=300, s-maxage=300, must-revalidate"

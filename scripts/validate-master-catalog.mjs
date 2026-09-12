@@ -241,24 +241,30 @@ export function validateMasterCatalog() {
         optionValues.add(option.value);
       }
       if (attribute.dependsOnKey) {
+        const fallbackValue = attribute.validation?.fallbackOption;
         const parent = resolved.attributes.find((candidate) => candidate.key === attribute.dependsOnKey);
         check(Boolean(parent), `dependent attribute has no parent: ${category.slug}.${attribute.key}`);
         check(["select", "multiselect"].includes(parent?.dataType ?? ""), `dependent parent is not option-backed: ${category.slug}.${attribute.key}`);
+        if (attribute.dataType === "text") {
+          check(attribute.key === "model" && attribute.validation?.inputPurpose === "manufacturer-model-code", `unreviewed dependent text field: ${category.slug}.${attribute.key}`);
+          check(Boolean(attribute.validation?.reviewPolicy && attribute.validation?.placeholder?.ru && attribute.validation?.placeholder?.kk), `factory model code lacks policy/example: ${category.slug}.${attribute.key}`);
+        } else {
         const parentValues = new Set(parent?.options?.map((option) => option.value) ?? []);
         for (const option of attribute.options ?? []) {
-          if (option.value === "other-model") continue;
+          if (option.value === fallbackValue) continue;
           check(Boolean(option.parentValue), `dependent option has no parent value: ${category.slug}.${attribute.key}.${option.value}`);
           check(parentValues.has(option.parentValue), `dependent option references invalid parent: ${category.slug}.${attribute.key}.${option.value}`);
         }
-        const fallback = attribute.options?.find((option) => option.value === "other-model");
+        const fallback = attribute.options?.find((option) => option.value === fallbackValue);
         check(Boolean(fallback), `dependent dictionary has no fallback: ${category.slug}.${attribute.key}`);
-        check(attribute.validation?.fallbackOption === "other-model", `dependent fallback metadata missing: ${category.slug}.${attribute.key}`);
+        check(typeof fallbackValue === "string" && Boolean(fallbackValue), `dependent fallback metadata missing: ${category.slug}.${attribute.key}`);
         const manual = resolved.attributes.find((candidate) => candidate.key === `${attribute.key}_other`);
         check(Boolean(manual), `dependent fallback has no manual value field: ${category.slug}.${attribute.key}`);
         const visibleWhen = manual?.validation?.visibleWhen;
-        check(visibleWhen?.key === attribute.key && visibleWhen?.values?.includes("other-model"), `manual fallback visibility is invalid: ${category.slug}.${attribute.key}`);
+        check(visibleWhen?.key === attribute.key && visibleWhen?.values?.includes(fallbackValue), `manual fallback visibility is invalid: ${category.slug}.${attribute.key}`);
         const requiredWhen = manual?.validation?.requiredWhen;
-        check(requiredWhen?.key === attribute.key && requiredWhen?.values?.includes("other-model"), `manual fallback requirement is invalid: ${category.slug}.${attribute.key}`);
+        check(requiredWhen?.key === attribute.key && requiredWhen?.values?.includes(fallbackValue), `manual fallback requirement is invalid: ${category.slug}.${attribute.key}`);
+        }
       }
       const validation = attribute.validation;
       const hasVisibleWhen = Boolean(
@@ -434,8 +440,8 @@ export function validateMasterCatalog() {
   optionValuesContract("baby-monitors-scales", "baby_device_type", ["audio-monitor", "video-monitor", "scale", "thermometer"]);
   for (const key of ["connection", "range_meters"]) conditionalFieldContract("baby-monitors-scales", key, "baby_device_type", ["audio-monitor", "video-monitor"]);
   conditionalFieldContract("baby-monitors-scales", "night_vision", "baby_device_type", ["video-monitor"]);
-  for (const slug of ["pet-aquariums", "pet-aquarium-equipment", "pet-bird-cages", "pet-rodent-cages", "pet-terrariums"]) {
-    categoryContract(slug, ["animalSupply"], ["animal_type", "supply_type", "dimensions", "material", "condition"], ["species", "age_months", "gender", "documents"], ["smallAnimal"]);
+  for (const [slug, profile] of [["pet-aquariums", "aquariumTank"], ["pet-aquarium-equipment", "aquariumEquipment"], ["pet-bird-cages", "petCage"], ["pet-rodent-cages", "petCage"], ["pet-terrariums", "terrariumEquipment"]]) {
+    categoryContract(slug, [profile], ["supply_type", "material", "condition"], ["species", "age_months", "gender", "documents", "dimensions"], ["smallAnimal", "animalSupply"]);
   }
   categoryContract("books-fiction", ["bookMedia"], ["author", "language", "book_format", "publication_year", "isbn", "condition"], ["model", "warranty"]);
   categoryContract("books-magazines", ["bookMedia"], ["language", "publication_year", "issue_number", "condition"], ["model", "warranty"]);
@@ -445,7 +451,7 @@ export function validateMasterCatalog() {
   categoryContract("rental-passenger-cars", ["rentalGoods", "passengerCar", "vehicleCompliance"], ["billing_period", "minimum_term", "deposit", "brand", "model", "year", "engine_power", "condition"]);
   categoryContract("rental-home-appliances", ["rentalGoods", "appliance", "genericAppliance"], ["billing_period", "brand", "model", "appliance_type", "condition"], ["energy_class"]);
   categoryContract("free-home-appliances", ["free", "appliance", "genericAppliance"], ["condition", "brand", "model", "appliance_type"], ["energy_class"]);
-  categoryContract("exchange-cars", ["exchange", "passengerCarExchange", "vehicleCompliance"], ["wanted", "brand", "model", "year", "engine_power", "condition"], ["model_other"]);
+  categoryContract("exchange-cars", ["exchange", "passengerCarExchange", "vehicleCompliance"], ["wanted", "brand", "model", "model_other", "generation", "year", "engine_power", "condition"], []);
   categoryContract("exchange-appliances", ["exchange", "appliance", "genericAppliance"], ["wanted", "brand", "model", "appliance_type", "condition"], ["energy_class"]);
   categoryContract("jobs-driver", ["job", "professionalRequirements"], ["employment", "schedule", "experience", "contract_type", "skills", "languages", "license_categories"]);
   categoryContract("renovation-turnkey", ["serviceBase", "serviceProfessional"], ["provider_type", "contract_available", "documents_available", "payment_method", "service_area"]);
@@ -460,7 +466,7 @@ export function validateMasterCatalog() {
   for (const key of ["bicycle_type", "frame_size", "frame_material"]) conditionalFieldContract("rental-bikes-scooters", key, "rental_vehicle_type", ["bicycle"]);
   for (const key of ["scooter_drive_type", "max_speed", "range_km"]) conditionalFieldContract("rental-bikes-scooters", key, "rental_vehicle_type", ["scooter"]);
 
-  categoryContract("rental-event-furniture", ["rentalEventFurniture"], ["event_furnishing_type", "furniture_type", "material", "dimensions", "textile_type", "textile_material"]);
+  categoryContract("rental-event-furniture", ["rentalEventFurniture"], ["event_furnishing_type", "furniture_type", "material", "width", "height", "depth", "textile_type", "textile_material"]);
   optionValuesContract("rental-event-furniture", "event_furnishing_type", ["furniture", "textile"]);
   for (const key of ["furniture_type", "material"]) conditionalFieldContract("rental-event-furniture", key, "event_furnishing_type", ["furniture"]);
   for (const key of ["textile_type", "textile_material"]) conditionalFieldContract("rental-event-furniture", key, "event_furnishing_type", ["textile"]);
