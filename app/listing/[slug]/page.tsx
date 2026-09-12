@@ -3,7 +3,8 @@ import { SITE_ORIGIN } from "@/lib/site-origin";
 import { PublicationRefresh } from "@/components/publication-refresh";
 import { AppLink as Link } from "@/components/app-link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { MapPin, UserRound, ChevronRight, Car, CalendarDays, Gauge, Settings2, Fuel, GitFork, CircleGauge, Circle, Tag, ClipboardCheck, SlidersHorizontal } from "lucide-react";
+import { MapPin, UserRound, ChevronRight, Tag } from "lucide-react";
+import { AttributeIcon } from "@/components/attribute-icon";
 import { ListingDetailDisclosure } from "@/components/listing-detail-disclosure";
 import { EmptyState } from "@/components/empty-state";
 import { Header } from "@/components/header";
@@ -63,7 +64,6 @@ async function ListingPageContent({ params }: ListingPageProps) {
     year: { ru: "Год", kk: "Жылы" }, transmission: { ru: "КПП", kk: "Қорап" },
     engine_volume: { ru: "Объём", kk: "Көлемі" }, condition: { ru: "Состояние", kk: "Күйі" },
   };
-  const icons: Record<string, typeof Car> = { brand: Car, model: Car, year: CalendarDays, mileage: Gauge, transmission: Settings2, fuel: Fuel, drive: GitFork, engine_volume: CircleGauge, steering: CircleGauge, color: Circle, condition: ClipboardCheck };
   return <>
     <PublicationRefresh expiresAt={listing.expiresAt ?? null} />
     <Header categorySlug={listing.categorySlug} searchPlaceholder={localize(listing.categorySearchPlaceholder, locale)} />
@@ -78,8 +78,7 @@ async function ListingPageContent({ params }: ListingPageProps) {
             <h2>{t("listing.characteristics")}</h2>
             <ListingDetailDisclosure kind="characteristics" label={`${t("listing.characteristics")} (${characteristics.length})`} collapsible={characteristics.length > 11}>
               <dl className="characteristics-grid">{characteristics.map((item) => {
-                const Icon = icons[item.key] ?? SlidersHorizontal;
-                return <div key={item.key}><dt><Icon className="characteristic-icon" size={14} aria-hidden="true" /><span className="characteristic-label-full">{item.label}</span><span className="characteristic-label-compact" title={item.label}>{compactLabels[item.key] ? localize(compactLabels[item.key], locale) : item.label}</span></dt><dd><span>{item.value}</span></dd></div>;
+                return <div key={item.key}><dt><AttributeIcon attributeKey={item.key} categorySlug={listing.categorySlug} className="characteristic-icon" size={14} /><span className="characteristic-label-full">{item.label}</span><span className="characteristic-label-compact" title={item.label}>{compactLabels[item.key] ? localize(compactLabels[item.key], locale) : item.label}</span></dt><dd><span>{item.value}</span></dd></div>;
               })}</dl>
             </ListingDetailDisclosure>
           </article> : null}
