@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import {type KeyboardEvent, useLayoutEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {ChevronLeft, ChevronRight, X} from 'lucide-react';
+import {ChevronLeft, ChevronRight, Maximize, X} from 'lucide-react';
 import {useI18n} from '@/components/i18n-provider';
 import {activateModalFocus} from '@/lib/browser/modal';
 import {galleryIndex, galleryTarget} from '@/lib/media/gallery-position';
@@ -104,7 +104,7 @@ export function ListingGallery({images, title}: {images: readonly string[]; titl
               openingIndex.current = index;
               select(index);
               setOpen(true);
-            }}>{photo}</button>}
+            }}>{photo}<Maximize className="gallery-expand-icon" size={20} aria-hidden="true" /></button>}
         </figure>;
       })}
     </div>;
