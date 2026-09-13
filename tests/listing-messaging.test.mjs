@@ -35,12 +35,13 @@ test("send derives sender on server and keeps the same id for retries",async()=>
   await assert.rejects(adapter.sendTextMessage(f.client,next,"actor","я".repeat(4001),id));
   await assert.rejects(adapter.sendTextMessage(f.client,next,"actor","ok","not-a-uuid"));
 });
-test("history keyset uses both timestamp and id, is bounded, excludes deleted rows, rejects injected cursor",async()=>{
+test("history keyset uses both timestamp and id, is bounded, retains scrubbed tombstones, rejects injected cursor",async()=>{
   const f=clientFixture({data:[],error:null});
   await adapter.readMessagePage(f.client,next,{after:{id,sentAt:"2026-09-06T10:00:00.123456+00:00"}});
   assert.ok(f.calls.some(c=>c[0]==="limit"&&c[1]===101));
   assert.ok(f.calls.some(c=>c[0]==="eq"&&c[1]==="conversation_id"&&c[2]===next));
-  assert.ok(f.calls.some(c=>c[0]==="is"&&c[1]==="deleted_at"&&c[2]===null));
+  assert.ok(!f.calls.some(c=>c[0]==="is"&&c[1]==="deleted_at"));
+  assert.match(f.calls.find(c=>c[0]==="select")[1],/edited_at, deleted_at/);
   assert.match(f.calls.find(c=>c[0]==="or")[1],/created_at.gt.*and\(created_at.eq.*id.gt/);
   await assert.rejects(adapter.readMessagePage(f.client,next,{after:{id,sentAt:"x),id.neq.null"}}));
 });

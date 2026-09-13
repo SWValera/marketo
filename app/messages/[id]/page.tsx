@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AlertTriangle, UserRound } from "lucide-react";
+import { ChatShell } from "@/components/chat-shell";
+import { BackButton } from "@/components/back-button";
 import { ConversationThread } from "@/components/conversation-thread";
 import { EmptyState } from "@/components/empty-state";
 import { Header } from "@/components/header";
@@ -34,7 +36,20 @@ async function ConversationPageContent({ params }: ConversationPageProps) {
     return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} /><EmptyState icon={<AlertTriangle size={30} />} title={t("messages.loadErrorTitle")} description={t("messages.loadErrorNote")} actionHref={`/messages/${id}`} retry actionLabel={t("common.retry")} /></main><MobileNav /></>;
   }
   if (!conversation) notFound();
-  return <><Header /><main id="main-content" tabIndex={-1} className="page-shell subpage-main conversation-page"><PageHeader fallback="/messages" eyebrow={t("messages.eyebrow")} title={conversation.peerName} description={conversation.listingTitle ? t("messages.aboutListing", { title: conversation.listingTitle }) : t("messages.safeChat")} /><section className="conversation conversation-standalone"><header className="conversation-header"><span className="chat-avatar">{conversation.peerAvatarUrl
-    ? <img src={conversation.peerAvatarUrl} alt="" width={44} height={44} decoding="async" />
-    : <UserRound size={21} />}</span><div><strong>{conversation.peerName}</strong><small>{t("messages.jevuChat")}</small></div></header><ConversationThread key={conversation.id} conversation={conversation} currentUserId={authContext.user.id} /></section></main><MobileNav /></>;
+  return <ChatShell><Header /><main id="main-content" tabIndex={-1} className="conversation-page">
+    <section className="conversation conversation-standalone">
+      <header className="conversation-header">
+        <BackButton fallback="/messages" className="chat-back" />
+        <span className="chat-avatar">{conversation.peerAvatarUrl
+          ? <img src={conversation.peerAvatarUrl} alt="" width={44} height={44} decoding="async" />
+          : <UserRound size={21} aria-hidden="true" />}</span>
+        <div className="conversation-peer"><h1>{conversation.peerName}</h1>
+          {conversation.listingId && conversation.listingTitle
+            ? <small>{conversation.listingTitle}</small>
+            : <small>{t("messages.jevuChat")}</small>}
+        </div>
+      </header>
+      <ConversationThread key={conversation.id} conversation={conversation} currentUserId={authContext.user.id} />
+    </section>
+  </main><MobileNav /></ChatShell>;
 }

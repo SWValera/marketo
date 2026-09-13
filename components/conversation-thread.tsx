@@ -1,24 +1,33 @@
 "use client";
-import { CheckCheck, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChatMessageRow } from "@/components/chat-message";
 import { ChatComposer } from "@/components/chat-composer";
 import { useChatPolling } from "@/components/use-chat-polling";
 import { useI18n } from "@/components/i18n-provider";
 import { mergeMessages, type ChatMessage } from "@/lib/chat/messages";
-import { markConversationRead, readMessagePage, type MessageCursor, type MessageRow } from "@/lib/data/supabase/chat";
+import { deleteTextMessage, syncMessageChanges, markConversationRead, readMessagePage, type MessageCursor, type MessageRow } from "@/lib/data/supabase/chat";
 import type { Conversation } from "@/lib/data/types";
-import { localeTag } from "@/lib/i18n/config";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export function ConversationThread({ conversation, currentUserId }: { conversation: Conversation; currentUserId: string }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [messages, setMessages] = useState(conversation.messages);
   const [hasOlder, setHasOlder] = useState(Boolean(conversation.hasOlderMessages));
   const [olderBusy, setOlderBusy] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
-  const [seen, setSeen] = useState<string | null>(null);
+  const seen = atBottom ? messages.findLast(message => !message.deletedAt)?.id : undefined;
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [action, setAction] = useState<{id:string;kind:"menu"|"swipe"} | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState(false);
+  const deleteFlight = useRef(false);
+  const loaded = useRef(messages);
+  const syncOffset = useRef(0);
+  useEffect(() => { loaded.current = messages; }, [messages]);
   const viewport = useRef<HTMLDivElement>(null);
   const shouldScroll = useRef(true);
   const initialCursor = conversation.messages.at(-1);
@@ -27,8 +36,23 @@ export function ConversationThread({ conversation, currentUserId }: { conversati
   const olderFlight = useRef(false);
   const readFlight = useRef(false);
   const acknowledged = useRef<string | null>(null);
-  const map = (row: MessageRow): ChatMessage => ({ id:row.id, body:row.body, sentAt:row.created_at, own:row.sender_id === currentUserId, read:false });
-  const date = new Intl.DateTimeFormat(localeTag(locale), { dateStyle:"short", timeStyle:"short" });
+  const map = useCallback((row: MessageRow): ChatMessage => ({ id:row.id, body:row.deleted_at ? "" : row.body, sentAt:row.created_at,
+    editedAt:row.edited_at, deletedAt:row.deleted_at, own:row.sender_id === currentUserId, read:false }), [currentUserId]);
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    const channel = client.channel(`conversation:${conversation.id}`)
+      .on("postgres_changes", {event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conversation.id}`}, event => {
+        const row = event.new as MessageRow;
+        if (row.id && row.created_at && typeof row.body === "string") setMessages(current => mergeMessages(current, [map(row)]));
+      })
+      .on("postgres_changes", {event:"UPDATE",schema:"public",table:"messages",filter:`conversation_id=eq.${conversation.id}`}, event => {
+        const row = event.new as MessageRow;
+        if (row.id && row.created_at && typeof row.body === "string") setMessages(current =>
+          current.some(message => message.id === row.id) ? mergeMessages(current, [map(row)]) : current);
+      })
+      .subscribe(status => { if (status === "SUBSCRIBED") syncOffset.current = 0; });
+    return () => { void client.removeChannel(channel); };
+  }, [conversation.id, map]);
 
   const acknowledge = useCallback(async (id: string | undefined) => {
     if (!id || readFlight.current || acknowledged.current === id || document.visibilityState !== "visible") return;
@@ -39,10 +63,9 @@ export function ConversationThread({ conversation, currentUserId }: { conversati
   }, [conversation.id]);
   useEffect(() => {
     const element = viewport.current;
-    if (element && shouldScroll.current) element.scrollTop = element.scrollHeight;
-    const last = cursor.current;
-    if (atBottom && last) setSeen(last.id);
-  }, [messages, atBottom]);
+    if (element && shouldScroll.current && !action) element.scrollTop = element.scrollHeight;
+
+  }, [messages, atBottom, action]);
   useEffect(() => { if (seen) void acknowledge(seen); }, [seen, acknowledge]); // Acknowledge only after rendering visible messages.
 
   useChatPolling(currentUserId, async signal => {
@@ -61,6 +84,13 @@ export function ConversationThread({ conversation, currentUserId }: { conversati
         }
         if (!page.hasMore) break;
       }
+      // Round-robin bounded reconciliation also works when WebSockets are unavailable.
+      const candidates = loaded.current.filter(message => !message.deletedAt);
+      const offset = syncOffset.current < candidates.length ? syncOffset.current : 0;
+      const changed = await syncMessageChanges(client, conversation.id, candidates.slice(offset, offset + 100), signal);
+      if (signal.aborted) return;
+      syncOffset.current = offset + 100;
+      if (changed.length) setMessages(current => mergeMessages(current, changed.map(map)));
       if (conversation.peerId) {
         const marker = await client.from("conversation_participants").select("last_read_at")
           .eq("conversation_id", conversation.id).eq("user_id", conversation.peerId).abortSignal(signal).maybeSingle();
@@ -93,20 +123,31 @@ export function ConversationThread({ conversation, currentUserId }: { conversati
     shouldScroll.current = true; setAtBottom(true);
     setMessages(current => mergeMessages(current, [map(row)]));
   }
-  return <>
+  async function remove(message: ChatMessage) {
+    if (deleteFlight.current) return;
+    deleteFlight.current = true; setDeleting(message.id); setMutationError(false);
+    try {
+      const row = await deleteTextMessage(getSupabaseBrowserClient(), conversation.id, message.id);
+      setMessages(current => mergeMessages(current, [map(row)]));
+      setAction(null); if (editing?.id === message.id) setEditing(null);
+    } catch { setMutationError(true); }
+    finally { deleteFlight.current = false; setDeleting(null); }
+  }
+  const activeEdit = editing && !messages.find(message => message.id === editing.id)?.deletedAt ? editing : null;
+  return <div className="conversation-body">
     {connectionError ? <p className="chat-connection-status" role="status">{t("messages.connectionLost")}</p> : null}
+    {mutationError ? <p className="chat-connection-status" role="alert">{t("messages.deleteFailed")}</p> : null}
     <div className="chat-thread chat-live-thread" ref={viewport} aria-label={t("messages.heading")}
       onScroll={() => { const node=viewport.current; if (!node) return; const bottom=node.scrollHeight-node.scrollTop-node.clientHeight < 60; shouldScroll.current=bottom; setAtBottom(bottom); }}>
       {hasOlder ? <button type="button" className="secondary-button chat-history-button" disabled={olderBusy} onClick={() => void loadOlder()}>{olderBusy ? t("common.loading") : t("messages.loadOlder")}</button> : null}
       {historyError ? <p role="status">{t("messages.historyFailed")}</p> : null}
       <div className="chat-message-log" role="log" aria-live="polite" aria-relevant="additions" aria-label={t("messages.heading")}>
-        {messages.length ? messages.map(message => <div className={"message-bubble " + (message.own ? "outgoing" : "incoming")} key={message.id}>
-          <p>{message.body}</p><time dateTime={message.sentAt}>{date.format(new Date(message.sentAt))}
-            {message.own && message.read ? <CheckCheck size={16} aria-label={t("messages.read")} /> : null}</time>
-        </div>) : <p className="inline-feedback">{t("messages.noMessagesYet")}</p>}
+        {messages.length ? messages.map(message => <ChatMessageRow key={message.id} message={message} action={action} setAction={setAction}
+          busy={deleting !== null || composing} onEdit={() => { setEditing(message); setAction(null); }} onDelete={() => void remove(message)} />) : <p className="inline-feedback">{t("messages.noMessagesYet")}</p>}
       </div>
     </div>
     {!atBottom ? <button className="chat-jump-button" type="button" onClick={() => { shouldScroll.current=true; setAtBottom(true); viewport.current?.scrollTo({ top:viewport.current.scrollHeight }); }}><ChevronDown size={18} />{t("messages.toLatest")}</button> : null}
-    <ChatComposer conversationId={conversation.id} currentUserId={currentUserId} disabled={conversation.canSend === false} onSent={onSent} />
-  </>;
+    <ChatComposer conversationId={conversation.id} currentUserId={currentUserId} disabled={conversation.canSend === false && !activeEdit} onSent={onSent}
+      editing={activeEdit} onBusyChange={setComposing} onCancelEdit={() => setEditing(null)} onEdited={row => setMessages(current => mergeMessages(current, [map(row)]))} />
+  </div>;
 }

@@ -9,7 +9,7 @@ export class ChatDataError extends Error {
     super(code, options); this.name = "ChatDataError";
   }
 }
-export type MessageRow = { id: string; body: string; sender_id: string | null; created_at: string };
+export type MessageRow = { id: string; body: string; sender_id: string | null; created_at: string; edited_at?: string | null; deleted_at?: string | null };
 export type MessageCursor = { id: string; sentAt: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function safeDisplayName(value: string | null | undefined, locale: Locale) {
@@ -48,8 +48,8 @@ export async function readMessagePage(client: JevuSupabaseClient, conversationId
   const cursor = options.after ?? options.before;
   if (cursor && (!UUID.test(cursor.id) || !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})$/.test(cursor.sentAt) || !Number.isFinite(Date.parse(cursor.sentAt)))) throw new ChatDataError("DETAIL_UNAVAILABLE");
   const ascending = Boolean(options.after);
-  let query = client.from("messages").select("id, body, sender_id, created_at")
-    .eq("conversation_id", conversationId).is("deleted_at", null)
+  let query = client.from("messages").select("id, body, sender_id, created_at, edited_at, deleted_at")
+    .eq("conversation_id", conversationId)
     .order("created_at", { ascending }).order("id", { ascending }).limit(101);
   if (cursor) {
     const op = ascending ? "gt" : "lt";
@@ -89,7 +89,7 @@ export async function getConversation(client: JevuSupabaseClient, conversationId
     peerName: peerId ? safeDisplayName(profile.data?.display_name, locale) : (locale === "kk" ? "Пайдаланушы жойылған" : "Пользователь удалён"), peerAvatarUrl: publicMediaUrl(profile.data?.avatar_path ?? null),
     listingId: row.listing_id, listingTitle: listing.data?.title ?? null,
     lastMessage: latest?.body ?? null, lastMessageAt: latest?.created_at ?? row.last_message_at, unreadCount: null,
-    messages: page.rows.map(message => ({ id:message.id, body:message.body, sentAt:message.created_at,
+    messages: page.rows.map(message => ({ id:message.id, body:message.deleted_at ? "" : message.body, sentAt:message.created_at, editedAt:message.edited_at, deletedAt:message.deleted_at,
       own:message.sender_id === userId, read:message.sender_id === userId && Boolean(readAt && readAt >= message.created_at) })),
   };
 }
@@ -108,4 +108,31 @@ export async function markConversationRead(client: JevuSupabaseClient, conversat
     target_conversation_id: conversationId, through_message_id: throughMessageId,
   }).abortSignal(AbortSignal.timeout(10000));
   if (error) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
+}
+
+export async function editTextMessage(client: JevuSupabaseClient, conversationId: string, messageId: string, body: string, editedAt?: string | null) {
+  const cleanBody = body.trim();
+  if (!cleanBody || Array.from(cleanBody).length > 4000 || !UUID.test(messageId)) throw new ChatDataError("MESSAGE_FAILED");
+  const { data, error } = await client.rpc("edit_listing_message", {
+    target_conversation_id: conversationId, target_message_id: messageId, message_body: cleanBody, expected_edited_at: editedAt ?? null,
+  }).abortSignal(AbortSignal.timeout(15000));
+  if (error || !data?.[0]) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
+  return data[0];
+}
+export async function deleteTextMessage(client: JevuSupabaseClient, conversationId: string, messageId: string) {
+  const { data, error } = await client.rpc("delete_listing_message", {
+    target_conversation_id: conversationId, target_message_id: messageId,
+  }).abortSignal(AbortSignal.timeout(15000));
+  if (error || !data?.[0]) throw new ChatDataError("MESSAGE_FAILED", { cause: error });
+  return data[0];
+}
+export async function syncMessageChanges(client: JevuSupabaseClient, conversationId: string,
+  known: Conversation["messages"], signal: AbortSignal) {
+  if (!known.length) return [];
+  const { data, error } = await client.rpc("sync_listing_message_changes", {
+    target_conversation_id: conversationId,
+    known_messages: known.slice(0, 100).map(message => ({ id:message.id, edited_at:message.editedAt ?? null, deleted_at:message.deletedAt ?? null })),
+  }).abortSignal(signal);
+  if (error) throw new ChatDataError("DETAIL_UNAVAILABLE", { cause:error });
+  return data ?? [];
 }

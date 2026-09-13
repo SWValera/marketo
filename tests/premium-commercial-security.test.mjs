@@ -1,3 +1,4 @@
+import { emptyCatalogTransformPlan } from "./catalog-bootstrap.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, rmdir } from "node:fs/promises";
@@ -59,11 +60,13 @@ test("Premium commercial accounts, orders and analytics are owner-scoped by RLS"
       await execFileAsync(process.execPath,[
         fileURLToPath(new URL('scripts/generate-catalog-completeness-migration.mjs',root)),
         '--release-id',CATEGORY_REFERENCE_VERSION,'--output',releasePath,
+        '--type-transforms',await emptyCatalogTransformPlan(db,releaseDirectory),
       ],{cwd:fileURLToPath(root),env:prepareNodeRuntimeEnvironment(process.env)});
       await db.exec(await readFile(releasePath,'utf8'));
       await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
     } finally {
       await rm(releasePath,{force:true});
+      await rm(join(releaseDirectory,'empty-test-type-transforms.json'),{force:true});
       await rmdir(releaseDirectory);
     }
     await db.query(

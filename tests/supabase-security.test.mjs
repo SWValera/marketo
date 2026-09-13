@@ -1,3 +1,4 @@
+import { emptyCatalogTransformPlan } from "./catalog-bootstrap.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
@@ -12,6 +13,7 @@ import { CATEGORY_REFERENCE_VERSION } from "../lib/reference-data/release.ts";
 import { prepareNodeRuntimeEnvironment } from "../scripts/lib/node-runtime.mjs";
 import { closePGliteTestDatabase, createPGliteTestDatabase } from "./pglite-test-database.mjs";
 import { auditProfileLifecycle, auditRegistrationHandoff } from "./profile-lifecycle-db-audit.mjs";
+import { auditMessageActions } from "./message-actions-db-audit.mjs";
 import { auditListingMessaging } from "./listing-messaging-db-audit.mjs";
 
 const root = new URL("../", import.meta.url);
@@ -136,6 +138,8 @@ async function applyMigrations(db, { through = null, seed = true } = {}) {
         CATEGORY_REFERENCE_VERSION,
         "--output",
         releasePath,
+        "--type-transforms",
+        await emptyCatalogTransformPlan(db, releaseDirectory),
       ], { cwd: fileURLToPath(root), env: generatorEnvironment });
       await db.exec(await readFile(releasePath, "utf8"));
       await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));
@@ -1372,7 +1376,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 29);
+      assert.equal(functions.rows.length, 31);
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
       assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_listing_contact_options"]);
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
@@ -1381,6 +1385,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
 
     await t.test("0028 owner lifecycle, calendar month, exact public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
     await t.test("0029 messages and 0030 protected phone metadata", () => auditListingMessaging(db, users, listings.activeOwner, conversationId, { protectedPhones: true }));
+    await t.test("0033 sender-only edits, deletion, stale writes and reconnect", () => auditMessageActions(db, users, conversationId));
     await t.test("0028 private PKCE mailbox capabilities, leases, cancellation and rate limits", () => auditRegistrationHandoff(db, users.owner));
     await closePGliteTestDatabase(db);
     currentDbClosed = true;

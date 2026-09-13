@@ -284,6 +284,18 @@ export type Database = {
         Args: { target_conversation_id: string; client_message_id: string; message_body: string };
         Returns: Array<{ id: string; body: string; sender_id: string; created_at: string }>;
       };
+      edit_listing_message: {
+        Args: { target_conversation_id: string; target_message_id: string; message_body: string; expected_edited_at?: string | null };
+        Returns: Array<Database["public"]["Tables"]["messages"]["Row"]>;
+      };
+      delete_listing_message: {
+        Args: { target_conversation_id: string; target_message_id: string };
+        Returns: Array<Database["public"]["Tables"]["messages"]["Row"]>;
+      };
+      sync_listing_message_changes: {
+        Args: { target_conversation_id: string; known_messages: Json };
+        Returns: Array<Database["public"]["Tables"]["messages"]["Row"]>;
+      };
       mark_listing_conversation_read: {
         Args: { target_conversation_id: string; through_message_id: string };
         Returns: undefined;

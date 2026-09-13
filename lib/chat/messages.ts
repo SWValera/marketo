@@ -9,7 +9,20 @@ export function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map(current.map(message => [message.id, message]));
   for (const message of incoming) {
     const previous = byId.get(message.id);
-    byId.set(message.id, { ...message, read: message.read || previous?.read || false });
+    // Deletion is irreversible; late history/send responses must not resurrect old text.
+    const older = previous && (previous.deletedAt || (previous.editedAt &&
+      (!message.editedAt || compareTime(previous.editedAt, message.editedAt) > 0))) && !message.deletedAt;
+    const latest = older ? previous : message;
+    byId.set(message.id, { ...latest, body:latest.deletedAt ? "" : latest.body, read: message.read || previous?.read || false });
   }
   return [...byId.values()].sort(compareMessages);
+}
+
+function compareTime(left: string, right: string) {
+  return Date.parse(left) - Date.parse(right) || microseconds(left) - microseconds(right);
+}
+export function swipeIntent(dx: number, dy: number): "left" | "right" | "scroll" | "pending" {
+  if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) return "scroll";
+  if (Math.abs(dx) < 32 || Math.abs(dx) < Math.abs(dy) * 1.5) return "pending";
+  return dx < 0 ? "left" : "right";
 }

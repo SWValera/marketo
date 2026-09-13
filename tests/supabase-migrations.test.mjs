@@ -1,3 +1,4 @@
+import { emptyCatalogTransformPlan } from "./catalog-bootstrap.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
@@ -80,7 +81,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:32},(_,index)=>String(index+1).padStart(4,'0')));
+    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:33},(_,index)=>String(index+1).padStart(4,'0')));
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -97,7 +98,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         and namespace.nspname in ('public', 'private')
     `);
     // 0030 adds reveal_listing_phone; 0031 adds five elevated account guards/RPCs.
-    assert.equal(elevatedFunctions.rows.length, 29);
+    assert.equal(elevatedFunctions.rows.length, 31);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -558,7 +559,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         "--output",
         releasePath,
         "--type-transforms",
-        fileURLToPath(new URL(`supabase/catalog-releases/${CATEGORY_REFERENCE_VERSION}-type-transforms.json`, root)),
+        await emptyCatalogTransformPlan(db, releaseDirectory),
       ], { cwd: fileURLToPath(root), env: generatorEnvironment });
       await db.exec(await readFile(releasePath, "utf8"));
       await db.exec(await readFile(new URL("supabase/seeds/001_marketo_reference.sql", root), "utf8"));

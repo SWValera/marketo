@@ -134,7 +134,7 @@ export type Conversation = ChatSummary & {
   peerId?: string;
   hasOlderMessages?: boolean;
   canSend?: boolean;
-  messages: Array<{ id: string; body: string; sentAt: string; own: boolean; read: boolean }>;
+  messages: Array<{ id: string; body: string; sentAt: string; own: boolean; read: boolean; editedAt?: string | null; deletedAt?: string | null }>;
 };
 
 export type Notification = {
