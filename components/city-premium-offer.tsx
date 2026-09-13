@@ -51,7 +51,8 @@ export function CityPremiumOffer({ listingId }: { listingId: string }) {
   const placement = offer?.placement;
   const active = placement?.status === "active" && Date.parse(placement.ends_at ?? "") > now;
   const full = product?.available === 0;
-  const canActivate = !!product?.enabled && product.price_amount === 0 && !!offer?.listing_active && !active && !full && placement?.status !== "reserved";
+  const pending = placement?.status === "pending_approval";
+  const canActivate = !!product?.enabled && product.price_amount === 0 && (!!offer?.listing_active || !!offer?.listing_pending) && !active && !pending && !full && placement?.status !== "reserved";
   return <section className="city-premium-offer" aria-label={t("promotion.title")}>
     <h3><Star size={19} aria-hidden="true" />{t("promotion.title")}</h3>
     <p>{t("promotion.description")}</p>
@@ -61,10 +62,11 @@ export function CityPremiumOffer({ listingId }: { listingId: string }) {
         <div><dt>{t("promotion.duration")}</dt><dd>{t("promotion.days", {count:product.duration_seconds / 86400})}</dd></div>
         <div><dt>{t("promotion.price")}</dt><dd>{product.price_amount === 0 ? t("promotion.free") : product.price_amount.toLocaleString(localeTag(locale)) + " " + product.currency}</dd></div>
         <div><dt>{t("promotion.available")}</dt><dd>{product.available} / {product.capacity}</dd></div></dl>
-      {active ? <p className="promotion-active" role="status">{t("promotion.activeUntil", {date:placement.ends_at ? new Intl.DateTimeFormat(localeTag(locale), {dateStyle:"medium",timeStyle:"short"}).format(new Date(placement.ends_at)) : ""})}</p> : <>
+      {active ? <p className="promotion-active" role="status">{t("promotion.activeUntil", {date:placement.ends_at ? new Intl.DateTimeFormat(localeTag(locale), {dateStyle:"medium",timeStyle:"short"}).format(new Date(placement.ends_at)) : ""})}</p> : pending ? <div className="promotion-pending" role="status"><strong>{t("promotion.selected")}</strong><p>{t("promotion.pendingApproval", {count:product.duration_seconds / 86400})}</p></div> : <>
         {placement?.status === "expired" || placement?.status === "completed" || (placement?.status === "active" && !active) ? <p>{t("promotion.expired")}</p> : null}
         {full ? <p>{t("promotion.full", {capacity:product.capacity})}</p> : null}
-        {!offer.listing_active ? <p>{t("promotion.afterApproval")}</p> : null}
+        {offer.listing_pending ? <p>{t("promotion.afterApproval")}</p> : !offer.listing_active ? <p>{t("promotion.listingUnavailable")}</p> : null}
+        {placement?.status === "cancelled" && placement.failure_reason ? <p role="status">{t(placement.failure_reason === "capacity_full" ? "promotion.approvalFull" : placement.failure_reason === "moderation_rejected" ? "promotion.approvalRejected" : "promotion.approvalFailed")}</p> : null}
         {product.price_amount > 0 ? <p>{t("promotion.paymentUnavailable")}</p> : null}
         {!product.enabled ? <p>{t("promotion.unavailable")}</p> : null}
         <button type="button" className="primary-control" disabled={!canActivate || busy} onClick={() => void activate()}>

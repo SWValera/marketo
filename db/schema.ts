@@ -17,6 +17,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -339,6 +340,7 @@ export const cityPremiumPlacements = pgTable("city_premium_placements", {
   paymentStatus: text("payment_status").notNull().default("not_required"),
   paymentReference: text("payment_reference"),
   reservationExpiresAt: timestamptz("reservation_expires_at"),
+  failureReason: text("failure_reason"),
   accountId: uuid("account_id").references(() => cityPremiumAccounts.id, { onDelete: "restrict" }),
   orderId: uuid("order_id"),
   status: text("status").notNull().default("active"),
@@ -350,6 +352,7 @@ export const cityPremiumPlacements = pgTable("city_premium_placements", {
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("promotion_pending_listing_unique").on(table.listingId, table.promotionType).where(sql`${table.status} = 'pending_approval'`),
   index("promotion_owner_history_idx").on(table.userId, table.listingId, table.promotionType, table.createdAt),
   index("promotion_city_window_idx").on(table.settlementId, table.promotionType, table.status, table.endsAt, table.reservationExpiresAt),
   index("city_premium_placements_active_window_idx").on(table.settlementId, table.status, table.startsAt, table.endsAt, table.id),

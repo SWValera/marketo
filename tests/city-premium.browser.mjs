@@ -15,8 +15,8 @@ const mocks={
 };
 const entry=`import React from 'react';import{createRoot}from'react-dom/client';import{CityPremiumOffer}from'./components/city-premium-offer';
 const params=new URLSearchParams(location.search);window.lang=params.get('lang')||'ru';const mode=params.get('mode');window.calls=[];
-window.offer={listing_active:mode!=='pending',placement:mode==='expired'?{id:'previous',status:'expired',ends_at:new Date(Date.now()-1).toISOString(),price_amount:0,currency:'KZT'}:null,product:{enabled:true,duration_seconds:604800,capacity:15,available:mode==='full'?0:15,price_amount:mode==='paid'?1000:0,currency:'KZT',city_ru:'City',city_kk:'City'}};
-window.client={rpc:(name,args)=>({abortSignal:async()=>{window.calls.push({name,args});if(name==='activate_city_premium'){if(mode==='error')return {data:null,error:{message:'city premium capacity exceeded'}};window.offer={...window.offer,placement:{id:'active',status:'active',ends_at:new Date(Date.now()+604800000).toISOString(),price_amount:0,currency:'KZT'}};return {data:'active',error:null}}return {data:structuredClone(window.offer),error:null}}})};
+window.offer={listing_active:!['pending','pending_full'].includes(mode),listing_pending:['pending','pending_full'].includes(mode),placement:mode==='approval_full'?{id:'declined',status:'cancelled',failure_reason:'capacity_full',ends_at:null,price_amount:0,currency:'KZT'}:mode==='expired'?{id:'previous',status:'expired',ends_at:new Date(Date.now()-1).toISOString(),price_amount:0,currency:'KZT'}:null,product:{enabled:true,duration_seconds:604800,capacity:15,available:['full','pending_full','approval_full'].includes(mode)?0:15,price_amount:mode==='paid'?1000:0,currency:'KZT',city_ru:'City',city_kk:'City'}};
+window.client={rpc:(name,args)=>({abortSignal:async()=>{window.calls.push({name,args});if(name==='activate_city_premium'){if(mode==='error')return {data:null,error:{message:'city premium capacity exceeded'}};window.offer={...window.offer,placement:{id:'active',status:mode==='pending'?'pending_approval':'active',ends_at:mode==='pending'?null:new Date(Date.now()+604800000).toISOString(),price_amount:0,currency:'KZT'}};return {data:'active',error:null}}return {data:structuredClone(window.offer),error:null}}})};
 createRoot(document.getElementById('app')).render(<main style={{padding:16,maxWidth:640,margin:'auto'}}><p id="ordinary-listing">Ordinary listing preserved</p><CityPremiumOffer listingId="10000000-0000-4000-8000-000000000001"/></main>);`;
 const bundle=await build({stdin:{contents:entry,loader:'tsx',resolveDir:root},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'promotion-transport-fixture',setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:'mock'}:null);b.onLoad({filter:/.*/,namespace:'mock'},a=>({contents:mocks[a.path],loader:'tsx',resolveDir:root}));}}]});
 const css=(await readFile('app/globals.css','utf8')).replace('@import "tailwindcss";','');
@@ -35,17 +35,28 @@ try{
 
  for(const [width,height,mobile] of [[390,844,true],[430,932,true],[1280,900,false]]) {
    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
-   for(const lang of ['ru','kk']) for(const mode of ['available','full','pending','expired','paid','error']) {
+   for(const lang of ['ru','kk']) for(const mode of (process.env.JEVU_PROMOTION_MODES?.split(',')||['available','full','pending','pending_full','approval_full','expired','paid','error'])) {
      await send('Page.navigate',{url:origin+'/?lang='+lang+'&mode='+mode});
      await until(`!!document.querySelector('.city-premium-offer dl')`);
      const geometry=await evaluate(`({width:document.documentElement.scrollWidth,button:document.querySelector('.city-premium-offer .primary-control').getBoundingClientRect().height,disabled:document.querySelector('.primary-control').disabled})`);
      assert.equal(geometry.width,width);assert.ok(geometry.button>=44);
-     assert.equal(geometry.disabled,['full','pending','paid'].includes(mode));
+     assert.equal(geometry.disabled,['full','pending_full','approval_full','paid'].includes(mode));
      if(!geometry.disabled) {
        await evaluate(`document.querySelector('.primary-control').click()`);
-       await until(mode==='error'?`!!document.querySelector('[role=alert]')`:`!!document.querySelector('.promotion-active')`);
+       await until(mode==='error'?`!!document.querySelector('[role=alert]')`:mode==='pending'?`!!document.querySelector('.promotion-pending')`:`!!document.querySelector('.promotion-active')`);
        assert.equal(await evaluate(`document.querySelector('#ordinary-listing').textContent`),'Ordinary listing preserved');
        assert.equal(await evaluate(`window.calls.filter(c=>c.name==='activate_city_premium').length`),1);
+     }
+     if(mode==='pending') {
+       assert.equal(await evaluate("!!document.querySelector('[role=alert]') || !!document.querySelector('.city-premium-offer .secondary-button')"),false,'Selection has no error or Retry');
+       assert.equal(await evaluate("window.offer.placement.ends_at"),null);
+       assert.equal(await evaluate("!!document.querySelector('.primary-control')"),false,'Pending state cannot submit twice');
+       await evaluate("window.offer={...window.offer,listing_active:true,listing_pending:false,placement:{...window.offer.placement,status:'active',ends_at:new Date(Date.now()+604800000).toISOString()}};window.dispatchEvent(new Event('focus'))");
+       await until("!!document.querySelector('.promotion-active')");
+     }
+     if(mode==='approval_full') {
+       assert.equal(await evaluate("!!document.querySelector('[role=alert]')"),false,'Full at approval is a stored outcome, not a request error');
+       assert.equal(await evaluate("!!document.querySelector('.city-premium-offer p[role=status]')"),true);
      }
      if(lang==='ru'&&mode==='available'){const shot=await send('Page.captureScreenshot',{format:'png'});await writeFile(join(out,'premium-'+width+'.png'),Buffer.from(shot.data,'base64'));}
      results.push({width,lang,mode,status:'PASS'});

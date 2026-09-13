@@ -2,8 +2,8 @@ import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 export type CityPremiumProduct = Database["public"]["Functions"]["get_city_premium_availability"]["Returns"][number];
 export type CityPremiumOffer = {
-  product: CityPremiumProduct | null; listing_active: boolean;
-  placement: { id: string; status: string; ends_at: string | null; price_amount: number; currency: string } | null;
+  product: CityPremiumProduct | null; listing_active: boolean; listing_pending?: boolean;
+  placement: { id: string; status: string; failure_reason?: string | null; ends_at: string | null; price_amount: number; currency: string } | null;
 };
 export async function readCityPremiumOffer(client: JevuSupabaseClient, listingId: string, signal: AbortSignal) {
   const { data, error } = await client.rpc("get_city_premium_offer", { target_listing_id: listingId }).abortSignal(AbortSignal.any([signal, AbortSignal.timeout(12000)]));

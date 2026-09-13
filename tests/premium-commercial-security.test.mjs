@@ -1,3 +1,4 @@
+import { auditCityPremiumApproval } from "./city-premium-approval-db-audit.mjs";
 import { auditCityPremium } from "./city-premium-db-audit.mjs";
 import { emptyCatalogTransformPlan } from "./catalog-bootstrap.mjs";
 import assert from "node:assert/strict";
@@ -149,6 +150,10 @@ test("Premium commercial accounts, orders and analytics are owner-scoped by RLS"
     for(const slug of ['promotion-test-a','promotion-test-b']) cities.push((await db.query("insert into public.settlements(region_id,slug,name_ru,name_kk,kind) values($1,$2,'Test','Test','city') returning id",[region,slug])).rows[0].id);
     // PGlite exercises permissions/lifecycle; the native PostgreSQL audit additionally supplies two independent connections.
     await auditCityPremium(db,{owner:ownerId,buyer:buyerId,city:cities[0],otherCity:cities[1],category:categoryId});
+    const approvalCities=[];
+    for(const slug of ['approval-test-a','approval-test-b']) approvalCities.push((await db.query("insert into public.settlements(region_id,slug,name_ru,name_kk,kind) values($1,$2,'Test','Test','city') returning id",[region,slug])).rows[0].id);
+    await auditCityPremiumApproval(db,{owner:ownerId,buyer:buyerId,city:approvalCities[0],otherCity:approvalCities[1],category:categoryId});
+
   } finally {
     await closePGliteTestDatabase(db);
   }

@@ -81,7 +81,7 @@ export async function auditCityPremium(db, {owner, buyer, city, otherCity, categ
   await db.exec("update public.promotion_products set price_amount=0,enabled=false where code='CITY_PREMIUM'");
   await assert.rejects(activate(reserve),e=>e.code==='22023');
   await db.exec("update public.promotion_products set enabled=true where code='CITY_PREMIUM'");
-  for(const state of ['sold','archived','rejected','pending']) {
+  for(const state of ['sold','archived','rejected']) {
     await db.query('update public.listings set status=$1 where id=$2',[state,other]);
     assert.equal((await db.query('select * from public.get_city_premium_placements($1)',[otherCity])).rows.length,0);
     await assert.rejects(activate(other),e=>e.code==='22023');
