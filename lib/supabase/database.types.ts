@@ -13,6 +13,7 @@ import type {
   cityPremiumOrders,
   cityPremiumPlacements,
   cityPremiumSettings,
+  promotionProducts,
   conversationParticipants,
   conversations,
   countries,
@@ -80,6 +81,7 @@ export type Database = {
       listing_attribute_values: Contract<typeof listingAttributeValues>;
       listing_attribute_option_values: Contract<typeof listingAttributeOptionValues>;
       listing_images: Contract<typeof listingImages>;
+      promotion_products: Contract<typeof promotionProducts>;
       city_premium_settings: Contract<typeof cityPremiumSettings>;
       city_premium_accounts: Contract<typeof cityPremiumAccounts>;
       city_premium_orders: Contract<typeof cityPremiumOrders>;
@@ -114,6 +116,13 @@ export type Database = {
       };
     };
     Functions: {
+      activate_city_premium: { Args: { target_listing_id: string }; Returns: string };
+      get_city_premium_offer: { Args: { target_listing_id: string }; Returns: Json };
+      expire_listing_promotions: { Args: Record<string, never>; Returns: number };
+      get_city_premium_availability: {
+        Args: { p_settlement_id: string };
+        Returns: Array<{ enabled: boolean; duration_seconds: number; capacity: number; available: number; price_amount: number; currency: string; city_ru: string; city_kk: string }>;
+      };
       owner_listing_transition: { Args: { target_listing_id: string; requested_action: string }; Returns: string };
       get_my_profile: {
         Args: Record<PropertyKey, never>;

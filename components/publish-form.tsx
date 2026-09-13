@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CityPremiumOffer } from "@/components/city-premium-offer";
 import { CategoryPicker } from "@/components/category-picker";
 import { useI18n } from "@/components/i18n-provider";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
@@ -666,6 +667,7 @@ export function PublishForm({
           <h2>{t("publish.savedTitle")}</h2>
           <p>{t("publish.savedNote")}</p>
           <div className="publish-summary">{summary.map((item) => <span key={item}>{item}</span>)}</div>
+          {listingId ? <CityPremiumOffer key={listingId} listingId={listingId} /> : null}
           <button type="button" onClick={reset}>{t("publish.createAnother")}</button>
         </div>
       ) : (

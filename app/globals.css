@@ -1436,3 +1436,16 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
   .chat-shell .chat-composer { border-bottom: 1px solid var(--line); }
 }
 @media (prefers-reduced-motion: reduce) { .chat-message-row .message-bubble { transition: none; } }
+
+.city-premium-offer { width: 100%; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: #fff; text-align: left; }
+.city-premium-offer h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1rem; color: var(--green-dark); }
+.city-premium-offer p { margin: 8px 0; font-size: .9375rem; line-height: 1.5; overflow-wrap: anywhere; }
+.city-premium-offer dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 12px 0; }
+.city-premium-offer dt { color: var(--text-muted); font-size: .8125rem; }
+.city-premium-offer dd { margin: 3px 0 0; font-size: .9375rem; font-weight: 700; overflow-wrap: anywhere; }
+.city-premium-offer button { min-height: 44px; max-width: 100%; white-space: normal; }
+.city-premium-offer button:disabled { opacity: .55; cursor: not-allowed; }
+.city-premium-offer .promotion-active { color: var(--green-dark); font-weight: 700; }
+.city-premium-offer .promotion-error { color: var(--warning); }
+.owner-city-premium { margin-top: 10px; min-width: 0; }
+.owner-city-premium > .city-premium-offer { margin-top: 8px; }

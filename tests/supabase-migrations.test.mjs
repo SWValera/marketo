@@ -89,7 +89,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       join pg_namespace as namespace on namespace.oid = relation.relnamespace
       where namespace.nspname = 'public' and relation.relkind = 'r'
     `);
-    assert.deepEqual(rlsCoverage.rows[0], { total: 29, rls: 29 });
+    assert.deepEqual(rlsCoverage.rows[0], { total: 30, rls: 30 });
     const elevatedFunctions = await db.query(`
       select procedure.proname, procedure.proconfig
       from pg_proc as procedure
@@ -98,7 +98,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         and namespace.nspname in ('public', 'private')
     `);
     // 0030 adds reveal_listing_phone; 0031 adds five elevated account guards/RPCs.
-    assert.equal(elevatedFunctions.rows.length, 31);
+    assert.equal(elevatedFunctions.rows.length, 35);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -151,6 +151,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       order by procedure.proname
     `);
     assert.deepEqual(anonymousRpcAllowlist.rows, [
+      { proname: "get_city_premium_availability" },
       { proname: "get_city_premium_placements" },
       { proname: "get_listing_contact_options" },
       { proname: "search_catalog_listing_cards" },
@@ -693,7 +694,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
           join pg_namespace as namespace on namespace.oid = procedure.pronamespace
           where namespace.nspname = 'public'
             and has_function_privilege('anon', procedure.oid, 'EXECUTE')
-            and procedure.proname not in ('search_catalog_listing_cards', 'get_city_premium_placements', 'get_listing_contact_options')
+            and procedure.proname not in ('search_catalog_listing_cards', 'get_city_premium_placements', 'get_city_premium_availability', 'get_listing_contact_options')
         ) as unexpected_anon_public_execute,
         (
           select count(*)::int

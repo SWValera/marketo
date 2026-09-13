@@ -52,7 +52,8 @@ test("premium API and migration expose active paid placements only with default 
   const correction = await readFile(new URL("supabase/migrations/0020_targeted_catalog_and_premium_foundation.sql", root), "utf8");
   assert.match(api, /eq\("is_active", true\)\.eq\("is_selectable", true\)/);
   assert.match(api, /get_city_premium_placements/);
-  assert.match(api, /p_limit: 15/);
+  assert.match(api, /get_city_premium_availability/);
+  assert.match(api, /p_limit: product.capacity/);
   assert.match(migration, /capacity smallint not null default 15/);
   assert.match(migration, /status = 'active'[\s\S]*starts_at <= current_timestamp[\s\S]*ends_at > current_timestamp/);
   assert.match(migration, /listing\.status = 'active'/);

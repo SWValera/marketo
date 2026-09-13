@@ -40,6 +40,7 @@ const expectedMigrations = [
   "0031_account_deletion.sql",
   "0032_catalog_reference_metadata.sql",
   "0033_message_actions.sql",
+  "0034_promotion_products.sql",
 ];
 
 const immutableMigrationHashes = {

@@ -11,11 +11,14 @@ export async function GET(request: Request) {
   const { data: settlement, error: settlementError } = await client.from("settlements").select("id").eq("id", city).eq("is_active", true).eq("is_selectable", true).maybeSingle();
   if (settlementError) return NextResponse.json({ error: "city_lookup_failed" }, { status: 503 });
   if (!settlement) return NextResponse.json({ error: "city_not_found" }, { status: 404 });
-  const { data, error } = await client.rpc("get_city_premium_placements", { p_settlement_id: city, p_limit: 15 });
+  const { data: availability, error: availabilityError } = await client.rpc("get_city_premium_availability", { p_settlement_id: city });
+  const product = availability?.[0];
+  if (availabilityError || !product) return NextResponse.json({ error: "showcase_lookup_failed" }, { status: 503 });
+  const { data, error } = await client.rpc("get_city_premium_placements", { p_settlement_id: city, p_limit: product.capacity });
   if (error) return NextResponse.json({ error: "showcase_lookup_failed" }, { status: 503 });
   return NextResponse.json({
     city,
-    capacity: 15,
+    capacity: product.capacity,
     placements: data.map((placement) => ({
       id: placement.placement_id,
       listingId: placement.listing_id,
