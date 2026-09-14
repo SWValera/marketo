@@ -46,3 +46,28 @@ moderation_rejected. Other activation failures cancel it with activation_failed.
 Only optional promotion work is inside the exception subtransaction: ordinary
 moderation still succeeds. There is no automatic retry queue. The owner offer
 displays selection, the active end date, or a clear terminal outcome in RU/KK.
+
+
+## Read-only RPC and owner connection results (0036)
+
+Production get_city_premium_offer returned HTTP 405 / SQLSTATE 25006 because
+PostgREST executes STABLE functions in a READ ONLY transaction, while its account
+write guard attempted SELECT FOR SHARE. Offer reads now check the same authenticated
+owner/non-deleted account predicates without a write lock. Account locks remain in
+activation. Regression tests include a real READ ONLY transaction, unlike the
+previous read-write-only SQL harness.
+
+connect_city_premium is a result adapter over the existing UUID activation RPC.
+It returns ACTIVE, ALREADY_ACTIVE, PENDING_APPROVAL, NO_SLOTS, or a concrete
+LISTING_NOT_ELIGIBLE reason; paid/disabled/reserved outcomes stay non-technical.
+Unknown database errors are rethrown. Client diagnostics retain RPC, SQLSTATE and
+HTTP status without record values, IDs, tokens or payloads.
+
+Expired/cancelled/completed history is retained and does not block activation.
+An active listing with a matching legacy pending intent activates that same record.
+An incompatible legacy intent is cancelled with history retained before normal
+allocation. Pending listings continue to wait for moderation without using a slot.
+
+The production browser used the 09e532a pending-approval chunk. Its SHA-256 matched
+an independent network fetch with no Service Worker, so no cache reset or Service
+Worker changes were required for this defect.

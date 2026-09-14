@@ -116,6 +116,7 @@ export type Database = {
       };
     };
     Functions: {
+      connect_city_premium: { Args: { target_listing_id: string }; Returns: Json };
       activate_city_premium: { Args: { target_listing_id: string }; Returns: string };
       get_city_premium_offer: { Args: { target_listing_id: string }; Returns: Json };
       expire_listing_promotions: { Args: Record<string, never>; Returns: number };
