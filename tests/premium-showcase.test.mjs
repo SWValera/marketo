@@ -23,7 +23,8 @@ test("showcase preserves server order, pages by pairs and expands the same cards
   assert.match(source, /premiumDemoCount\(paidItems.length\)/);
   assert.match(source, /return \[\.\.\.paidItems, \.\.\.brandedItems\]/);
   assert.match(source, /viewAll \? items : page.items/);
-  assert.doesNotMatch(source, /useShowcaseTimeline|showcaseWindow|Math.random/);
+  assert.match(source, /useShowcaseTimeline\(Math.ceil\(items.length \/ 2\), viewAll, cityKey\)/);
+  assert.doesNotMatch(source, /showcaseWindow|Math.random/);
   assert.match(source, /key=\{item.kind \+ "-" \+ item.id\}/);
   assert.match(source, /Date\.parse\(item\.expiresAt\) > deadlineNow/);
   assert.match(source, /paidState\.city === selectedLocation/);

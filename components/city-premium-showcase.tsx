@@ -28,6 +28,7 @@ import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
+import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { premiumCarouselPage, premiumDemoCount } from "@/lib/premium-showcase-presentation";
 
 type PaidPlacement = {
@@ -99,7 +100,6 @@ export function CityPremiumShowcase() {
   const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
   const [viewAll, setViewAll] = useState(false);
-  const [carousel, setCarousel] = useState({ city: cityKey, page: 0 });
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClickUntil = useRef(0);
   const [deadlineNow, setDeadlineNow] = useState(0);
@@ -148,9 +148,10 @@ export function CityPremiumShowcase() {
     return [...paidItems, ...brandedItems];
   }, [paid, cityKey]);
 
-  const page = premiumCarouselPage(items, carousel.city === cityKey ? carousel.page : 0);
+  const carousel = useShowcaseTimeline(Math.ceil(items.length / 2), viewAll, cityKey);
+  const page = premiumCarouselPage(items, carousel.page);
   const displayed = viewAll ? items : page.items;
-  const moveToPage = (index: number) => setCarousel({ city: cityKey, page: index });
+  const moveToPage = carousel.selectPage;
   const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
 
@@ -164,7 +165,7 @@ export function CityPremiumShowcase() {
         <p className="showcase-city"><MapPin size={16} aria-hidden="true" /><span>{cityLabel}</span></p>
         {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t("showcase.total", { count: paid.length })}</p> : null}
       </div>
-      <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => { setViewAll((value) => !value); moveToPage(0); }}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
+      <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setViewAll((value) => !value)}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
     {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
     <div id="city-premium-items">

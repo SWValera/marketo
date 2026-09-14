@@ -1,44 +1,34 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { rotationFrameAt, SHOWCASE_ROTATION_MS } from "@/lib/showcase-rotation";
+import { useMemo, useSyncExternalStore } from "react";
+import { createShowcaseClock, type ShowcaseClockEnvironment } from "@/lib/showcase-clock";
 
-const subscribeNever = () => () => undefined;
-const getZeroSnapshot = () => 0;
-const getTimelineSnapshot = () => rotationFrameAt(Date.now());
+const browserClock: ShowcaseClockEnvironment = {
+  now: () => Date.now(),
+  setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+  clearTimeout: (timer) => window.clearTimeout(timer),
+  isVisible: () => !document.hidden,
+  subscribeActivity: (listener) => {
+    const resume = () => listener(!document.hidden);
+    const suspend = () => listener(false);
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("focus", resume);
+    window.addEventListener("pageshow", resume);
+    window.addEventListener("pagehide", suspend);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("focus", resume);
+      window.removeEventListener("pageshow", resume);
+      window.removeEventListener("pagehide", suspend);
+    };
+  },
+};
 
-function subscribeTimeline(listener: () => void) {
-  const now = Date.now();
-  const delay = SHOWCASE_ROTATION_MS - (now % SHOWCASE_ROTATION_MS) + 1;
-  let interval: number | undefined;
-  const timeout = window.setTimeout(() => {
-    listener();
-    interval = window.setInterval(listener, SHOWCASE_ROTATION_MS);
-  }, delay);
-  return () => {
-    window.clearTimeout(timeout);
-    if (interval !== undefined) window.clearInterval(interval);
-  };
-}
-
-function subscribeReducedMotion(listener: () => void) {
-  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-  media.addEventListener("change", listener);
-  return () => media.removeEventListener("change", listener);
-}
-
-const getReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const getServerReducedMotion = () => false;
-
-export function useShowcaseTimeline(paused: boolean) {
-  const reducedMotion = useSyncExternalStore(
-    subscribeReducedMotion,
-    getReducedMotion,
-    getServerReducedMotion,
+export function useShowcaseTimeline(pageCount: number, paused: boolean, scope: string) {
+  const clock = useMemo(
+    () => createShowcaseClock({ pageCount, paused, scope }, browserClock),
+    [pageCount, paused, scope],
   );
-  return useSyncExternalStore(
-    paused || reducedMotion ? subscribeNever : subscribeTimeline,
-    reducedMotion ? getZeroSnapshot : getTimelineSnapshot,
-    getZeroSnapshot,
-  );
+  const page = useSyncExternalStore(clock.subscribe, clock.getSnapshot, clock.getServerSnapshot);
+  return { page, selectPage: clock.selectPage };
 }

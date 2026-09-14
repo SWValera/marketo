@@ -4,11 +4,12 @@ import {join,resolve} from "node:path";
 import {spawn} from "node:child_process";
 import {createServer,get} from "node:http";
 import {build} from "esbuild";
-const root=resolve("."),out=resolve("artifacts/jevu-premium-carousel-20260914");
+const root=resolve("."),out=resolve("artifacts/jevu-premium-time-sync-20260914");
 await mkdir(out,{recursive:true});
 const candidates=[process.env.JEVU_BROWSER_PATH,"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe","C:/Program Files/Google/Chrome/Application/chrome.exe","/usr/bin/chromium"].filter(Boolean);
 let browser;for(const path of candidates)if(await access(path).then(()=>true,()=>false)){browser=path;break;}assert.ok(browser,"An installed Chromium is required");
 const mocks={
+ "@/lib/showcase-clock":"import {createShowcaseClock as actual} from './lib/showcase-clock.ts';export const createShowcaseClock=(options,env)=>actual(options,{...env,setTimeout:(fn,delay)=>window.__setBoundary(fn,delay),clearTimeout:id=>window.__clearBoundary(id)});",
  "@/components/app-link":"export const AppLink=({children,...props})=><a {...props}>{children}</a>;",
  "@/components/category-link":"export const CategoryLink=({children,cityId,...props})=><a {...props}>{children}</a>;",
  "@/components/i18n-provider":"import {translate} from './lib/i18n/messages';export const useI18n=()=>({locale:window.lang,t:(key,values)=>translate(window.lang,key,values)});",
@@ -49,6 +50,7 @@ try{
  const evaluate=async expression=>{const r=await send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
  const until=async expression=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await delay(30);}assert.fail(expression);};
  await send("Page.enable");await send("Runtime.enable");
+ await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__fakeNow=Number(new URLSearchParams(location.search).get('now')||0);\nDate.now=()=>window.__fakeNow;\nwindow.__hidden=false;\nObject.defineProperty(document,'hidden',{configurable:true,get:()=>window.__hidden});\nwindow.__clockTimers=new Map();window.__clockID=0;window.__clockMax=0;\nwindow.__setBoundary=(fn,delay)=>{const id=++window.__clockID;window.__clockTimers.set(id,{fn,at:Date.now()+delay});window.__clockMax=Math.max(window.__clockMax,window.__clockTimers.size);return id;};\nwindow.__clearBoundary=id=>window.__clockTimers.delete(id);\nwindow.__advance=to=>{while(true){const entry=[...window.__clockTimers].sort((a,b)=>a[1].at-b[1].at)[0];if(!entry||entry[1].at>to)break;window.__fakeNow=entry[1].at;window.__clockTimers.delete(entry[0]);entry[1].fn();}window.__fakeNow=to;};\n"});
  await send("Page.addScriptToEvaluateOnNewDocument",{source:`window.imageFrames=[];const loop=()=>{if(window.ready && document.querySelector('.showcase-status')){const cards=[...document.querySelectorAll('.showcase-card')];if(cards.length)window.imageFrames.push(cards.map(c=>[c.getBoundingClientRect().width,c.getBoundingClientRect().height]));}requestAnimationFrame(loop)};requestAnimationFrame(loop);`});
  const geometry=`(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,bottom:r.bottom}};const cards=[...document.querySelectorAll('.showcase-card')];return {scrollWidth:document.documentElement.scrollWidth,columns:getComputedStyle(document.querySelector('.showcase-grid')).gridTemplateColumns.split(' ').length,real:cards.filter(c=>c.classList.contains('showcase-paid-card')).length,demo:cards.filter(c=>c.classList.contains('showcase-brand-card')).length,links:cards.filter(c=>c.classList.contains('showcase-paid-card')).map(c=>c.getAttribute('href')),counter:document.querySelector('.showcase-status')?.textContent,cards:cards.map(c=>({box:rect(c),media:c.querySelector('.showcase-media')?rect(c.querySelector('.showcase-media')):null,image:c.querySelector('img')&&getComputedStyle(c.querySelector('img')).display!=='none'?{...rect(c.querySelector('img')),fit:getComputedStyle(c.querySelector('img')).objectFit}:null,copy:rect(c.querySelector('.showcase-card-copy')),overflow:c.scrollWidth>c.clientWidth}))}})()`;
  const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.w/c.media.h-4/3)<.02);if(c.image){assert.equal(c.image.fit,"cover");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
@@ -97,6 +99,10 @@ try{
      await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
      await until("document.querySelectorAll('.showcase-dots button')[1].getAttribute('aria-current')==='true'");
      assert.ok((await evaluate("location.href")).startsWith(origin),"Swiping must not open a listing");
+     assert.equal(await evaluate("window.__clockTimers.size"),1);
+     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),3000,"Swipe keeps the global deadline");
+     await evaluate("window.__advance(6000)");
+     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
      await evaluate("document.querySelector('.showcase-dots button').click()");
      await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
    }
@@ -122,6 +128,61 @@ try{
  assert.equal(await evaluate("document.querySelectorAll('.showcase-card').length"),2);
  await evaluate("document.querySelector('.showcase-arrow-next').click()");
  await until("document.querySelectorAll('.showcase-brand-card').length===1");
+
+ // Deterministic wall clock with the actual hook, controller and browser lifecycle listeners.
+ // Only boundary scheduling is controlled; React, DOM, image loading and touch events are real.
+ await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ for(const count of counts){
+   const pages=(count+demo[count])/2,start=8400;
+   await send("Page.navigate",{url:origin+"/?count="+count+"&now="+start});
+   await until("window.ready && !!document.querySelector('.showcase-status')");await delay(250);
+   const currentPage=()=>evaluate("(()=>{const buttons=[...document.querySelectorAll('.showcase-dots button')];return buttons.length?buttons.findIndex(b=>b.getAttribute('aria-current')==='true'):0})()");
+   const expectedAt=time=>Math.floor(time/3000)%pages;
+   const check=async expected=>{await until("(()=>{const b=[...document.querySelectorAll('.showcase-dots button')];return (b.length?b.findIndex(x=>x.getAttribute('aria-current')==='true'):0)})()==="+expected);assert.equal(await evaluate("document.querySelectorAll('.showcase-card').length"),2);};
+   await check(expectedAt(start));
+   assert.equal(await evaluate("window.__clockTimers.size"),pages>1?1:0);
+   if(pages>1){
+     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),9000);
+     await evaluate("window.__advance(8999)");await check(expectedAt(start));
+     const heights=(await evaluate(geometry)).cards.map(c=>c.box.h);
+     for(let step=0;step<pages+2;step++){
+       const time=9000+step*3000;
+       await evaluate("window.__advance("+time+")");await check(expectedAt(time));
+       const g=await evaluate(geometry);assertGeometry(g,390,2);assert.deepEqual(g.cards.map(c=>c.box.h),heights);
+     }
+     const now=await evaluate("Date.now()"),deadline=await evaluate("[...window.__clockTimers.values()][0].at");
+     const before=await currentPage();
+     await evaluate("document.querySelector('.showcase-arrow-next').click()");await check((before+1)%pages);
+     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),deadline);
+     await evaluate("document.querySelector('.showcase-arrow-prev').click()");await check(before);
+     await evaluate("document.querySelectorAll('.showcase-dots button')[0].click()");await check(0);
+     assert.equal(await evaluate("window.__clockTimers.size"),1);
+     await evaluate("window.__advance("+deadline+")");await check(expectedAt(deadline));
+     // Expanded has no boundary timer. Collapse uses time now, not page one.
+     await evaluate("document.querySelector('.showcase-view-all').click()");
+     await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true' && window.__clockTimers.size===0");
+     const collapseAt=(Math.floor((now+30000)/3000)+1)*3000+1200;
+     await evaluate("window.__fakeNow="+collapseAt+";document.querySelector('.showcase-view-all').click()");
+     await check(expectedAt(collapseAt));assert.equal(await evaluate("window.__clockTimers.size"),1);
+     // Hidden removes the timer, resume jumps directly after 30 seconds.
+     await evaluate("window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))");
+     await until("window.__clockTimers.size===0");
+     const resumeAt=collapseAt+31000;
+     await evaluate("window.__fakeNow="+resumeAt+";window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'))");
+     await check(expectedAt(resumeAt));assert.equal(await evaluate("window.__clockTimers.size"),1);
+     // Focus and BFCache restore clear even same-bucket manual overrides.
+     await evaluate("document.querySelector('.showcase-arrow-next').click()");await check((expectedAt(resumeAt)+1)%pages);
+     await evaluate("window.dispatchEvent(new Event('focus'))");await check(expectedAt(resumeAt));
+     await evaluate("window.dispatchEvent(new Event('pagehide'))");await until("window.__clockTimers.size===0");
+     await evaluate("window.__fakeNow="+(resumeAt+35000)+";window.dispatchEvent(new Event('pageshow'))");await check(expectedAt(resumeAt+35000));
+     assert.equal(await evaluate("window.__clockMax"),1,"No second boundary timer after manual/mode/lifecycle events");
+   }
+   const remountAt=37400;
+   await send("Page.navigate",{url:origin+"/?count="+count+"&now="+remountAt});
+   await until("window.ready && !!document.querySelector('.showcase-status')");await check(expectedAt(remountAt));
+   results.push({count,timeSync:"PASS",midBucketMount:"PASS",remainder:pages>1?600:null,background:"PASS",expanded:"PASS",remount:"PASS"});
+ }
+
  assert.deepEqual(errors,[]);
  await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",environment:"Installed Chromium; actual showcase/CSS with fixture data/images; not physical Safari/PWA",scenarios:results.length+1,results,errors},null,2));
  console.log(JSON.stringify({status:"PASS",scenarios:results.length+1,errors}));
