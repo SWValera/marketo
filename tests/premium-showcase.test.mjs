@@ -18,11 +18,11 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   assert.match(tabs, /fetchHomeListingPreview\(controller\.signal\)/);
 });
 
-test("showcase preserves server order, uses four initial tiles and expands the same cards", async () => {
+test("showcase preserves server order, pages by pairs and expands the same cards", async () => {
   const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
   assert.match(source, /premiumDemoCount\(paidItems.length\)/);
   assert.match(source, /return \[\.\.\.paidItems, \.\.\.brandedItems\]/);
-  assert.match(source, /viewAll \? items : items.slice\(0, 4\)/);
+  assert.match(source, /viewAll \? items : page.items/);
   assert.doesNotMatch(source, /useShowcaseTimeline|showcaseWindow|Math.random/);
   assert.match(source, /key=\{item.kind \+ "-" \+ item.id\}/);
   assert.match(source, /Date\.parse\(item\.expiresAt\) > deadlineNow/);
@@ -33,7 +33,7 @@ test("showcase preserves server order, uses four initial tiles and expands the s
 
 test("demo tiles follow the complete 0..15 rule without filling capacity", async () => {
   const { premiumDemoCount } = await import("../lib/premium-showcase-presentation.ts");
-  const expected = [4,3,2,1,0,1,0,1,0,1,0,1,0,1,0,0];
+  const expected = [2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];
   expected.forEach((demo, real) => assert.equal(premiumDemoCount(real), demo, "real=" + real));
   for (const invalid of [-1, NaN, Infinity, 1.5, 16]) assert.equal(premiumDemoCount(invalid), 0);
 });
@@ -61,11 +61,31 @@ test("premium API and migration expose active paid placements only with default 
 test("both showcase modes retain two mobile columns and the catalog thumbnail treatment", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
-  assert.match(css, /\.showcase-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /\.showcase-grid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.showcase-grid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.showcase-grid-all \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.doesNotMatch(css, /\.showcase-grid-all \{ grid-template-columns: minmax\(0, 1fr\)/);
   assert.doesNotMatch(css, /showcase-card:nth-child\(3\)/);
   assert.match(source, /showcase-media listing-image-wrap/);
   assert.match(source, /className="listing-image"/);
-  assert.match(css, /\.showcase-media \.listing-image \{ position: absolute; inset: 0; \}/);
+  assert.match(css, /\.showcase-media \.listing-image \{ position: absolute; inset: 0;/);
+});
+
+test("carousel shows exactly two items per page, wraps and preserves real ordering", async () => {
+  const { premiumDemoCount, premiumCarouselPage } = await import("../lib/premium-showcase-presentation.ts");
+  for (let real = 0; real <= 15; real++) {
+    const items = [...Array.from({length: real}, (_,i) => "real-"+i), ...Array.from({length: premiumDemoCount(real)}, (_,i) => "demo-"+i)];
+    const count = Math.ceil(items.length / 2);
+    const seen = [];
+    for (let page = 0; page < count; page++) {
+      const result = premiumCarouselPage(items, page);
+      assert.equal(result.items.length, 2);
+      assert.equal(result.pageIndex, page);
+      seen.push(...result.items);
+    }
+    assert.deepEqual(seen, items);
+    assert.equal(premiumCarouselPage(items, -1).pageIndex, count-1);
+    assert.deepEqual(premiumCarouselPage(items, count).items, items.slice(0,2));
+    assert.deepEqual(premiumCarouselPage(items, NaN).items, items.slice(0,2));
+  }
+  assert.deepEqual(premiumCarouselPage([], 10), {pageCount: 0, pageIndex: 0, items: []});
 });

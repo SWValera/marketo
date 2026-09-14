@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import {access,mkdir,mkdtemp,readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
-import {spawn,execFileSync} from "node:child_process";
+import {spawn} from "node:child_process";
 import {createServer,get} from "node:http";
 import {build} from "esbuild";
-const root=resolve("."),out=resolve("artifacts/jevu-premium-showcase-ui-20260914");
+const root=resolve("."),out=resolve("artifacts/jevu-premium-carousel-20260914");
 await mkdir(out,{recursive:true});
-const baseline=process.env.JEVU_SHOWCASE_BASELINE==="1";
 const candidates=[process.env.JEVU_BROWSER_PATH,"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe","C:/Program Files/Google/Chrome/Application/chrome.exe","/usr/bin/chromium"].filter(Boolean);
 let browser;for(const path of candidates)if(await access(path).then(()=>true,()=>false)){browser=path;break;}assert.ok(browser,"An installed Chromium is required");
 const mocks={
@@ -24,9 +23,8 @@ const placements=Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:
 window.fetch=async()=>{window.ready=true;return new Response(JSON.stringify({capacity:15,placements}),{headers:{'content-type':'application/json'}})};
 createRoot(document.getElementById('app')).render(<><main className="page-shell home-showcase-shell"><CityPremiumShowcase/></main><div style={{height:150}}/><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>);
 `;
-if(baseline)mocks["./components/city-premium-showcase"]=execFileSync("git",["show","HEAD:components/city-premium-showcase.tsx"],{encoding:"utf8",windowsHide:true});
 const bundle=await build({stdin:{contents:entry,loader:"tsx",resolveDir:root},bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",define:{"process.env.NODE_ENV":'"production"'},plugins:[{name:"showcase-fixture",setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:"fixture"}:null);b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:mocks[a.path],loader:"tsx",resolveDir:root}));}}]});
-const css=(baseline?execFileSync("git",["show","HEAD:app/globals.css"],{encoding:"utf8",windowsHide:true}):await readFile("app/globals.css","utf8")).replace('@import "tailwindcss";',"");
+const css=(await readFile("app/globals.css","utf8")).replace('@import "tailwindcss";',"")+'\n.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }';
 const server=createServer((req,res)=>{
  if(req.url.startsWith("/image/")){
   if(req.url.includes("broken")){res.writeHead(404);res.end();return;}
@@ -53,44 +51,79 @@ try{
  await send("Page.enable");await send("Runtime.enable");
  await send("Page.addScriptToEvaluateOnNewDocument",{source:`window.imageFrames=[];const loop=()=>{if(window.ready && document.querySelector('.showcase-status')){const cards=[...document.querySelectorAll('.showcase-card')];if(cards.length)window.imageFrames.push(cards.map(c=>[c.getBoundingClientRect().width,c.getBoundingClientRect().height]));}requestAnimationFrame(loop)};requestAnimationFrame(loop);`});
  const geometry=`(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,bottom:r.bottom}};const cards=[...document.querySelectorAll('.showcase-card')];return {scrollWidth:document.documentElement.scrollWidth,columns:getComputedStyle(document.querySelector('.showcase-grid')).gridTemplateColumns.split(' ').length,real:cards.filter(c=>c.classList.contains('showcase-paid-card')).length,demo:cards.filter(c=>c.classList.contains('showcase-brand-card')).length,links:cards.filter(c=>c.classList.contains('showcase-paid-card')).map(c=>c.getAttribute('href')),counter:document.querySelector('.showcase-status')?.textContent,cards:cards.map(c=>({box:rect(c),media:c.querySelector('.showcase-media')?rect(c.querySelector('.showcase-media')):null,image:c.querySelector('img')&&getComputedStyle(c.querySelector('img')).display!=='none'?{...rect(c.querySelector('img')),fit:getComputedStyle(c.querySelector('img')).objectFit}:null,copy:rect(c.querySelector('.showcase-card-copy')),overflow:c.scrollWidth>c.clientWidth}))}})()`;
- const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.w/c.media.h-4/3)<.02);if(c.image){assert.equal(c.image.fit,"contain");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
- const counts=[0,1,2,3,4,5,6,14,15],demo=[4,3,2,1,0,1,0,1,0,1,0,1,0,1,0,0];
- for(const [width,height,mobile] of (baseline?[[390,844,true]]:[[375,812,true],[390,844,true],[430,932,true],[768,1024,false],[1280,900,false]])){
+ const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.w/c.media.h-4/3)<.02);if(c.image){assert.equal(c.image.fit,"cover");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
+
+ const counts=[0,1,2,3,4,5,15],demo=[2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];
+ for(const [width,height,mobile] of [[375,812,true],[390,844,true],[430,932,true],[768,1024,false],[1280,900,false]]){
   await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile});
   await send("Emulation.setTouchEmulationEnabled",{enabled:mobile});
-  for(const count of (baseline?[5]:counts)){
-   await send("Page.navigate",{url:origin+"/?count="+count});
-   await until(baseline?"window.ready && !!document.querySelector('.showcase-paid-card')":"window.ready && !!document.querySelector('.showcase-status')");
-   await delay(350);const collapsed=await evaluate(geometry);
-   if(baseline){
-    await evaluate("document.querySelector('.showcase-view-all').click()");await delay(350);const expanded=await evaluate(geometry);
-    await writeFile(join(out,"baseline-fixture.json"),JSON.stringify({collapsed,expanded},null,2));
-    console.log(JSON.stringify({baseline:true,expanded:expanded.cards.map(c=>({media:c.media,image:c.image})),columns:expanded.columns}));continue;
-   }
-   const columns=width<=640?2:width>=1024?4:3;
-   assertGeometry(collapsed,width,columns);assert.equal(collapsed.real,Math.min(count,4));assert.equal(collapsed.demo,Math.max(0,4-count));
+  for(const count of counts){
+   await send("Page.navigate",{url:origin+"/?count="+count});await until("window.ready && !!document.querySelector('.showcase-status')");await delay(300);
+   const collapsed=await evaluate(geometry),pageCount=(count+demo[count])/2;
+   assertGeometry(collapsed,width,2);assert.equal(collapsed.cards.length,2);assert.equal(collapsed.real,Math.min(count,2));assert.equal(collapsed.demo,Math.max(0,2-count));
    assert.ok(collapsed.counter.includes(String(count))&&collapsed.counter.includes("15"));
    const frames=await evaluate("window.imageFrames");
-   for(const frame of frames)assert.deepEqual(frame,frames.at(-1),"Image loading must not change card geometry");
-   if(count===2&&[390,430].includes(width)){const shot=await send("Page.captureScreenshot",{format:"png"});await writeFile(join(out,"showcase-"+width+".png"),Buffer.from(shot.data,"base64"));}
+   for(const frame of frames)assert.deepEqual(frame,frames.at(-1),"Image loading cannot change card geometry");
+   assert.equal(await evaluate("document.querySelectorAll('.showcase-dots button').length"),pageCount>1?pageCount:0);
+   const seen=[];
+   for(let pageIndex=0;pageIndex<pageCount;pageIndex++){
+     await delay(180);const current=await evaluate(geometry);
+     assertGeometry(current,width,2);assert.equal(current.cards.length,2);
+     assert.equal(current.demo,pageIndex===pageCount-1?demo[count]:0);
+     assert.deepEqual(current.cards.map(c=>c.box.h),collapsed.cards.map(c=>c.box.h),"No height jump between pairs");
+     seen.push(...current.links);
+     if(pageCount>1){
+       assert.equal(await evaluate("[...document.querySelectorAll('.showcase-dots button')].findIndex(b=>b.getAttribute('aria-current')==='true')"),pageIndex);
+       await evaluate("document.querySelector('.showcase-arrow-next').click()");
+       await until("[...document.querySelectorAll('.showcase-dots button')].findIndex(b=>b.getAttribute('aria-current')==='true')==="+((pageIndex+1)%pageCount));
+     }
+   }
+   assert.deepEqual(seen,Array.from({length:count},(_,i)=>"/listing/listing-"+i+"-fixture"));
+   if(pageCount>1){
+     await evaluate("document.querySelector('.showcase-arrow-prev').click()");
+     await until("document.querySelector('.showcase-dots button:last-child').getAttribute('aria-current')==='true'");
+     await evaluate("document.querySelector('.showcase-dots button').click()");
+     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
+     await evaluate("document.querySelector('.showcase-grid').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))");
+     await until("document.querySelectorAll('.showcase-dots button')[1].getAttribute('aria-current')==='true'");
+     await evaluate("document.querySelector('.showcase-dots button').click()");
+     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
+   }
+   if(count===3&&mobile){
+     await evaluate("window.scrollTo({top:0,behavior:'instant'})");
+     const point=await evaluate("(()=>{const r=document.querySelector('.showcase-media').getBoundingClientRect();return {x:r.x+r.width*.8,y:r.y+r.height*.5}})()");
+     await send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point]});
+     for(let step=1;step<=4;step++)await send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:point.x-step*16,y:point.y}]});
+     await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+     await until("document.querySelectorAll('.showcase-dots button')[1].getAttribute('aria-current')==='true'");
+     assert.ok((await evaluate("location.href")).startsWith(origin),"Swiping must not open a listing");
+     await evaluate("document.querySelector('.showcase-dots button').click()");
+     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
+   }
+   if(count===3&&[390,430,1280].includes(width)){
+     const shot=await send("Page.captureScreenshot",{format:"png"});await writeFile(join(out,"carousel-"+width+".png"),Buffer.from(shot.data,"base64"));
+   }
    await evaluate("window.firstCard=document.querySelector('.showcase-paid-card');document.querySelector('.showcase-view-all').click()");
-   await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true'");await delay(230);
-   const expanded=await evaluate(geometry);assertGeometry(expanded,width,columns);assert.equal(expanded.real,count);assert.equal(expanded.demo,demo[count]);
-   assert.deepEqual(expanded.links,Array.from({length:count},(_,i)=>"/listing/listing-"+i+"-fixture"));assert.equal(new Set(expanded.links).size,count);
-   await evaluate("window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})");await delay(300);
-   const lastRow=await evaluate("({card:document.querySelector('.showcase-card:last-child').getBoundingClientRect().bottom,nav:document.querySelector('.mobile-bottom-nav').getBoundingClientRect().top})");
-   if(mobile)assert.ok(lastRow.card<=lastRow.nav,"Last row remains reachable above fixed navigation");
-   if(count>=5)assert.equal(await evaluate("[...document.querySelectorAll('.showcase-media img')].filter(i=>i.src.includes('/broken')).every(i=>getComputedStyle(i).display==='none')"),true);
+   await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true'");await delay(220);
+   const expanded=await evaluate(geometry);assertGeometry(expanded,width,width<=640?2:width>=1024?4:3);assert.equal(expanded.real,count);assert.equal(expanded.demo,demo[count]);
+   assert.deepEqual(expanded.links,Array.from({length:count},(_,i)=>"/listing/listing-"+i+"-fixture"));
+   assert.equal(await evaluate("document.querySelectorAll('.showcase-arrow,.showcase-dots').length"),0);
    if(count>0)assert.equal(await evaluate("window.firstCard===document.querySelector('.showcase-paid-card')"),true);
+   await evaluate("window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})");await delay(230);
+   if(mobile)assert.equal(await evaluate("document.querySelector('.showcase-card:last-child').getBoundingClientRect().bottom<=document.querySelector('.mobile-bottom-nav').getBoundingClientRect().top"),true);
+   if(count>=5)assert.equal(await evaluate("[...document.querySelectorAll('.showcase-media img')].filter(i=>i.src.includes('/broken')).every(i=>getComputedStyle(i).display==='none')"),true);
    await evaluate("document.querySelector('.showcase-view-all').click()");await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='false'");
-   const restored=await evaluate(geometry);assert.equal(restored.real,collapsed.real);assert.equal(restored.demo,collapsed.demo);assert.deepEqual(restored.links,collapsed.links);
-   if(count===2&&width===390){await evaluate("window.stableHTML=document.querySelector('.showcase-grid').innerHTML");await delay(3300);assert.equal(await evaluate("window.stableHTML===document.querySelector('.showcase-grid').innerHTML"),true,"No automatic rotation/remount");}
-   results.push({width,count,collapsed:"PASS",expanded:"PASS",restored:"PASS",images:"PASS"});
+   const restored=await evaluate(geometry);assert.equal(restored.cards.length,2);assert.deepEqual(restored.links,collapsed.links);
+   results.push({width,count,pages:pageCount,collapsed:"PASS",arrowsDotsKeyboard:"PASS",swipe:count===3&&mobile?"PASS":"not run",expanded:"PASS",restored:"PASS",images:"PASS"});
   }
+  console.log(JSON.stringify({width,status:"PASS"}));
  }
- if(!baseline){
-  await send("Page.navigate",{url:origin+"/?count=2&lang=kk"});await until("window.ready && !!document.querySelector('.showcase-status')");await evaluate("document.querySelector('.showcase-view-all').click()");assert.equal((await evaluate(geometry)).demo,2);
-  assert.deepEqual(errors,[]);await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",environment:"Installed Chromium; actual showcase/CSS with fixture data/images; not physical Safari/PWA",scenarios:results.length+1,results,errors},null,2));console.log(JSON.stringify({status:"PASS",scenarios:results.length+1,errors}));
- }
+ await send("Page.navigate",{url:origin+"/?count=3&lang=kk"});await until("window.ready && !!document.querySelector('.showcase-status')");
+ assert.equal(await evaluate("document.querySelectorAll('.showcase-card').length"),2);
+ await evaluate("document.querySelector('.showcase-arrow-next').click()");
+ await until("document.querySelectorAll('.showcase-brand-card').length===1");
+ assert.deepEqual(errors,[]);
+ await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",environment:"Installed Chromium; actual showcase/CSS with fixture data/images; not physical Safari/PWA",scenarios:results.length+1,results,errors},null,2));
+ console.log(JSON.stringify({status:"PASS",scenarios:results.length+1,errors}));
  await send("Browser.close").catch(()=>{});
 }finally{socket?.close();child.kill();server.close();}

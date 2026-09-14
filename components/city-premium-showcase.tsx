@@ -6,6 +6,9 @@ import {
   BriefcaseBusiness,
   Building2,
   CarFront,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
   Gift,
   KeyRound,
   MapPin,
@@ -17,7 +20,7 @@ import {
 } from "lucide-react";
 import { AppLink as Link } from "@/components/app-link";
 import { CategoryLink } from "@/components/category-link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
@@ -25,7 +28,7 @@ import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
-import { premiumDemoCount } from "@/lib/premium-showcase-presentation";
+import { premiumCarouselPage, premiumDemoCount } from "@/lib/premium-showcase-presentation";
 
 type PaidPlacement = {
   id: string;
@@ -96,6 +99,9 @@ export function CityPremiumShowcase() {
   const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
   const [viewAll, setViewAll] = useState(false);
+  const [carousel, setCarousel] = useState({ city: cityKey, page: 0 });
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickUntil = useRef(0);
   const [deadlineNow, setDeadlineNow] = useState(0);
 
   useEffect(() => {
@@ -142,7 +148,9 @@ export function CityPremiumShowcase() {
     return [...paidItems, ...brandedItems];
   }, [paid, cityKey]);
 
-  const displayed = viewAll ? items : items.slice(0, 4);
+  const page = premiumCarouselPage(items, carousel.city === cityKey ? carousel.page : 0);
+  const displayed = viewAll ? items : page.items;
+  const moveToPage = (index: number) => setCarousel({ city: cityKey, page: index });
   const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
 
@@ -151,18 +159,54 @@ export function CityPremiumShowcase() {
     aria-label={t("showcase.aria")}
   >
     <div className="showcase-heading">
-      <h1>{t("showcase.title")}</h1>
-      <div className="showcase-city-row">
-        <p className="showcase-city"><MapPin size={18} aria-hidden="true" /><span>{cityLabel}</span></p>
-        <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setViewAll((value) => !value)}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}</button>
+      <div className="showcase-heading-copy">
+        <h1><Crown size={24} aria-hidden="true" />{t("showcase.title")}</h1>
+        <p className="showcase-city"><MapPin size={16} aria-hidden="true" /><span>{cityLabel}</span></p>
+        {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t("showcase.total", { count: paid.length })}</p> : null}
       </div>
+      <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => { setViewAll((value) => !value); moveToPage(0); }}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
     {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
     <div id="city-premium-items">
     {viewAll && selectedLocation === "all" ? <div className="showcase-status"><p>{t("showcase.chooseCity")}</p><LocationPicker allowAll={false} /></div> : null}
     {viewAll && paidLoading ? <p className="showcase-status" role="status">{t("common.loading")}…</p> : null}
-    {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t("showcase.total", { count: paid.length })}</p> : null}
-    <div className={["showcase-grid", viewAll ? "showcase-grid-all" : ""].filter(Boolean).join(" ")} aria-live="off">
+    <div className="showcase-carousel-area">
+    <div
+      className={["showcase-grid", viewAll ? "showcase-grid-all" : ""].filter(Boolean).join(" ")}
+      role="group"
+      aria-label={viewAll ? t("showcase.viewAll") : t("showcase.page", { page: page.pageIndex + 1, total: page.pageCount })}
+      tabIndex={viewAll ? -1 : 0}
+      onKeyDown={(event) => {
+        if (viewAll || event.target !== event.currentTarget) return;
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          moveToPage(page.pageIndex + (event.key === "ArrowLeft" ? -1 : 1));
+        }
+      }}
+      onTouchStart={(event) => {
+        suppressClickUntil.current = 0;
+        const touch = event.touches[0];
+        touchStart.current = !viewAll && event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+      }}
+      onTouchCancel={() => { touchStart.current = null; }}
+      onTouchEnd={(event) => {
+        const start = touchStart.current;
+        touchStart.current = null;
+        const touch = event.changedTouches[0];
+        if (!start || !touch || viewAll || page.pageCount < 2) return;
+        const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+        if (Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+          suppressClickUntil.current = performance.now() + 400;
+          moveToPage(page.pageIndex + (dx < 0 ? 1 : -1));
+        }
+      }}
+      onClickCapture={(event) => {
+        if (performance.now() < suppressClickUntil.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
       {displayed.map((item) => {
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;
@@ -172,17 +216,26 @@ export function CityPremiumShowcase() {
               <span className="listing-placeholder" aria-hidden="true"><PackageOpen size={42} /></span>
               {item.imageUrl ? <img className="listing-image" src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
             </div>
-            <div className="showcase-card-copy"><strong>{item.title}</strong><b>{price}</b><small><MapPin size={13} /> {locale === "kk" ? item.locationKk : item.locationRu}</small></div>
+            <div className="showcase-card-copy"><strong>{item.title}</strong><b>{price}</b><small><MapPin size={13} /><span>{locale === "kk" ? item.locationKk : item.locationRu}</span></small></div>
           </Link>;
         }
         const Icon = item.icon;
         return <CategoryLink cityId={selectedLocation} className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={item.kind + "-" + item.id}>
           <span className="showcase-badge">JEVU</span>
           <div className="showcase-demo-media"><span className="showcase-brand-icon"><Icon size={34} /></span></div>
-          <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small>{t("showcase.open")} <ArrowRight size={13} /></small></div>
+          <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small><span>{t("showcase.open")}</span><ArrowRight size={13} /></small></div>
         </CategoryLink>;
       })}
     </div>
+    {!viewAll && page.pageCount > 1 ? <>
+      <button type="button" className="showcase-arrow showcase-arrow-prev" aria-label={t("showcase.previous")} aria-controls="city-premium-items" onClick={() => moveToPage(page.pageIndex - 1)}><ChevronLeft size={22} aria-hidden="true" /></button>
+      <button type="button" className="showcase-arrow showcase-arrow-next" aria-label={t("showcase.next")} aria-controls="city-premium-items" onClick={() => moveToPage(page.pageIndex + 1)}><ChevronRight size={22} aria-hidden="true" /></button>
+    </> : null}
+    </div>
+    {!viewAll && page.pageCount > 1 ? <div className="showcase-dots" role="group" aria-label={t("showcase.pages")}>
+      {Array.from({ length: page.pageCount }, (_, index) => <button key={index} type="button" aria-label={t("showcase.page", { page: index + 1, total: page.pageCount })} aria-current={index === page.pageIndex ? "true" : undefined} aria-controls="city-premium-items" onClick={() => moveToPage(index)}><span /></button>)}
+    </div> : null}
+    {!viewAll ? <span className="sr-only" aria-live="polite" aria-atomic="true">{t("showcase.page", { page: page.pageIndex + 1, total: page.pageCount })}</span> : null}
     </div>
   </section>;
 }
