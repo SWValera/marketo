@@ -1,7 +1,7 @@
 /** Fill only the final carousel page; an empty scope has one full demo page. */
 export function premiumDemoCount(realCount: number, cardsPerPage = 2): number {
   if (!Number.isSafeInteger(realCount) || realCount < 0) return 0;
-  const size = cardsPerPage === 4 ? 4 : 2;
+  const size = [2, 3, 4].includes(cardsPerPage) ? cardsPerPage : 2;
   return realCount === 0 ? size : (size - realCount % size) % size;
 }
 
@@ -11,13 +11,14 @@ export function premiumExpandedDemoCount(realCount: number, capacity: number | n
 }
 
 /** Actual content width plus viewport geometry, never device identification. */
-export function premiumCardsPerPage(contentWidth: number, landscape = false): number {
+export function premiumCardsPerPage(contentWidth: number, landscape = false, shortLandscape = false): number {
+  if (shortLandscape && landscape && contentWidth >= 480) return 3;
   return contentWidth >= 1340 || (landscape && contentWidth >= 860) ? 4 : 2;
 }
 
 /** Slice already composed carousel items, preserving the server order. */
 export function premiumCarouselPage<T>(items: readonly T[], requestedPage: number, cardsPerPage = 2) {
-  const size = [2, 4].includes(cardsPerPage) ? cardsPerPage : 2;
+  const size = [2, 3, 4].includes(cardsPerPage) ? cardsPerPage : 2;
   const pageCount = Math.ceil(items.length / size);
   const requested = Number.isSafeInteger(requestedPage) ? requestedPage : 0;
   const pageIndex = pageCount ? ((requested % pageCount) + pageCount) % pageCount : 0;

@@ -3,8 +3,8 @@ import test from "node:test";
 import {readFile} from "node:fs/promises";
 import {premiumDemoCount,premiumExpandedDemoCount,premiumCarouselPage,premiumCardsPerPage,premiumPreparedIndexes} from "../lib/premium-showcase-presentation.ts";
 
-for(const size of [2,4])test("full carousel pages and separate city slots: size="+size,()=>{
- for(const real of [0,1,2,3,4,5,8,9,14,15,31]){
+for(const size of [2,3,4])test("full carousel pages and separate city slots: size="+size,()=>{
+ for(const real of [0,1,2,3,4,5,6,7,8,9,14,15,31]){
   const demos=premiumDemoCount(real,size),items=Array.from({length:real+demos},(_,i)=>i),pages=Math.ceil(items.length/size);
   assert.equal(pages,Math.max(1,Math.ceil(real/size)));
   assert.equal(demos,real===0?size:(size-real%size)%size);
@@ -25,8 +25,11 @@ for(const size of [2,4])test("full carousel pages and separate city slots: size=
  }
 });
 
-test("geometry selects only two or four columns",()=>{
+test("short landscape adds three columns without changing existing breakpoints",()=>{
  for(const [width,landscape,size] of [[340,true,2],[670,false,2],[911,false,2],[859,true,2],[860,true,4],[911,true,4],[1067,true,4],[1253,true,4],[1390,true,4]])assert.equal(premiumCardsPerPage(width,landscape),size);
+ for(const width of [500,602,670,818])assert.equal(premiumCardsPerPage(width,true,true),3);
+ assert.equal(premiumCardsPerPage(479,true,true),2);
+ assert.equal(premiumCardsPerPage(670,false,true),2);
  for(const invalid of [-1,NaN,Infinity,1.5])assert.equal(premiumDemoCount(invalid,4),0);
 });
 
