@@ -2,6 +2,9 @@ import { createSupabasePublicServerClient, createSupabaseServerClient } from "@/
 import { getListingMediaBucket } from "@/lib/media/bucket";
 import { isListingMediaFilename, trustedListingMediaContentType } from "@/lib/media/storage-key";
 
+import { getListingImageProcessor } from "@/lib/media/photo-service";
+import { listingThumbnail } from "@/lib/media/listing-thumbnail";
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const avatarFilename = /^[a-z0-9][a-z0-9_-]{0,127}\.(?:jpe?g|png|webp|avif)$/i;
 
@@ -57,7 +60,7 @@ async function servePublicAvatar(segments: string[]) {
   return new Response(object.body, { headers });
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ key: string[] }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ key: string[] }> }) {
   const { key: segments } = await params;
   if (segments[0] === "avatars") return servePublicAvatar(segments);
   if (segments.length !== 4 || segments[0] !== "listings" || !uuid.test(segments[1]) || !uuid.test(segments[2]) || !isListingMediaFilename(segments[3])) {
@@ -120,6 +123,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
   } else {
     headers.set("cache-control", "private, no-store, max-age=0");
     headers.set("vary", "Cookie, Authorization");
+  }
+  if (new URL(request.url).searchParams.get("variant") === listingThumbnail.variant) {
+    try {
+      const output = await getListingImageProcessor().input(object.body).transform({
+        width: listingThumbnail.width, height: listingThumbnail.height, fit: "cover",
+      }).output({ format: "image/webp", quality: listingThumbnail.quality, anim: false });
+      const thumbnail = output.response();
+      if (!thumbnail.ok || !thumbnail.body) throw new Error("thumbnail_unavailable");
+      headers.set("content-type", "image/webp");
+      headers.set("etag", 'W/"' + object.httpEtag.replaceAll('"', '') + '-card-v1"');
+      return new Response(thumbnail.body, { headers });
+    } catch {
+      return new Response("Media unavailable", { status: 503 });
+    }
   }
   return new Response(object.body, { headers });
 }
