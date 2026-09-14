@@ -9,12 +9,16 @@ export function useShowcaseWidth() {
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const update = (width: number) => setCardsPerPage(premiumCardsPerPage(width));
+    const orientation = matchMedia("(orientation: landscape)");
+    let contentWidth = 0;
+    const update = (width: number) => { contentWidth = width; setCardsPerPage(premiumCardsPerPage(width, orientation.matches)); };
+    const rotate = () => update(contentWidth);
     const style = getComputedStyle(node);
     update(node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
     const observer = new ResizeObserver(([entry]) => update(entry.contentRect.width));
     observer.observe(node);
-    return () => observer.disconnect();
+    orientation.addEventListener("change", rotate);
+    return () => { observer.disconnect(); orientation.removeEventListener("change", rotate); };
   }, []);
   return { ref, cardsPerPage };
 }

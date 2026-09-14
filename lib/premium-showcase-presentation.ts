@@ -1,17 +1,23 @@
-/** Demo items complete carousel pairs; they never occupy promotion capacity. */
-export function premiumDemoCount(realCount: number): number {
+/** Fill only the final carousel page; an empty scope has one full demo page. */
+export function premiumDemoCount(realCount: number, cardsPerPage = 2): number {
   if (!Number.isSafeInteger(realCount) || realCount < 0) return 0;
-  return realCount === 0 ? 2 : realCount % 2;
+  const size = cardsPerPage === 4 ? 4 : 2;
+  return realCount === 0 ? size : (size - realCount % size) % size;
 }
 
-/** The existing shell tops out at 1440px (1390px content); four columns fit there. */
-export function premiumCardsPerPage(contentWidth: number): number {
-  return contentWidth >= 1340 ? 4 : contentWidth >= 1040 ? 3 : 2;
+/** Expanded city slots are independent of carousel padding. National has no capacity. */
+export function premiumExpandedDemoCount(realCount: number, capacity: number | null, cardsPerPage: number) {
+  return capacity === null ? (realCount === 0 ? cardsPerPage : 0) : Math.max(0, capacity - realCount);
 }
 
-/** Dynamic page size; no additional demo padding for desktop rows. */
+/** Actual content width plus viewport geometry, never device identification. */
+export function premiumCardsPerPage(contentWidth: number, landscape = false): number {
+  return contentWidth >= 1340 || (landscape && contentWidth >= 860) ? 4 : 2;
+}
+
+/** Slice already composed carousel items, preserving the server order. */
 export function premiumCarouselPage<T>(items: readonly T[], requestedPage: number, cardsPerPage = 2) {
-  const size = [2, 3, 4].includes(cardsPerPage) ? cardsPerPage : 2;
+  const size = [2, 4].includes(cardsPerPage) ? cardsPerPage : 2;
   const pageCount = Math.ceil(items.length / size);
   const requested = Number.isSafeInteger(requestedPage) ? requestedPage : 0;
   const pageIndex = pageCount ? ((requested % pageCount) + pageCount) % pageCount : 0;

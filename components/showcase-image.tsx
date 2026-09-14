@@ -14,10 +14,14 @@ export function ShowcaseImage({ src, prepare, expanded, current, onSettled }: {
 }) {
   const ref = useRef<HTMLImageElement>(null);
   const [failed, setFailed] = useState(false);
-  const settled = useRef(false);
+  const settled = useRef<ShowcaseImageState | null>(null);
   const startedAt = useRef<number | null>(null);
   const report = useRef(onSettled);
-  useEffect(() => { report.current = onSettled; }, [onSettled]);
+  useEffect(() => {
+    report.current = onSettled;
+    // A city and national scope may retain the same decoded img node.
+    if (settled.current) onSettled(src, settled.current);
+  }, [onSettled, src]);
   useEffect(() => {
     const image = ref.current;
     if (!image || (!prepare && !expanded) || settled.current) return;
@@ -25,7 +29,7 @@ export function ShowcaseImage({ src, prepare, expanded, current, onSettled }: {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (state: ShowcaseImageState) => {
       if (disposed || settled.current) return;
-      settled.current = true;
+      settled.current = state;
       clearTimeout(timer);
       if (state === "error") { setFailed(true); image.removeAttribute("src"); }
       report.current(src, state);

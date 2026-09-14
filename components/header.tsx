@@ -34,6 +34,8 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
 
         <LocationPicker compact className="city-button" />
 
+        <div className="header-search-row">
+        <Link prefetch={false} className="publish-button" href="/publish">{t("header.publish")}</Link>
         <form className="header-search" action="/search" role="search">
           <Search size={18} aria-hidden="true" />
           <input type="search" name="q" aria-label={t("header.searchAria")} placeholder={placeholder} />
@@ -41,6 +43,7 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           {storedLocation !== "all" ? <input type="hidden" name="city" value={storedLocation} /> : null}
           <button type="submit">{t("common.find")}</button>
         </form>
+        </div>
 
         <nav className="header-actions" aria-label={t("nav.accountAria")}>
           <Link href="/favorites"><Heart size={20} /><span>{t("nav.favorites")}</span></Link>
@@ -51,7 +54,6 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
 
         <LanguageSwitcher compact />
         <PwaInstall />
-        <Link prefetch={false} className="publish-button" href="/publish">{t("header.publish")}</Link>
         <button
           type="button"
           className="menu-toggle"

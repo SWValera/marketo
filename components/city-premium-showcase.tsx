@@ -28,7 +28,7 @@ import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
 import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
-import { premiumCarouselPage, premiumDemoCount, premiumPreparedIndexes } from "@/lib/premium-showcase-presentation";
+import { premiumCarouselPage, premiumDemoCount, premiumExpandedDemoCount, premiumPreparedIndexes } from "@/lib/premium-showcase-presentation";
 
 import { useShowcaseWidth } from "@/components/use-showcase-width";
 import { ShowcaseImage, type ShowcaseImageState } from "@/components/showcase-image";
@@ -47,7 +47,9 @@ type PaidPlacement = {
   expiresAt?: string;
 };
 
-const paidPlacementCache = createSingleFlightTtlCache<string, PaidPlacement[]>({
+type PaidResult = { placements: PaidPlacement[]; capacity: number | null };
+
+const paidPlacementCache = createSingleFlightTtlCache<string, PaidResult>({
   maxEntries: 20,
   ttlMilliseconds: () => 60 * 1000,
 });
@@ -57,9 +59,10 @@ async function requestPaidPlacements(cityId: string) {
     headers: { accept: "application/json" },
   });
   if (!response.ok) throw new Error("showcase_unavailable");
-  const payload = await response.json() as { placements?: PaidPlacement[] };
+  const payload = await response.json() as Partial<PaidResult>;
   if (!Array.isArray(payload.placements)) throw new Error("showcase_invalid_response");
-  return payload.placements;
+  if (cityId !== "all" && (!Number.isSafeInteger(payload.capacity) || Number(payload.capacity) < 1)) throw new Error("showcase_invalid_capacity");
+  return { placements: payload.placements, capacity: cityId === "all" ? null : payload.capacity! };
 }
 
 type BrandDefinition = {
@@ -100,14 +103,21 @@ export function CityPremiumShowcase() {
   const selectedLocation = useStoredLocation();
   const cityKey = selectedLocation === "all" ? "all-kazakhstan" : selectedLocation;
   const selectedCity = selectedLocation === "all" ? undefined : getSettlement(geography.data, selectedLocation);
-  const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; status: "idle" | "ready" | "error" }>({ city: "", items: [], status: "idle" });
+  const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; capacity: number | null; status: "idle" | "ready" | "error" }>({ city: "", items: [], capacity: null, status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
-  const [viewAll, setViewAll] = useState(false);
+  const [expandedState, setExpandedState] = useState({ scope: cityKey, expanded: false });
+  if (expandedState.scope !== cityKey) setExpandedState({ scope: cityKey, expanded: false });
+  const viewAll = expandedState.scope === cityKey && expandedState.expanded;
   const { ref: showcaseRef, cardsPerPage } = useShowcaseWidth();
-  const [imageStates, setImageStates] = useState<Record<string, ShowcaseImageState>>({});
+  const [imageState, setImageState] = useState<{ scope: string; images: Record<string, ShowcaseImageState> }>({ scope: cityKey, images: {} });
+  if (imageState.scope !== cityKey) setImageState({ scope: cityKey, images: {} });
+  const imageStates = imageState.scope === cityKey ? imageState.images : {};
   const imageSettled = useCallback((src: string, state: ShowcaseImageState) => {
-    setImageStates((previous) => previous[src] === state ? previous : { ...previous, [src]: state });
-  }, []);
+    setImageState((previous) => {
+      const images = previous.scope === cityKey ? previous.images : {};
+      return images[src] === state ? previous : { scope: cityKey, images: { ...images, [src]: state } };
+    });
+  }, [cityKey]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClickUntil = useRef(0);
   const [deadlineNow, setDeadlineNow] = useState(0);
@@ -133,11 +143,10 @@ export function CityPremiumShowcase() {
   }, [ensureGeographyLoaded, selectedLocation]);
 
   useEffect(() => {
-    if (selectedLocation === "all") return;
     let active = true;
     void paidPlacementCache.getOrLoad(selectedLocation, () => requestPaidPlacements(selectedLocation))
-      .then((items) => { if (active) setPaidState({ city: selectedLocation, items, status: "ready" }); })
-      .catch(() => { if (active) setPaidState({ city: selectedLocation, items: [], status: "error" }); });
+      .then((result) => { if (active) setPaidState({ city: selectedLocation, items: result.placements, capacity: result.capacity, status: "ready" }); })
+      .catch(() => { if (active) setPaidState({ city: selectedLocation, items: [], capacity: null, status: "error" }); });
     return () => { active = false; };
   }, [paidRetry, selectedLocation]);
 
@@ -145,30 +154,35 @@ export function CityPremiumShowcase() {
     () => paidState.city === selectedLocation && paidState.status === "ready" ? paidState.items.filter((item) => !item.expiresAt || Date.parse(item.expiresAt) > deadlineNow) : [],
     [paidState, selectedLocation, deadlineNow],
   );
+  const capacity = selectedLocation === "all" ? null : paidState.city === selectedLocation ? paidState.capacity ?? 0 : 0;
+  const carouselDemoCount = premiumDemoCount(paid.length, cardsPerPage);
+  const expandedDemoCount = premiumExpandedDemoCount(paid.length, capacity, cardsPerPage);
   const items = useMemo(() => {
     const paidItems = paid.map((placement) => ({ kind: "paid" as const, ...placement, imageUrl: listingThumbnailUrl(placement.imageUrl) }));
-    const brandedCount = premiumDemoCount(paidItems.length);
+    const brandedCount = Math.max(carouselDemoCount, expandedDemoCount);
     const offset = stableHash(cityKey) % brandDefinitions.length;
     const brandedItems = Array.from({ length: brandedCount }, (_, index) => {
       const definition = brandDefinitions[(offset + index) % brandDefinitions.length];
-      return { kind: "brand" as const, ...definition };
+      return { kind: "brand" as const, ...definition, id: `${cityKey}-slot-${index}` };
     });
     return [...paidItems, ...brandedItems];
-  }, [paid, cityKey]);
+  }, [paid, cityKey, carouselDemoCount, expandedDemoCount]);
+  const carouselItems = items.slice(0, paid.length + carouselDemoCount);
 
-  const carousel = useShowcaseTimeline(Math.ceil(items.length / cardsPerPage), viewAll, cityKey + ":" + cardsPerPage);
-  const page = premiumCarouselPage(items, carousel.page, cardsPerPage);
+  const carousel = useShowcaseTimeline(Math.ceil(carouselItems.length / cardsPerPage), viewAll, cityKey + ":" + cardsPerPage);
+  const page = premiumCarouselPage(carouselItems, carousel.page, cardsPerPage);
   const currentItems = new Set(page.items);
-  const prepared = premiumPreparedIndexes(items.length, page.pageIndex, cardsPerPage);
+  const prepared = premiumPreparedIndexes(carouselItems.length, page.pageIndex, cardsPerPage);
   const pageReady = page.items.every((item) => item.kind !== "paid" || !item.imageUrl || imageStates[item.imageUrl]);
   const moveToPage = carousel.selectPage;
-  const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
+  const paidLoading = paidState.city !== selectedLocation || paidState.status === "idle";
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
 
   return <section
     ref={showcaseRef}
     style={{ "--showcase-columns": cardsPerPage, "--showcase-media-max": cardsPerPage > 2 ? "180px" : "240px" } as CSSProperties}
     data-cards-per-page={cardsPerPage}
+    data-scope={selectedLocation}
     className="city-premium-showcase"
     aria-label={t("showcase.aria")}
   >
@@ -176,11 +190,11 @@ export function CityPremiumShowcase() {
       <div className="showcase-heading-copy">
         <h1><Crown size={24} aria-hidden="true" />{t("showcase.title")}</h1>
         <p className="showcase-city"><MapPin size={16} aria-hidden="true" /><span>{cityLabel}</span></p>
-        {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t("showcase.total", { count: paid.length })}</p> : null}
+        {paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t(selectedLocation === "all" ? "showcase.nationalTotal" : "showcase.total", { count: paid.length, capacity: capacity ?? 0 })}</p> : null}
       </div>
-      <button className="secondary-button showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setViewAll((value) => !value)}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
+      <button className="showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setExpandedState({ scope: cityKey, expanded: !viewAll })}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
-    {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
+    {paidState.city === selectedLocation && paidState.status === "error" ? <div className="showcase-load-error" role="alert"><span>{t("state.errorNote")}</span><button type="button" onClick={() => setPaidRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
     <div id="city-premium-items">
     {viewAll && selectedLocation === "all" ? <div className="showcase-status"><p>{t("showcase.chooseCity")}</p><LocationPicker allowAll={false} /></div> : null}
     {viewAll && paidLoading ? <p className="showcase-status" role="status">{t("common.loading")}…</p> : null}
@@ -222,7 +236,7 @@ export function CityPremiumShowcase() {
       }}
     >
       {items.map((item, index) => {
-        const visible = viewAll || currentItems.has(item);
+        const visible = viewAll ? index < paid.length + expandedDemoCount : currentItems.has(item);
         const pending = item.kind === "paid" && Boolean(item.imageUrl) && !imageStates[item.imageUrl!];
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;

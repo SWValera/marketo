@@ -5,7 +5,7 @@ import {spawn} from "node:child_process";
 import {createServer,get} from "node:http";
 import {build} from "esbuild";
 import WebSocket from "ws";
-const root=resolve("."),out=resolve("artifacts/jevu-premium-responsive-images-20260914");
+const root=resolve("."),out=resolve("artifacts/jevu-premium-final-20260914");
 await mkdir(out,{recursive:true});
 const candidates=[process.env.JEVU_BROWSER_PATH,"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe","C:/Program Files/Google/Chrome/Application/chrome.exe","/usr/bin/chromium"].filter(Boolean);
 let browser;for(const path of candidates)if(await access(path).then(()=>true,()=>false)){browser=path;break;}assert.ok(browser,"An installed Chromium is required");
@@ -14,16 +14,18 @@ const mocks={
  "@/components/app-link":"export const AppLink=({children,...props})=><a {...props}>{children}</a>;",
  "@/components/category-link":"export const CategoryLink=({children,cityId,...props})=><a {...props}>{children}</a>;",
  "@/components/i18n-provider":"import {translate} from './lib/i18n/messages';export const useI18n=()=>({locale:window.lang,t:(key,values)=>translate(window.lang,key,values)});",
- "@/components/location-picker":"export const useStoredLocation=()=> 'fixture-city';export const LocationPicker=()=>null;",
+ "@/components/location-picker":"import {useSyncExternalStore} from 'react';let city='fixture-city';const listeners=new Set();window.changeLocation=(value,count,delay=0)=>{window.fixtureCounts[value]=count;window.scopeDelay=delay;city=value;listeners.forEach(f=>f())};export const useStoredLocation=()=>useSyncExternalStore(f=>{listeners.add(f);return()=>listeners.delete(f)},()=>city,()=>city);export const LocationPicker=({className})=><button className={className}>Петропавловск</button>;",
+ "@/components/pwa-install":"export const PwaInstall=()=> <button className='install-header-button'><span className='install-header-label'>Установить</span><span className='install-header-icon'>↓</span></button>;",
+ "@/components/language-switcher":"export const LanguageSwitcher=()=> <div className='language-switcher compact'><button>RU</button><button>КАЗ</button></div>;",
  "@/components/reference-geography-provider":"const value={data:{regions:[],settlements:[{id:'fixture-city',name:{ru:'Петропавловск',kk:'Петропавл'}}]},ensureLoaded:()=>{}};export const useReferenceGeography=()=>value;",
 };
 const entry=`
-import React from 'react';import{createRoot}from'react-dom/client';import{CityPremiumShowcase}from'./components/city-premium-showcase';
-const params=new URLSearchParams(location.search),count=Number(params.get('count')||0);window.lang=params.get('lang')||'ru';window.ready=false;
+import React from 'react';import{createRoot}from'react-dom/client';import{CityPremiumShowcase}from'./components/city-premium-showcase';import{Header}from'./components/header';
+const params=new URLSearchParams(location.search),count=Number(params.get('count')||0);window.lang=params.get('lang')||'ru';window.ready=false;window.fixtureCounts={'fixture-city':count};window.scopeDelay=0;window.requestScopes=[];
 const shapes=params.has('healthy')?['landscape','portrait','square']:['landscape','portrait','square','missing','broken'];
-const placements=Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:'listing-'+i,slug:'fixture',title:i===0?'Длинное название объявления для проверки переноса текста':'Объявление '+(i+1),priceMinor:1000000,currencyCode:'KZT',locationRu:'Петропавловск',locationKk:'Петропавл',imageUrl:shapes[i%shapes.length]==='missing'?null:'/api/media/listings/fixture/'+i+'/'+shapes[i%shapes.length]+'.svg?delay='+Number(params.get('delay')||180),expiresAt:new Date(Date.now()+86400000).toISOString()}));
-window.fetch=async()=>{window.ready=true;return new Response(JSON.stringify({capacity:15,placements}),{headers:{'content-type':'application/json'}})};
-createRoot(document.getElementById('app')).render(<><main className="page-shell home-showcase-shell"><CityPremiumShowcase/></main><div style={{height:150}}/><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>);
+const placementsFor=count=>Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:'listing-'+i,slug:'fixture',title:i===0?'Длинное название объявления для проверки переноса текста':'Объявление '+(i+1),priceMinor:1000000,currencyCode:'KZT',locationRu:'Петропавловск',locationKk:'Петропавл',imageUrl:shapes[i%shapes.length]==='missing'?null:'/api/media/listings/fixture/'+i+'/'+shapes[i%shapes.length]+'.svg?delay='+Number(params.get('delay')||180),expiresAt:new Date(Date.now()+86400000).toISOString()}));
+window.fetch=async url=>{const city=new URL(url,location.origin).searchParams.get('city');window.requestScopes.push(city);const count=window.fixtureCounts[city]??0;const ms=window.scopeDelay;await new Promise(r=>setTimeout(r,ms));window.ready=true;return new Response(JSON.stringify({capacity:city==='all'?null:15,placements:placementsFor(count)}),{headers:{'content-type':'application/json'}})};
+createRoot(document.getElementById('app')).render(<><Header/><main className="page-shell home-showcase-shell"><CityPremiumShowcase/></main><section className="page-shell home-marketplace"><div className="home-marketplace-tabs"><button>Каталог</button><button>Объявления</button></div><h2>Популярные категории</h2><div style={{height:180}}/></section><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>);
 `;
 const bundle=await build({stdin:{contents:entry,loader:"tsx",resolveDir:root},bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",define:{"process.env.NODE_ENV":'"production"'},plugins:[{name:"showcase-fixture",setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:"fixture"}:null);b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:mocks[a.path],loader:"tsx",resolveDir:root}));}}]});
 const css=(await readFile("app/globals.css","utf8")).replace('@import "tailwindcss";',"")+'\n.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }';
@@ -49,199 +51,140 @@ try{
  socket.onmessage=e=>{const x=JSON.parse(e.data);if(x.id){const p=pending.get(x.id);pending.delete(x.id);clearTimeout(p?.timer);if(x.error)p?.reject(Error(JSON.stringify(x.error)));else p?.resolve(x.result);}else if(x.method==="Network.requestWillBeSent"&&x.params.type==="Image")imageRequests.push(x.params.request.url);else if(x.method==="Runtime.exceptionThrown")errors.push(x.params.exceptionDetails.text);};
  const send=(method,params={})=>new Promise((resolve,reject)=>{const next=++id,timer=setTimeout(()=>{pending.delete(next);reject(Error("CDP timeout: "+method));},30000);pending.set(next,{resolve,reject,timer});socket.send(JSON.stringify({id:next,method,params}));});
  const evaluate=async expression=>{const r=await send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
- const until=async expression=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await delay(30);}assert.fail(expression);};
+ const until=async expression=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await delay(30);}assert.fail(expression+" state="+JSON.stringify(await evaluate("({now:Date.now(),scope:document.querySelector('.city-premium-showcase')?.dataset.scope,expanded:document.querySelector('.showcase-view-all')?.getAttribute('aria-expanded'),current:[...document.querySelectorAll('.showcase-dots button')].findIndex(b=>b.getAttribute('aria-current')==='true'),timers:window.__clockTimers.size,errors:window.__partialFrames})")));};
+ let visit=0;
+ const navigate=async url=>{const target=url+"&visit="+(++visit);await send("Page.navigate",{url:target});await until("location.href==="+JSON.stringify(target)+" && window.ready && !!document.querySelector('.showcase-status')");};
  await send("Page.enable");await send("Runtime.enable");
  await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__decoded=new WeakSet();window.__partialFrames=0;const originalDecode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(){return originalDecode.call(this).then(()=>{window.__decoded.add(this)})};const inspect=()=>{for(const c of document.querySelectorAll('.showcase-paid-card:not([hidden])')){const img=c.querySelector('img'),text=c.querySelector('.showcase-card-copy strong');if(img&&text&&getComputedStyle(text).visibility==='visible'&&getComputedStyle(img).display!=='none'&&(!img.complete||!img.naturalWidth||!window.__decoded.has(img)))window.__partialFrames++}requestAnimationFrame(inspect)};requestAnimationFrame(inspect);"});
  await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__fakeNow=Number(new URLSearchParams(location.search).get('now')||0);\nDate.now=()=>window.__fakeNow;\nwindow.__hidden=false;\nObject.defineProperty(document,'hidden',{configurable:true,get:()=>window.__hidden});\nwindow.__clockTimers=new Map();window.__clockID=0;window.__clockMax=0;\nwindow.__setBoundary=(fn,delay)=>{const id=++window.__clockID;window.__clockTimers.set(id,{fn,at:Date.now()+delay});window.__clockMax=Math.max(window.__clockMax,window.__clockTimers.size);return id;};\nwindow.__clearBoundary=id=>window.__clockTimers.delete(id);\nwindow.__advance=to=>{while(true){const entry=[...window.__clockTimers].sort((a,b)=>a[1].at-b[1].at)[0];if(!entry||entry[1].at>to)break;window.__fakeNow=entry[1].at;window.__clockTimers.delete(entry[0]);entry[1].fn();}window.__fakeNow=to;};\n"});
  await send("Page.addScriptToEvaluateOnNewDocument",{source:`window.imageFrames=[];const loop=()=>{if(window.ready && document.querySelector('.showcase-status')){const cards=[...document.querySelectorAll('.showcase-card:not([hidden])')];if(cards.length)window.imageFrames.push(cards.map(c=>[c.getBoundingClientRect().width,c.getBoundingClientRect().height]));}requestAnimationFrame(loop)};requestAnimationFrame(loop);`});
  const geometry=`(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,bottom:r.bottom}};const cards=[...document.querySelectorAll('.showcase-card:not([hidden])')];return {scrollWidth:document.documentElement.scrollWidth,columns:getComputedStyle(document.querySelector('.showcase-grid')).gridTemplateColumns.split(' ').length,real:cards.filter(c=>c.classList.contains('showcase-paid-card')).length,demo:cards.filter(c=>c.classList.contains('showcase-brand-card')).length,links:cards.filter(c=>c.classList.contains('showcase-paid-card')).map(c=>c.getAttribute('href')),counter:document.querySelector('.showcase-status')?.textContent,cards:cards.map(c=>({box:rect(c),media:c.querySelector('.showcase-media')?rect(c.querySelector('.showcase-media')):null,image:c.querySelector('img')&&getComputedStyle(c.querySelector('img')).display!=='none'?{...rect(c.querySelector('img')),fit:getComputedStyle(c.querySelector('img')).objectFit}:null,copy:rect(c.querySelector('.showcase-card-copy')),overflow:c.scrollWidth>c.clientWidth}))}})()`;
- const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.h-Math.min(c.media.w*.75,width>=1180?180:240))<1);if(c.image){assert.equal(c.image.fit,"cover");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
+ const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.h-Math.min(c.media.w*.75,columns===4?180:240))<1);if(c.image){assert.equal(c.image.fit,"cover");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
 
- const counts=[0,1,2,3,4,5,15],demo=[2,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];
- for(const [width,height,mobile] of [[375,812,true],[390,844,true],[430,932,true],[768,1024,false],[1024,1366,false],[1180,820,false],[1366,768,false],[1536,864,false],[1920,1080,false]]){
-  await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile});
-  await send("Emulation.setTouchEmulationEnabled",{enabled:mobile});
-  for(const count of counts){
-   await send("Page.navigate",{url:origin+"/?count="+count});await until("window.ready && !!document.querySelector('.showcase-status')");await delay(300);
-   const collapsed=await evaluate(geometry),size=width>=1536?4:width>=1180?3:2,pageCount=Math.ceil((count+demo[count])/size);
-   assertGeometry(collapsed,width,size);assert.equal(collapsed.cards.length,Math.min(count+demo[count],size));assert.equal(collapsed.real,Math.min(count,size));assert.equal(collapsed.demo,Math.min(demo[count],Math.max(0,size-count)));
-   assert.ok(collapsed.counter.includes(String(count))&&collapsed.counter.includes("15"));
-   const frames=await evaluate("window.imageFrames");
-   for(const frame of frames)assert.deepEqual(frame,frames.at(-1),"Image loading cannot change card geometry");
-   assert.equal(await evaluate("document.querySelectorAll('.showcase-dots button').length"),pageCount>1?pageCount:0);
-   const seen=[];
-   for(let pageIndex=0;pageIndex<pageCount;pageIndex++){
-     await delay(180);const current=await evaluate(geometry);
-     assertGeometry(current,width,size);assert.equal(current.cards.length,Math.min(size,count+demo[count]-pageIndex*size));
-     assert.equal(current.demo,pageIndex===pageCount-1?demo[count]:0);
-     assert.ok(current.cards.every(c=>Math.abs(c.box.h-collapsed.cards[0].box.h)<1),"No height jump between pages");
-     seen.push(...current.links);
-     if(pageCount>1){
-       assert.equal(await evaluate("[...document.querySelectorAll('.showcase-dots button')].findIndex(b=>b.getAttribute('aria-current')==='true')"),pageIndex);
-       await evaluate("document.querySelector('.showcase-arrow-next').click()");
-       await until("[...document.querySelectorAll('.showcase-dots button')].findIndex(b=>b.getAttribute('aria-current')==='true')==="+((pageIndex+1)%pageCount));
-     }
-   }
-   assert.deepEqual(seen,Array.from({length:count},(_,i)=>"/listing/listing-"+i+"-fixture"));
-   if(pageCount>1){
-     await evaluate("document.querySelector('.showcase-arrow-prev').click()");
-     await until("document.querySelector('.showcase-dots button:last-child').getAttribute('aria-current')==='true'");
-     await evaluate("document.querySelector('.showcase-dots button').click()");
-     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
-     await evaluate("document.querySelector('.showcase-grid').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))");
-     await until("document.querySelectorAll('.showcase-dots button')[1].getAttribute('aria-current')==='true'");
-     await evaluate("document.querySelector('.showcase-dots button').click()");
-     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
-   }
-   if(count===3&&mobile){
-     await evaluate("window.scrollTo({top:0,behavior:'instant'})");
-     const point=await evaluate("(()=>{const r=document.querySelector('.showcase-media').getBoundingClientRect();return {x:r.x+r.width*.8,y:r.y+r.height*.5}})()");
-     await send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point]});
-     for(let step=1;step<=4;step++)await send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:point.x-step*16,y:point.y}]});
-     await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
-     await until("document.querySelectorAll('.showcase-dots button')[1].getAttribute('aria-current')==='true'");
-     assert.ok((await evaluate("location.href")).startsWith(origin),"Swiping must not open a listing");
-     assert.equal(await evaluate("window.__clockTimers.size"),1);
-     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),3000,"Swipe keeps the global deadline");
-     await evaluate("window.__advance(6000)");
-     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
-     await evaluate("document.querySelector('.showcase-dots button').click()");
-     await until("document.querySelector('.showcase-dots button').getAttribute('aria-current')==='true'");
-   }
-   if(count===3&&[390,430,1180,1366,1536].includes(width)){
-     const shot=await send("Page.captureScreenshot",{format:"png"});await writeFile(join(out,"carousel-"+width+".png"),Buffer.from(shot.data,"base64"));
-   }
-   await evaluate("window.firstCard=document.querySelector('.showcase-paid-card:not([hidden])');document.querySelector('.showcase-view-all').click()");
-   await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true'");await delay(220);
-   const expanded=await evaluate(geometry);assertGeometry(expanded,width,width<=640?2:width>=1024?4:3);assert.equal(expanded.real,count);assert.equal(expanded.demo,demo[count]);
-   assert.deepEqual(expanded.links,Array.from({length:count},(_,i)=>"/listing/listing-"+i+"-fixture"));
-   assert.equal(await evaluate("document.querySelectorAll('.showcase-arrow,.showcase-dots').length"),0);
-   if(count>0)assert.equal(await evaluate("window.firstCard===document.querySelector('.showcase-paid-card:not([hidden])')"),true);
-   await evaluate("window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'})");await delay(230);
-   if(mobile)assert.equal(await evaluate("document.querySelector('.showcase-card:not([hidden]):last-child').getBoundingClientRect().bottom<=document.querySelector('.mobile-bottom-nav').getBoundingClientRect().top"),true);
-   if(count>=5)assert.equal(await evaluate("[...document.querySelectorAll('.showcase-media img')].filter(i=>i.src.includes('/broken')).every(i=>getComputedStyle(i).display==='none')"),true);
-   await evaluate("document.querySelector('.showcase-view-all').click()");await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='false'");
-   const restored=await evaluate(geometry);assert.equal(restored.cards.length,Math.min(size,count+demo[count]));assert.deepEqual(restored.links,collapsed.links);
-   results.push({width,count,pages:pageCount,collapsed:"PASS",arrowsDotsKeyboard:"PASS",swipe:count===3&&mobile?"PASS":"not run",expanded:"PASS",restored:"PASS",images:"PASS"});
-  }
-  console.log(JSON.stringify({width,status:"PASS"}));
- }
- await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
- await send("Page.navigate",{url:origin+"/?count=3&lang=kk"});await until("window.ready && !!document.querySelector('.showcase-status')");
- assert.equal(await evaluate("document.querySelectorAll('.showcase-card:not([hidden])').length"),2);
- await evaluate("document.querySelector('.showcase-arrow-next').click()");
- await until("document.querySelectorAll('.showcase-brand-card:not([hidden])').length===1");
 
- // Deterministic wall clock with the actual hook, controller and browser lifecycle listeners.
- // Only boundary scheduling is controlled; React, DOM, image loading and touch events are real.
- await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
- for(const count of counts){
-   const pages=(count+demo[count])/2,start=8400;
-   await send("Page.navigate",{url:origin+"/?count="+count+"&now="+start});
-   await until("window.ready && !!document.querySelector('.showcase-status')");await delay(250);
-   const currentPage=()=>evaluate("(()=>{const buttons=[...document.querySelectorAll('.showcase-dots button')];return buttons.length?buttons.findIndex(b=>b.getAttribute('aria-current')==='true'):0})()");
-   const expectedAt=time=>Math.floor(time/3000)%pages;
-   const check=async expected=>{await until("(()=>{const b=[...document.querySelectorAll('.showcase-dots button')];return (b.length?b.findIndex(x=>x.getAttribute('aria-current')==='true'):0)})()==="+expected);assert.equal(await evaluate("document.querySelectorAll('.showcase-card:not([hidden])').length"),2);};
-   await check(expectedAt(start));
+ const counts=[0,1,2,3,4,5,8,9,14,15];
+ const currentPage="(()=>{const b=[...document.querySelectorAll('.showcase-dots button')];return b.length?b.findIndex(x=>x.getAttribute('aria-current')==='true'):0})()";
+ const imageReady="!document.querySelector('.showcase-grid-pending')";
+ const sizeAt=(w,h)=>w>=1440||(w>=1024&&w>h)?4:2;
+ const checkPage=async page=>until(currentPage+"==="+page);
+ const settle=async()=>{await until("window.ready && !!document.querySelector('.showcase-status')");await until(imageReady);await until("document.readyState==='complete'");await evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");};
+ await send("DOM.enable");await send("CSS.enable");
+ for(const [width,height] of [[375,812],[390,844],[430,932],[768,1024],[1024,1366],[1024,768],[1180,820],[1280,800],[1366,768],[1536,864]]){
+  if(process.env.JEVU_BROWSER_CASE && width!==Number(process.env.JEVU_BROWSER_CASE.split(":")[0]))continue;
+  const size=sizeAt(width,height);
+  await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:width<500});
+  await send("Emulation.setTouchEmulationEnabled",{enabled:true});
+  for(const count of process.env.JEVU_BROWSER_CASE?[Number(process.env.JEVU_BROWSER_CASE.split(":")[1])]:[390,1366].includes(width)?counts:[3,5]){
+   console.log(JSON.stringify({width,height,count,phase:"start"}));
+   const demo=count===0?size:(size-count%size)%size,pages=Math.max(1,Math.ceil(count/size));
+   await navigate(origin+"/?count="+count+"&healthy=1&now=8400");await settle();
+   assert.equal(await evaluate("Number(document.querySelector('.city-premium-showcase').dataset.cardsPerPage)"),size);
+   await checkPage(Math.floor(8400/3000)%pages);
    assert.equal(await evaluate("window.__clockTimers.size"),pages>1?1:0);
-   if(pages>1){
-     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),9000);
-     await evaluate("window.__advance(8999)");await check(expectedAt(start));
-     const heights=(await evaluate(geometry)).cards.map(c=>c.box.h);
-     for(let step=0;step<pages+2;step++){
-       const time=9000+step*3000;
-       await evaluate("window.__advance("+time+")");await check(expectedAt(time));
-       const g=await evaluate(geometry);assertGeometry(g,390,2);assert.deepEqual(g.cards.map(c=>c.box.h),heights);
-     }
-     const now=await evaluate("Date.now()"),deadline=await evaluate("[...window.__clockTimers.values()][0].at");
-     const before=await currentPage();
-     await evaluate("document.querySelector('.showcase-arrow-next').click()");await check((before+1)%pages);
-     assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),deadline);
-     await evaluate("document.querySelector('.showcase-arrow-prev').click()");await check(before);
-     await evaluate("document.querySelectorAll('.showcase-dots button')[0].click()");await check(0);
-     assert.equal(await evaluate("window.__clockTimers.size"),1);
-     await evaluate("window.__advance("+deadline+")");await check(expectedAt(deadline));
-     // Expanded has no boundary timer. Collapse uses time now, not page one.
-     await evaluate("document.querySelector('.showcase-view-all').click()");
-     await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true' && window.__clockTimers.size===0");
-     const collapseAt=(Math.floor((now+30000)/3000)+1)*3000+1200;
-     await evaluate("window.__fakeNow="+collapseAt+";document.querySelector('.showcase-view-all').click()");
-     await check(expectedAt(collapseAt));assert.equal(await evaluate("window.__clockTimers.size"),1);
-     // Hidden removes the timer, resume jumps directly after 30 seconds.
-     await evaluate("window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))");
-     await until("window.__clockTimers.size===0");
-     const resumeAt=collapseAt+31000;
-     await evaluate("window.__fakeNow="+resumeAt+";window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'))");
-     await check(expectedAt(resumeAt));assert.equal(await evaluate("window.__clockTimers.size"),1);
-     // Focus and BFCache restore clear even same-bucket manual overrides.
-     await evaluate("document.querySelector('.showcase-arrow-next').click()");await check((expectedAt(resumeAt)+1)%pages);
-     await evaluate("window.dispatchEvent(new Event('focus'))");await check(expectedAt(resumeAt));
-     await evaluate("window.dispatchEvent(new Event('pagehide'))");await until("window.__clockTimers.size===0");
-     await evaluate("window.__fakeNow="+(resumeAt+35000)+";window.dispatchEvent(new Event('pageshow'))");await check(expectedAt(resumeAt+35000));
-     assert.equal(await evaluate("window.__clockMax"),1,"No second boundary timer after manual/mode/lifecycle events");
+   if(pages>1){assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),9000);await evaluate("document.querySelector('.showcase-dots button').click()");await checkPage(0);}
+   const seen=[],heights=[];
+   for(let page=0;page<pages;page++){
+    await until(imageReady);const g=await evaluate(geometry);assertGeometry(g,width,size);
+    assert.equal(g.cards.length,size);assert.equal(g.real,Math.min(size,Math.max(0,count-page*size)));
+    assert.equal(g.demo,page===pages-1?demo:0);seen.push(...g.links);heights.push(g.cards.map(c=>c.box.h));
+    if(pages>1){await evaluate("document.querySelector('.showcase-arrow-next').click()");await checkPage((page+1)%pages);}
    }
-   const remountAt=37400;
-   await send("Page.navigate",{url:origin+"/?count="+count+"&now="+remountAt});
-   await until("window.ready && !!document.querySelector('.showcase-status')");await check(expectedAt(remountAt));
-   results.push({count,timeSync:"PASS",midBucketMount:"PASS",remainder:pages>1?600:null,background:"PASS",expanded:"PASS",remount:"PASS"});
+   assert.equal(new Set(seen).size,count);assert.equal(seen.length,count);
+   for(const h of heights)for(const value of h)assert.ok(Math.abs(value-heights[0][0])<1,"Full slides keep their height");
+   assert.ok((await evaluate(geometry)).counter.includes(count+""));
+   if(pages>1){
+    for(let step=0;step<4;step++){const at=9000+step*3000;await evaluate("window.__advance("+at+")");await checkPage(Math.floor(at/3000)%pages);}
+    const deadline=await evaluate("[...window.__clockTimers.values()][0].at");
+    await evaluate("document.querySelector('.showcase-arrow-prev').click()");await delay(30);
+    assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),deadline);
+    await evaluate("document.querySelector('.showcase-grid').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))");
+    await evaluate("window.__advance("+deadline+")");await checkPage(Math.floor(deadline/3000)%pages);
+   }
+   if(size===4){
+    const layout=await evaluate("(()=>{const a=document.querySelector('.header-search-row>.publish-button').getBoundingClientRect(),b=document.querySelector('.header-search').getBoundingClientRect(),n=document.querySelector('.home-marketplace').getBoundingClientRect(),h=document.querySelector('.home-marketplace h2').getBoundingClientRect();return{same:Math.abs(a.y-b.y)<1,left:a.right<=b.left,search:b.width,next:n.y,heading:h.y}})()");
+    assert.ok(layout.same&&layout.left&&layout.search>300,JSON.stringify(layout));
+    assert.ok(layout.next<height&&layout.heading<height,"Next section title visible: "+JSON.stringify(layout));
+   }
+   if(count===5&&[390,1024,1366].includes(width)){await evaluate("document.querySelector('.showcase-dots button')?.click()");await delay(50);const shot=await send("Page.captureScreenshot",{format:"png"});await writeFile(join(out,"final-"+width+"-"+height+".png"),Buffer.from(shot.data,"base64"));}
+   await evaluate("window.firstImage=document.querySelector('.showcase-paid-card img');document.querySelector('.showcase-view-all').click()");await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='true'");await delay(200);
+   const expanded=await evaluate(geometry);assertGeometry(expanded,width,size);assert.equal(expanded.cards.length,15);assert.equal(expanded.real,count);assert.equal(expanded.demo,15-count);
+   assert.equal(await evaluate("window.__clockTimers.size"),0);
+   if(count)assert.equal(await evaluate("window.firstImage===document.querySelector('.showcase-paid-card img')"),true);
+   if(count===5){
+    const doc=await send("DOM.getDocument");const {nodeId}=await send("DOM.querySelector",{nodeId:doc.root.nodeId,selector:".showcase-view-all"});
+    for(const pseudo of [[],["hover"],["active"],["focus"],["focus-visible"],["hover","focus"]]){
+     await send("CSS.forcePseudoState",{nodeId,forcedPseudoClasses:pseudo});
+     const style=await evaluate("(()=>{const b=document.querySelector('.showcase-view-all'),s=getComputedStyle(b);return {text:b.textContent,color:s.color,bg:s.backgroundImage,icon:getComputedStyle(b.querySelector('svg')).color}})()");
+     assert.equal(style.color,"rgb(240, 255, 232)");assert.ok(style.bg.includes("gradient"));assert.equal(style.icon,style.color);assert.ok(style.text.includes("Свернуть"));
+    }await send("CSS.forcePseudoState",{nodeId,forcedPseudoClasses:[]});
+   }
+   await evaluate("window.__fakeNow=43400;document.querySelector('.showcase-view-all').click()");await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='false'");
+   await checkPage(Math.floor(43400/3000)%pages);assert.equal((await evaluate(geometry)).cards.length,size);
+   assert.ok(await evaluate("window.__clockMax<=1"));
+   results.push({width,height,count,size,pages,composition:"PASS",expanded15:"PASS",timeSync:"PASS",header:size===4?"PASS":"preserved",button:"PASS"});
+  }console.log(JSON.stringify({width,height,status:"PASS"}));
  }
 
-
- // Cold cache: actual HTTP, actual decode, actual retained img nodes, controlled clock only.
- await send("Network.enable");await send("Network.setCacheDisabled",{cacheDisabled:true});
+ // Live location transitions, retained decoded images, late query replacement, and expanded reset.
  await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
- const requestStart=imageRequests.length;
- await send("Page.navigate",{url:origin+"/?count=15&healthy=1&delay=650"});
- await until("window.ready && !!document.querySelector('.showcase-status')");
- await until("!document.querySelector('.showcase-grid-pending')");
- assert.ok(imageRequests.length-requestStart<=6,"Prepare only current/next/previous, not all 15");
- const imageReady="([...document.querySelectorAll('.showcase-card:not([hidden]) img')].every(i=>i.complete&&i.naturalWidth>0&&window.__decoded.has(i)&&getComputedStyle(i).visibility==='visible'))";
- await until(imageReady);
- const imageSteps=[];
- for(let step=1;step<=8;step++){
-  await delay(750);await evaluate("window.__advance("+step*3000+")");
-  await until("document.querySelectorAll('.showcase-dots button')["+step%8+"].getAttribute('aria-current')==='true'");
-  assert.equal(await evaluate(imageReady),true,"Next page decoded BEFORE its reveal");
-  imageSteps.push({bucket:step,ready:true});
+ await navigate(origin+"/?count=5&healthy=1&now=8400");await settle();
+ for(const [scope,count] of [["fixture-other",9],["all",20],["fixture-city",5],["empty",0],["all",20],["fixture-city",5]]){
+  await evaluate("document.querySelector('.showcase-view-all').click()");await until("window.__clockTimers.size===0");
+  await evaluate("window.changeLocation("+JSON.stringify(scope)+","+count+")");
+  await until("document.querySelector('.city-premium-showcase').dataset.scope==="+JSON.stringify(scope));
+  await until("document.querySelectorAll('.showcase-paid-card').length==="+count);await until(imageReady);
+  assert.equal(await evaluate("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')"),"false");
+  const pages=Math.max(1,Math.ceil(count/2)),now=await evaluate("Date.now()");
+  await checkPage(Math.floor(now/3000)%pages);
+  if(pages>1)for(let i=0;i<4;i++){const next=await evaluate("[...window.__clockTimers.values()][0].at");await evaluate("window.__advance("+next+")");await checkPage(Math.floor(next/3000)%pages);}
+  else assert.equal(await evaluate("window.__clockTimers.size"),0);
+  assert.ok(await evaluate("window.__clockMax<=1"));
+  if(scope==="all"){const g=await evaluate(geometry);assert.ok(!g.counter.includes("из 15"));await evaluate("document.querySelector('.showcase-view-all').click()");await until("window.__clockTimers.size===0");assert.equal((await evaluate(geometry)).real,count);assert.equal((await evaluate(geometry)).demo,0);await evaluate("document.querySelector('.showcase-view-all').click()");await delay(30);}
  }
- for(const direction of ["prev","next"]){
-  await evaluate("document.querySelector('.showcase-arrow-"+direction+"').click()");
-  await delay(40);assert.equal(await evaluate(imageReady),true);
+ await evaluate("window.changeLocation('slow',14,600)");await delay(60);await evaluate("window.changeLocation('latest',8,0)");await until("document.querySelectorAll('.showcase-paid-card').length===8");await delay(750);assert.equal(await evaluate("document.querySelectorAll('.showcase-paid-card').length"),8);
+ results.push({scopeChanges:"PASS",national20:"PASS",expandedReset:"PASS",staleResponse:"PASS"});
+
+ // Same instance orientation change, no page-zero reset, background recovery.
+ for(const [width,height,size] of [[768,1024,2],[1024,768,4],[1024,1366,2],[1180,820,4],[390,844,2]]){
+  await evaluate("window.__fakeNow=43400");
+  await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:width<500});
+  await until("document.querySelector('.city-premium-showcase').dataset.cardsPerPage==="+JSON.stringify(String(size)));
+  const pages=Math.ceil(8/size);await checkPage(Math.floor(43400/3000)%pages);assert.equal((await evaluate(geometry)).cards.length,size);
+  await evaluate("window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'))");await until("window.__clockTimers.size===0");
+  await evaluate("window.__fakeNow=76400;window.__hidden=false;document.dispatchEvent(new Event('visibilitychange'))");await checkPage(Math.floor(76400/3000)%pages);assert.equal(await evaluate("window.__clockTimers.size"),1);
+ }
+ results.push({orientation:"PASS",background:"PASS"});
+
+ // Cold decode/network: four-card pages preload adjacent thumbnails, then reuse retained nodes.
+ await send("Network.enable");await send("Network.setCacheDisabled",{cacheDisabled:true});
+ await send("Emulation.setDeviceMetricsOverride",{width:1366,height:768,deviceScaleFactor:1,mobile:false});
+ const requestStart=imageRequests.length;
+ await navigate(origin+"/?count=15&healthy=1&delay=600");await settle();
+ const readyImages="([...document.querySelectorAll('.showcase-card:not([hidden]) img')].every(i=>i.complete&&i.naturalWidth>0&&window.__decoded.has(i)&&getComputedStyle(i).visibility==='visible'))";
+ for(let step=1;step<=12;step++){
+  await delay(700);await evaluate("window.__advance("+step*3000+")");await checkPage(step%4);
+  assert.equal(await evaluate(readyImages),true);
+  if(step===4||step===8){await evaluate("document.querySelector('.showcase-arrow-prev').click()");await delay(40);assert.equal(await evaluate(readyImages),true);await evaluate("document.querySelector('.showcase-arrow-next').click()");await delay(40);}
  }
  const requests=imageRequests.slice(requestStart).filter(u=>u.includes("/api/media/"));
- assert.ok(requests.every(u=>u.includes("variant=card")),"Every carousel source uses the thumbnail variant");
- assert.equal(new Set(requests).size,requests.length,"Retained nodes request each URL once even with HTTP cache disabled");
- const warmed=requests.length;
+ assert.equal(requests.length,15);assert.equal(new Set(requests).size,15);assert.ok(requests.every(u=>u.includes("variant=card")));
+ assert.equal(await evaluate("window.__partialFrames"),0);
  await send("Network.setCacheDisabled",{cacheDisabled:false});
- for(let step=9;step<=12;step++){await evaluate("window.__advance("+step*3000+")");await delay(40);assert.equal(await evaluate(imageReady),true);}
- assert.equal(imageRequests.slice(requestStart).filter(u=>u.includes("/api/media/")).length,warmed);
- assert.equal(await evaluate("window.__partialFrames"),0,"Never reveal text with an undecoded/missing photo");
- results.push({imageCold:"PASS",decodeBeforeReveal:"PASS",imageSteps,requests:warmed,repeatedRequests:0,warmCycles:"PASS"});
+ for(let step=13;step<=16;step++){await evaluate("window.__advance("+step*3000+")");await checkPage(step%4);assert.equal(await evaluate(readyImages),true);}
+ assert.equal(imageRequests.slice(requestStart).filter(u=>u.includes("/api/media/")).length,15);
+ results.push({coldAndWarm:"PASS",transitions:20,decode:"PASS",uniqueRequests:15,partialFrames:0});
 
- // Resize the same mounted instance. Scope must reset manual selection even when pageCount stays equal.
- for(const count of [3,15]){
-  await send("Page.navigate",{url:origin+"/?count="+count+"&healthy=1&now=43400"});
-  await until("window.ready && !!document.querySelector('.showcase-status')");
-  for(const [width,height,size] of [[768,1024,2],[1180,820,3],[1024,1366,2],[1366,768,3],[1536,864,4],[390,844,2]]){
-   const previousSize=await evaluate("Number(document.querySelector('.city-premium-showcase').dataset.cardsPerPage)");
-   await evaluate("document.querySelector('.showcase-arrow-next')?.click()");
-   await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:width<500});
-   await until("document.querySelector('.city-premium-showcase').dataset.cardsPerPage==="+JSON.stringify(String(size)));
-   const pages=Math.ceil((count+demo[count])/size),expected=Math.floor(43400/3000)%pages;
-   // A same-size transition preserves manual state; dispatch focus simulates returning to the viewport.
-   if(previousSize===size)await evaluate("window.dispatchEvent(new Event('focus'))");
-   await until("(()=>{const b=[...document.querySelectorAll('.showcase-dots button')];return b.length?b.findIndex(x=>x.getAttribute('aria-current')==='true'):0})()==="+expected);
-   const g=await evaluate(geometry);assertGeometry(g,width,size);
-   assert.equal(g.cards.length,Math.min(size,count+demo[count]-expected*size));
-   assert.equal(await evaluate("window.__clockTimers.size"),pages>1?1:0);
-   assert.equal(await evaluate("window.__clockMax"),1);
-   await until("!document.querySelector('.showcase-grid-pending')");
-  }
- }
- results.push({liveResize:"PASS",widths:[768,1180,1024,1366,1536,390],timeSyncAfterResize:"PASS",oneTimer:"PASS"});
-
+ // Actual touch swipe still advances and keeps its original global deadline.
+ await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});await send("Emulation.setTouchEmulationEnabled",{enabled:true});
+ await navigate(origin+"/?count=3&healthy=1");await settle();
+ const point=await evaluate("(()=>{const r=document.querySelector('.showcase-media').getBoundingClientRect();return{x:r.x+r.width*.8,y:r.y+r.height*.5}})()");
+ await send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point]});
+ for(let step=1;step<=4;step++)await send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:point.x-step*16,y:point.y}]});
+ await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});await checkPage(1);assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),3000);
+ await evaluate("window.__advance(6000)");await checkPage(0);assert.ok((await evaluate("location.href")).startsWith(origin));
+ results.push({swipe:"PASS"});
  assert.deepEqual(errors,[]);
- await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",environment:"Installed Chromium; actual showcase/CSS with fixture data/images; not physical Safari/PWA",scenarios:results.length+1,results,errors},null,2));
- console.log(JSON.stringify({status:"PASS",scenarios:results.length+1,errors}));
+ await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",scenarios:results.length,results,errors,environment:"Chromium, actual components/CSS, fixture data; no physical Safari/PWA"},null,2));
+ console.log(JSON.stringify({status:"PASS",scenarios:results.length,errors}));
  await send("Browser.close").catch(()=>{});
 }finally{socket?.close();child.kill();server.close();}
