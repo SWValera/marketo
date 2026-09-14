@@ -18,32 +18,24 @@ test("Home follows Header → Search → City Premium Showcase → Catalog/Listi
   assert.match(tabs, /fetchHomeListingPreview\(controller\.signal\)/);
 });
 
-test("compact showcase rotates every three seconds without visible carousel controls", async () => {
+test("showcase preserves server order, uses four initial tiles and expands the same cards", async () => {
   const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
-  const timeline = await readFile(new URL("components/use-showcase-timeline.ts", root), "utf8");
-  const { SHOWCASE_ROTATION_MS, rotationFrameAt, showcaseWindow } = await import("../lib/showcase-rotation.ts");
-  assert.equal(SHOWCASE_ROTATION_MS, 3000);
-  assert.match(source, /useShowcaseTimeline\(items\.length < 2 \|\| viewAll\)/);
-  assert.match(source, /const visible = showcaseWindow\(items, timelineFrame\)/);
-  assert.match(timeline, /window\.setInterval\(listener, SHOWCASE_ROTATION_MS\)/);
-  assert.match(timeline, /prefers-reduced-motion: reduce/);
-  const cards = Array.from({ length: 15 }, (_, index) => index);
-  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(2999)), [0, 1, 2]);
-  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(3000)), [1, 2, 3]);
-  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(6000)), [2, 3, 4]);
-  assert.deepEqual(showcaseWindow(cards, rotationFrameAt(45000)), [0, 1, 2]);
-  assert.doesNotMatch(source, /autoplayPaused|toggleAutoplay|rotationOffsets|setInterval|marketo-showcase-offset|showcase-controls|aria-roledescription|t\("showcase\.(?:previous|next|pause|resume)"\)/);
-  assert.match(source, /Math\.max\(0, 6 - paidItems\.length\)/);
-  assert.match(source, /cityKey = selectedLocation === "all" \? "all-kazakhstan" : selectedLocation/);
-  assert.doesNotMatch(source, /cityKey\s*=.*locale/);
-  assert.match(source, /<div className="showcase-city-row">\s*<p className="showcase-city">[\s\S]*?\{cityLabel\}[\s\S]*?<\/p>\s*<button className="secondary-button showcase-view-all"/);
-  assert.doesNotMatch(source, /t\("showcase\.activeOnly"\)/);
-  assert.match(source, /const displayed = viewAll \? paid\.map\(/);
+  assert.match(source, /premiumDemoCount\(paidItems.length\)/);
+  assert.match(source, /return \[\.\.\.paidItems, \.\.\.brandedItems\]/);
+  assert.match(source, /viewAll \? items : items.slice\(0, 4\)/);
+  assert.doesNotMatch(source, /useShowcaseTimeline|showcaseWindow|Math.random/);
+  assert.match(source, /key=\{item.kind \+ "-" \+ item.id\}/);
   assert.match(source, /Date\.parse\(item\.expiresAt\) > deadlineNow/);
   assert.match(source, /paidState\.city === selectedLocation/);
+  assert.match(source, /t\("showcase.total", \{ count: paid.length \}\)/);
   assert.match(source, /<LocationPicker allowAll=\{false\} \/>/);
-  assert.match(source, /viewAll && paidLoading/);
-  assert.match(source, /paid\.length \? "showcase\.total" : "showcase\.empty"/);
+});
+
+test("demo tiles follow the complete 0..15 rule without filling capacity", async () => {
+  const { premiumDemoCount } = await import("../lib/premium-showcase-presentation.ts");
+  const expected = [4,3,2,1,0,1,0,1,0,1,0,1,0,1,0,0];
+  expected.forEach((demo, real) => assert.equal(premiumDemoCount(real), demo, "real=" + real));
+  for (const invalid of [-1, NaN, Infinity, 1.5, 16]) assert.equal(premiumDemoCount(invalid), 0);
 });
 
 test("premium API and migration expose active paid placements only with default capacity 15", async () => {
@@ -66,10 +58,14 @@ test("premium API and migration expose active paid placements only with default 
   assert.doesNotMatch(correction, /10\s*000|10000/);
 });
 
-test("showcase renders three complete desktop cards, two complete mobile cards, and listing grid stays two-up", async () => {
+test("both showcase modes retain two mobile columns and the catalog thumbnail treatment", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
-  assert.match(css, /\.showcase-grid \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.showcase-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.showcase-grid:not\(\.showcase-grid-all\) > \.showcase-card:nth-child\(3\) \{ display: none; \}/);
-  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.listing-grid \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
+  const source = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
+  assert.match(css, /\.showcase-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.showcase-grid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(css, /\.showcase-grid-all \{ grid-template-columns: minmax\(0, 1fr\)/);
+  assert.doesNotMatch(css, /showcase-card:nth-child\(3\)/);
+  assert.match(source, /showcase-media listing-image-wrap/);
+  assert.match(source, /className="listing-image"/);
+  assert.match(css, /\.showcase-media \.listing-image \{ position: absolute; inset: 0; \}/);
 });

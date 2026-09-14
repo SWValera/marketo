@@ -21,12 +21,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
-import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
-import { showcaseWindow } from "@/lib/showcase-rotation";
+import { premiumDemoCount } from "@/lib/premium-showcase-presentation";
 
 type PaidPlacement = {
   id: string;
@@ -134,7 +133,7 @@ export function CityPremiumShowcase() {
   );
   const items = useMemo(() => {
     const paidItems = paid.map((placement) => ({ kind: "paid" as const, ...placement }));
-    const brandedCount = Math.max(0, 6 - paidItems.length);
+    const brandedCount = premiumDemoCount(paidItems.length);
     const offset = stableHash(cityKey) % brandDefinitions.length;
     const brandedItems = Array.from({ length: brandedCount }, (_, index) => {
       const definition = brandDefinitions[(offset + index) % brandDefinitions.length];
@@ -143,9 +142,7 @@ export function CityPremiumShowcase() {
     return [...paidItems, ...brandedItems];
   }, [paid, cityKey]);
 
-  const timelineFrame = useShowcaseTimeline(items.length < 2 || viewAll);
-  const visible = showcaseWindow(items, timelineFrame);
-  const displayed = viewAll ? paid.map((placement) => ({ kind: "paid" as const, ...placement })) : visible;
+  const displayed = viewAll ? items : items.slice(0, 4);
   const paidLoading = selectedLocation !== "all" && (paidState.city !== selectedLocation || paidState.status === "idle");
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
 
@@ -164,21 +161,24 @@ export function CityPremiumShowcase() {
     <div id="city-premium-items">
     {viewAll && selectedLocation === "all" ? <div className="showcase-status"><p>{t("showcase.chooseCity")}</p><LocationPicker allowAll={false} /></div> : null}
     {viewAll && paidLoading ? <p className="showcase-status" role="status">{t("common.loading")}…</p> : null}
-    {viewAll && selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t(paid.length ? "showcase.total" : "showcase.empty", { count: paid.length })}</p> : null}
+    {selectedLocation !== "all" && paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t("showcase.total", { count: paid.length })}</p> : null}
     <div className={["showcase-grid", viewAll ? "showcase-grid-all" : ""].filter(Boolean).join(" ")} aria-live="off">
-      {displayed.map((item, slot) => {
+      {displayed.map((item) => {
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;
-          return <Link className="showcase-card showcase-paid-card" href={`/listing/${item.listingId}-${item.slug}`} key={`${slot}-${item.id}`}>
+          return <Link className="showcase-card showcase-paid-card" href={`/listing/${item.listingId}-${item.slug}`} key={item.kind + "-" + item.id}>
             <span className="showcase-badge"><Star size={13} /> {t("showcase.premium")}</span>
-            <div className="showcase-media">{item.imageUrl ? <img src={item.imageUrl} alt="" decoding="async" /> : <Star size={42} />}</div>
+            <div className="showcase-media listing-image-wrap">
+              <span className="listing-placeholder" aria-hidden="true"><PackageOpen size={42} /></span>
+              {item.imageUrl ? <img className="listing-image" src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
+            </div>
             <div className="showcase-card-copy"><strong>{item.title}</strong><b>{price}</b><small><MapPin size={13} /> {locale === "kk" ? item.locationKk : item.locationRu}</small></div>
           </Link>;
         }
         const Icon = item.icon;
-        return <CategoryLink cityId={selectedLocation} className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={`${slot}-${item.id}`}>
+        return <CategoryLink cityId={selectedLocation} className={`showcase-card showcase-brand-card showcase-tone-${item.tone}`} href={item.href} key={item.kind + "-" + item.id}>
           <span className="showcase-badge">JEVU</span>
-          <span className="showcase-brand-icon"><Icon size={34} /></span>
+          <div className="showcase-demo-media"><span className="showcase-brand-icon"><Icon size={34} /></span></div>
           <div className="showcase-card-copy"><strong>{t(item.titleKey)}</strong><p>{t(item.descriptionKey)}</p><small>{t("showcase.open")} <ArrowRight size={13} /></small></div>
         </CategoryLink>;
       })}
