@@ -332,57 +332,47 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 
 .listings-section { margin-top: 44px; padding: 42px 0 50px; background: var(--canvas); border-block: 1px solid #edf0f3; }
 .listing-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
-.listing-card { display: grid; grid-template-columns: minmax(0, 1fr); position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: white; transition: transform .2s, box-shadow .2s; }
-.listing-card:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(17,24,39,.09); }
-/* Preserve the pre-resize footprint: 4:3 photo + original info lines,
-   padding/borders/gaps, minus the existing 6px overlap. No outer fixed height. */
-.listing-card::before {
-  content: "";
-  grid-area: 1 / 1;
-  box-sizing: content-box;
-  padding-top: 75%;
-  height: calc(1.125rem * 1.45);
-  margin-bottom: calc(5.9 * var(--font-ui) + 48px);
-  visibility: hidden;
-  pointer-events: none;
+.page-shell:has(.listing-grid), .dashboard-content:has(.listing-grid) { container: listing-cards / inline-size; }
+/* Match the showcase card width, accounting for its panel, arrows and gaps.
+   Only ordinary cards use this container; catalog columns stay unchanged. */
+.listing-card {
+  --listing-card-width: calc((100cqw - 50px - 96px - 16px) / 2);
+  --listing-media-max: 240px;
+  display: flex; flex-direction: column; width: 100%; max-width: var(--listing-card-width);
+  min-width: 0; justify-self: center; align-self: start;
+  position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 17px;
+  background: white; transition: transform .2s, box-shadow .2s;
 }
+.listing-card:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(17,24,39,.09); }
 .listing-image-wrap { position: relative; display: block; aspect-ratio: 4/3; overflow: hidden; background: #e7ece9; }
 .listing-card > .listing-image-wrap {
-  position: absolute;
-  inset: 0 0 auto;
+  flex: none;
   width: 100%;
   min-width: 0;
-  min-height: 0;
-  height: calc(60% + 6px);
+  height: auto;
+  max-height: var(--listing-media-max);
 }
 .listing-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(135deg,#eef4f0,#dce9e0); font-size: clamp(42px,5vw,70px); }
 .listing-image { position: relative; z-index: 1; width: 100%; height: 100%; display: block; object-fit: contain; background: #e7ece9; }
-.listing-card > .listing-image-wrap > .listing-image { object-fit: cover; }
+.listing-card > .listing-image-wrap > .listing-image { position: absolute; inset: 0; object-fit: cover; }
 .favorite-button { position: absolute; right: 11px; top: 11px; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #25313a; background: rgba(255,255,255,.93); box-shadow: 0 4px 12px rgba(0,0,0,.12); cursor: pointer; }
 .favorite-button.is-favorite { color: #e11d48; }
 .top-badge { position: absolute; left: 11px; top: 11px; padding: 5px 9px; border-radius: 7px; background: #f5c542; color: #392b00; font-size: var(--font-ui); font-weight: 900; }
 .listing-body { padding: 16px; }
 
-/* A consistent glass panel overlays only the bottom edge of the existing photo. */
+/* Natural photo/body flow, with the showcase's compact media and copy sizes. */
 .listing-card > .listing-body {
-  position: absolute;
-  inset: auto 0 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 40%;
   z-index: 2;
   width: 100%;
   box-sizing: border-box;
-  min-height: 0;
-  margin-top: -6px;
-  padding: 6px 16px;
-  border: 1px solid rgba(255,255,255,.80);
-  border-radius: 22px 22px 18px 18px;
-  background: radial-gradient(circle at 92% 72%, rgba(34,197,94,.24) 0%, rgba(34,197,94,.13) 26%, rgba(34,197,94,.05) 48%, rgba(255,255,255,0) 68%), rgba(255,255,255,.90);
-  -webkit-backdrop-filter: blur(18px) saturate(125%);
-  backdrop-filter: blur(18px) saturate(125%);
-  box-shadow: 0 8px 22px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.92);
+  min-height: 132px;
+  padding: 10px;
+  gap: 5px;
+  background: #fff;
 }
 .listing-card > .listing-body > .listing-price {
   flex-shrink: 0;
@@ -417,6 +407,28 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   text-overflow: ellipsis;
 }
 .listing-card > .listing-body > .listing-time { margin-top: 0; }
+@container listing-cards (min-width: 1390px) {
+  .listing-card { --listing-card-width: calc((100cqw - 50px - 96px - 48px) / 4); --listing-media-max: 180px; }
+}
+@media (orientation: landscape) {
+  @container listing-cards (min-width: 910px) {
+    .listing-card { --listing-card-width: calc((100cqw - 50px - 96px - 48px) / 4); --listing-media-max: 180px; }
+  }
+}
+@media (max-width: 640px) {
+  .listing-card { --listing-card-width: calc((100cqw - 26px - 10px) / 2); }
+  .listing-card > .listing-body { min-height: 122px; padding: 10px 8px; gap: 4px; }
+}
+@media (orientation: landscape) and (min-width: 568px) and (max-width: 1000px) and (max-height: 500px) {
+  .listing-card { --listing-card-width: calc((100cqw - 26px - 80px - 16px) / 3); }
+  .listing-card > .listing-image-wrap { height: clamp(64px, calc(100svh - 311px), 112px); max-height: none; aspect-ratio: auto; }
+  /* Keep the ordinary card's extra date row beneath the compact showcase rows. */
+  .listing-card > .listing-body { min-height: 81px; padding: 6px 8px; gap: 0; }
+  .listing-card > .listing-body > .listing-price { font-size: 1rem; line-height: 20px; height: 20px; }
+  .listing-card > .listing-body > .listing-title { font-size: .875rem; line-height: 17px; height: 17px; -webkit-line-clamp: 1; }
+  .listing-card > .listing-body > :is(.listing-location, .listing-time) { font-size: .75rem; line-height: 16px; height: 16px; }
+}
+
 .listing-price { margin: 0; color: var(--green-dark); font-size: 1.125rem; font-weight: 850; letter-spacing: -.02em; }
 .listing-title { display: block; margin-top: 6px; font-size: var(--font-ui); font-weight: 700; }
 .listing-title:hover { color: var(--green); }
@@ -520,7 +532,6 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .category-tile { min-height: 125px; }
   .listing-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
   .listing-card { border-radius: 13px; }
-  .listing-card::before { height: 0; margin-bottom: 168px; }
   .listing-body { padding: 11px; }
   .listing-price { font-size: var(--font-ui); }
   .listing-title { font-size: var(--font-ui); }
