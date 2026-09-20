@@ -58,7 +58,8 @@ export function OwnerListingActions({ listing }: { listing: Pick<MyListingSummar
     </div>
     {promotionOpen ? <OwnerPromotionDialog listingId={listing.id} onClose={closePromotion} onSaved={(choice) => {
       setPromotionOpen(false);
-      setNotice(t(choice === null ? "promotion.removed" : "promotion.saved"));
+      setNotice(t(choice === null ? "promotion.removed" : listing.status === "active" ? "promotion.activated" : "promotion.saved"));
+      router.refresh();
     }} /> : null}
     {notice ? <p role="status">{notice}</p> : null}
     {error ? <p className="owner-listing-action-error" role="alert">{error}</p> : null}

@@ -20,9 +20,9 @@ async function handle(request: Request, { params }: Context, write: boolean) {
   if (!listing) return json({ error: "listing_not_found" }, 404);
   if (!["draft", "pending", "active", "rejected"].includes(listing.status)) return json({ error: "listing_unavailable" }, 409);
   if (!write) {
-    const { data: choice, error } = await client.from("listing_promotion_choices").select("promotion_type").eq("listing_id", id).maybeSingle();
+    const { data: state, error } = await client.rpc("get_listing_promotion_state", { target_listing_id: id });
     if (error) return json({ error: "promotion_lookup_failed" }, 503);
-    return json({ promotionChoice: choice?.promotion_type ?? null });
+    return json(state);
   }
   const body: unknown = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || !("promotionChoice" in body)
@@ -30,7 +30,11 @@ async function handle(request: Request, { params }: Context, write: boolean) {
     return json({ error: "invalid_promotion_choice" }, 400);
   }
   const { error } = await client.rpc("set_listing_promotion_choice", { target_listing_id: id, promotion_choice: body.promotionChoice });
-  if (error) return json({ error: "promotion_save_failed" }, error.code === "42501" ? 409 : 503);
+  if (error) {
+    if (error.message === "promotion already active") return json({ error: "promotion_already_active" }, 409);
+    if (error.message === "publication expired") return json({ error: "listing_expired" }, 409);
+    return json({ error: "promotion_save_failed" }, error.code === "42501" || error.code === "22023" ? 409 : 503);
+  }
   return json({ promotionChoice: body.promotionChoice });
 }
 

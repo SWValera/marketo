@@ -52,6 +52,9 @@ type CatalogListingCardRow = {
   published_at: string | null;
   expires_at: string | null;
   promoted: boolean | null;
+  vip_until: string | null;
+  x2_until: string | null;
+  sort_at: string | null;
   primary_image_storage_key: string | null;
 };
 
@@ -118,6 +121,7 @@ export type Database = {
       };
     };
     Functions: {
+      get_listing_promotion_state: { Args: { target_listing_id: string }; Returns: Json };
       set_listing_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };
       submit_listing_with_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };
       connect_city_premium: { Args: { target_listing_id: string }; Returns: Json };

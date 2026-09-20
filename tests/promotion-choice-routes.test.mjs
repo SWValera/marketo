@@ -15,7 +15,7 @@ const client={
       maybeSingle:async()=>({data:table==="listings"?(exists?{id,status}:null):{promotion_type:choice},error:null})
     };return query;
   },
-  rpc:async(name,args)=>{calls.push({name,args});return {error:failure};}
+  rpc:async(name,args)=>{calls.push({name,args});return {error:failure,data:name==="get_listing_promotion_state"?{promotionChoice:choice}:null};}
 };
 const mocks={
   "next/server":"export const NextResponse={json:(value,options)=>Response.json(value,options)};",
@@ -54,6 +54,8 @@ test("promotion routes validate input, owner scope and shared submission",async(
     }
     exists=false;assert.equal((await profile.GET(request("GET"),context)).status,404);assert.equal((await profile.PUT(request("PUT",{promotionChoice:"basic"}),context)).status,404);exists=true;
     status="archived";assert.equal((await profile.PUT(request("PUT",{promotionChoice:"basic"}),context)).status,409);status="active";
+    failure={code:"P0001",message:"promotion already active"};
+    const locked=await profile.PUT(request("PUT",{promotionChoice:"maximum"}),context);assert.equal(locked.status,409);assert.deepEqual(await locked.json(),{error:"promotion_already_active"});
     failure={code:"42501"};assert.equal((await profile.PUT(request("PUT",{promotionChoice:"basic"}),context)).status,409);
   }finally{delete globalThis.__promotionRouteClient;}
 });

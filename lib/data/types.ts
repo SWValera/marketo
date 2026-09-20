@@ -25,6 +25,8 @@ export type ListingSummary = {
   categorySlug: string;
   cityId: string;
   promoted: boolean;
+  vipUntil?: string | null;
+  x2Until?: string | null;
   /** Optional category values used only when a caller explicitly hydrates them. */
   attributes?: Record<string, string | number | boolean>;
 };

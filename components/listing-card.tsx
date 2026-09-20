@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/app-link";
-import { Heart } from "lucide-react";
+import { Crown, Heart } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
@@ -19,6 +19,11 @@ import { usePublicationDeadline } from "@/components/use-publication-deadline";
 export function ListingCard({ listing }: { listing: ListingSummary }) {
   const { t } = useI18n();
   const expired = usePublicationDeadline(listing.expiresAt);
+  // Presentation deadlines come from server entitlements; activation/scheduling never runs here.
+  const vipExpired = usePublicationDeadline(listing.vipUntil);
+  const x2Expired = usePublicationDeadline(listing.x2Until);
+  const vip = Boolean(listing.vipUntil) && !vipExpired;
+  const x2 = Boolean(listing.x2Until) && !x2Expired;
   const router = useRouter();
   const pathname = usePathname();
   const favoriteStore = useSyncExternalStore(subscribeFavoriteStore, readFavoriteStore, readServerFavoriteStore);
@@ -64,12 +69,12 @@ export function ListingCard({ listing }: { listing: ListingSummary }) {
 
   if (expired) return null;
   return (
-    <article className="listing-card">
+    <article className={`listing-card${vip ? " listing-card-vip" : ""}${x2 ? " listing-card-x2" : ""}`}>
       <Link href={href} className="listing-image-wrap" aria-label={listing.title} {...intentPrefetchProps}>
         <span className="listing-placeholder" aria-hidden="true">{placeholder}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {listing.imageUrl ? <img className="listing-image" src={listing.imageUrl} alt="" loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
-        {listing.promoted && <span className="top-badge">TOP</span>}
+        {vip ? <span className="listing-vip-badge"><Crown size={14} aria-hidden="true" />VIP</span> : listing.promoted ? <span className="top-badge">TOP</span> : null}
       </Link>
       <button
         className={`favorite-button ${favorite ? "is-favorite" : ""}`}

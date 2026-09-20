@@ -1668,3 +1668,10 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
   .promotion-dialog { padding: 16px; max-height: calc(100dvh - 20px); }
   .promotion-dialog-overlay { padding: 10px; }
 }
+
+/* Server-issued VIP and X2, scoped to ordinary listing cards only. */
+.listing-card.listing-card-vip { border-color: #d8b758; box-shadow: 0 0 0 1px #e8cc7e; }
+.listing-card.listing-card-vip > .listing-body { background: #ddf5e9; }
+.listing-vip-badge { position: absolute; z-index: 2; left: 9px; top: 9px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: linear-gradient(115deg,#fae9b8,#dbb968); color: #2b2518; font-size: 12px; font-weight: 800; }
+.listing-grid > .listing-card.listing-card-x2 { grid-column: span 2; max-width: none; width: 100%; }
+.listing-card.listing-card-x2 > .listing-image-wrap { aspect-ratio: 2/1; height: auto; max-height: none; }

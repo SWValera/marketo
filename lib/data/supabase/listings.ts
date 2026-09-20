@@ -47,7 +47,7 @@ function orderedCatalogRequest(
   } else if (filters.sort === "expensive") {
     request = request.order("price_minor", { ascending: false, nullsFirst: false });
   } else {
-    request = request.order("published_at", { ascending: false });
+    request = request.order("sort_at", { ascending: false });
   }
   return request.order("id", { ascending: false });
 }
@@ -130,6 +130,8 @@ type SellerListingCardRow = {
   published_at: string;
   expires_at: string | null;
   promoted_until: string | null;
+  vip_until: string | null;
+  x2_until: string | null;
   categories: { slug: string } | null;
   settlements: { id: string; name_ru: string; name_kk: string } | null;
   listing_images: Array<{ storage_key: string; sort_order: number }>;
@@ -138,7 +140,7 @@ type SellerListingCardRow = {
 const MAX_SELLER_LISTINGS_PAGE_SIZE = 60;
 const MAX_SELLER_LISTING_PAGE_RETRIES = 1;
 const SELLER_LISTING_CARD_COLUMNS =
-  "id, slug, title, price_minor, currency_code, category_id, settlement_id, published_at, expires_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)";
+  "id, slug, title, price_minor, currency_code, category_id, settlement_id, published_at, expires_at, promoted_until, vip_until, x2_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)";
 
 export type SellerListingsPageInput = number | string | string[] | undefined;
 
@@ -298,6 +300,8 @@ export async function listPublishedListingCardsBySeller(
         location_name_kk: row.settlements?.name_kk ?? null,
         published_at: row.published_at,
         expires_at: row.expires_at ?? null,
+        vip_until: row.vip_until ?? null,
+        x2_until: row.x2_until ?? null,
         promoted: Boolean(row.promoted_until && new Date(row.promoted_until) > new Date()),
         primary_image_storage_key: row.listing_images[0]?.storage_key ?? null,
       };

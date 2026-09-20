@@ -19,6 +19,8 @@ export function OwnerPromotionDialog({ listingId, onClose, onSaved }: {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState("");
   const close = useCallback(() => { if (!inFlight.current) onClose(); }, [onClose]);
 
@@ -30,6 +32,8 @@ export function OwnerPromotionDialog({ listingId, onClose, onSaved }: {
         const body = await response.json();
         if (!response.ok || !body || typeof body !== "object" || !("promotionChoice" in body) || (body.promotionChoice !== null && !isPromotionChoice(body.promotionChoice))) throw new Error("lookup failed");
         setChoice(body.promotionChoice ?? "accelerated");
+        setLocked("locked" in body && body.locked === true);
+        setWaiting("showcase" in body && !!body.showcase && typeof body.showcase === "object" && "status" in body.showcase && body.showcase.status === "waiting");
       } catch {
         if (!controller.signal.aborted) setLoadFailed(true);
       } finally {
@@ -48,7 +52,7 @@ export function OwnerPromotionDialog({ listingId, onClose, onSaved }: {
   }, [close]);
 
   async function save(value: PromotionChoice | null) {
-    if (inFlight.current || loading || loadFailed) return;
+    if (inFlight.current || loading || loadFailed || locked) return;
     inFlight.current = true;
     setSaving(true);
     setError("");
@@ -57,7 +61,12 @@ export function OwnerPromotionDialog({ listingId, onClose, onSaved }: {
         method: "PUT", headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({ promotionChoice: value }),
       });
-      if (!response.ok) throw new Error("save failed");
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        if (body && typeof body === "object" && "error" in body && body.error === "promotion_already_active") { setLocked(true); setError(t("promotion.packageActive")); return; }
+        if (body && typeof body === "object" && "error" in body && body.error === "listing_expired") { setError(t("promotion.listingExpired")); return; }
+        throw new Error("save failed");
+      }
       onSaved(value);
     } catch {
       setError(t("promotion.failed"));
@@ -72,9 +81,10 @@ export function OwnerPromotionDialog({ listingId, onClose, onSaved }: {
     <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} className="promotion-dialog" tabIndex={-1}>
       <div className="promotion-dialog-heading"><h2 id={titleId}>{t("publish.promotionTitle")}</h2><button type="button" className="icon-button" aria-label={t("common.close")} disabled={saving} onClick={close}><X size={22} /></button></div>
       {loading ? <p role="status">{t("promotion.loading")}</p> : loadFailed ? <p role="alert">{t("promotion.loadFailed")}</p> : <>
-        <PromotionChooser value={choice} onChange={setChoice} disabled={saving} />
+        {locked ? <p role="status">{t(waiting ? "promotion.showcaseWaiting" : "promotion.packageActive")}</p> : null}
+        <PromotionChooser value={choice} onChange={setChoice} disabled={saving || locked} />
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <PromotionSubmitActions value={choice} onSubmit={(value) => void save(value)} saving={saving} />
+        <PromotionSubmitActions value={choice} onSubmit={(value) => void save(value)} saving={saving} disabled={locked} />
       </>}
     </div>
   </div>, document.body);

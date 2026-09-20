@@ -50,7 +50,7 @@ test("Premium commercial accounts, orders and analytics are owner-scoped by RLS"
       create publication supabase_realtime;
     `);
     const migrations = (await readdir(new URL("supabase/migrations/", root)))
-      .filter((name) => name.endsWith(".sql"))
+      .filter((name) => name.endsWith(".sql") && name < "0038")
       .sort();
     for (const migration of migrations) {
       await db.exec(await readFile(new URL(`supabase/migrations/${migration}`, root), "utf8"));

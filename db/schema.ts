@@ -217,6 +217,9 @@ export const listings = pgTable("listings", {
   currencyCode: char("currency_code", { length: 3 }).notNull().default("KZT"),
   status: text("status").notNull().default("draft"),
   promotedUntil: timestamptz("promoted_until"),
+  vipUntil: timestamptz("vip_until"),
+  x2Until: timestamptz("x2_until"),
+  bumpedAt: timestamptz("bumped_at"),
   publishedAt: timestamptz("published_at"),
   expiresAt: timestamptz("expires_at"),
   deletedAt: timestamptz("deleted_at"),
@@ -233,6 +236,10 @@ export const listings = pgTable("listings", {
 export const listingPromotionChoices = pgTable("listing_promotion_choices", {
   listingId: uuid("listing_id").primaryKey().references(() => listings.id, { onDelete: "cascade" }),
   promotionType: text("promotion_type").notNull(),
+  status: text("status").notNull().default("pending_approval"),
+  runId: uuid("run_id").notNull().defaultRandom(),
+  startedAt: timestamptz("started_at"),
+  endsAt: timestamptz("ends_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
@@ -341,6 +348,7 @@ export const cityPremiumPlacements = pgTable("city_premium_placements", {
   settlementId: uuid("settlement_id").notNull().references(() => settlements.id, { onDelete: "cascade" }),
   listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
   promotionType: text("promotion_type").notNull().default("CITY_PREMIUM").references(() => promotionProducts.code),
+  promotionRunId: uuid("promotion_run_id"),
   userId: uuid("user_id").references(() => profiles.id, { onDelete: "set null" }),
   priceAmount: bigint("price_amount", { mode: "number" }).notNull().default(0),
   currency: char("currency", { length: 3 }).notNull().default("KZT"),

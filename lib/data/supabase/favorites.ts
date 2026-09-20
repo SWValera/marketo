@@ -55,6 +55,8 @@ type FavoriteListingRow = {
   published_at: string | null;
   expires_at: string | null;
   promoted_until: string | null;
+  vip_until: string | null;
+  x2_until: string | null;
   categories: unknown;
   settlements: unknown;
   listing_images: unknown;
@@ -108,7 +110,7 @@ export async function listFavoriteListings(
 
   const listingsResult = await client
     .from("listings")
-    .select("id, slug, title, price_minor, currency_code, published_at, expires_at, promoted_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
+    .select("id, slug, title, price_minor, currency_code, published_at, expires_at, promoted_until, vip_until, x2_until, categories(slug), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
     .in("id", listingIds)
     .eq("status", "active")
     .not("published_at", "is", null)
@@ -138,6 +140,8 @@ export async function listFavoriteListings(
         : settlement.name_ru ?? settlement.name_kk ?? "",
       publishedLabel: dateLabel(row.published_at, locale),
       expiresAt: row.expires_at,
+      vipUntil: row.vip_until,
+      x2Until: row.x2_until,
       imageUrl: publicMediaUrl(images[0]?.storage_key ?? null),
       categorySlug: category.slug,
       cityId: settlement.id,

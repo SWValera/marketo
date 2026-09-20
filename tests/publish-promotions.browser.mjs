@@ -43,8 +43,8 @@ await build({entryPoints:['app/api/listings/[id]/promotion-choice/route.ts'],out
 })]});
 const profileRoute=await import(pathToFileURL(profileRoutePath));
 
-let mode='success';const requests=[],rpcCalls=[];const statuses=new Map(),choices=new Map();
-globalThis.__publishClient={auth:{getUser:async()=>({data:{user:{id:'fixture-user'}},error:null})},from:(table)=>{const query={select:()=>query,eq:()=>query,is:()=>query,maybeSingle:async()=>({data:table==='listings'?{id:listingId,status:'active'}:choices.has(listingId)?{promotion_type:choices.get(listingId)}:null,error:null})};return query;},rpc:async(name,args)=>{rpcCalls.push({name,args});if(mode==='submit-error')return {error:{code:'42501'}};if(name==='submit_listing_with_promotion_choice')statuses.set(args.target_listing_id,'pending');choices.set(args.target_listing_id,args.promotion_choice);return {error:null};}};
+let mode='success',locked=false;const requests=[],rpcCalls=[];const statuses=new Map(),choices=new Map();
+globalThis.__publishClient={auth:{getUser:async()=>({data:{user:{id:'fixture-user'}},error:null})},from:(table)=>{const query={select:()=>query,eq:()=>query,is:()=>query,maybeSingle:async()=>({data:table==='listings'?{id:listingId,status:'active'}:choices.has(listingId)?{promotion_type:choices.get(listingId)}:null,error:null})};return query;},rpc:async(name,args)=>{if(name==='get_listing_promotion_state')return {error:null,data:{promotionChoice:choices.get(args.target_listing_id)??null,locked}};rpcCalls.push({name,args});if(mode==='submit-error')return {error:{code:'42501'}};if(name==='submit_listing_with_promotion_choice')statuses.set(args.target_listing_id,'pending');choices.set(args.target_listing_id,args.promotion_choice);return {error:null};}};
 const css=(await readFile('app/globals.css','utf8')).replace('@import "tailwindcss";','');
 const server=createServer(async(req,res)=>{try{
  const path=new URL(req.url,'http://fixture').pathname;
@@ -87,7 +87,7 @@ try{
   assert.equal(await evaluate("document.querySelector('.publish-advertise').disabled"),false);
   for(const value of ['basic','maximum','city_premium','accelerated']){await click(`[value=${value}] + span`);assert.deepEqual(await selected(),[value]);await click(`[value=${value}] + span`);assert.deepEqual(await selected(),[value]);}
   assert.deepEqual(await evaluate("[...document.querySelectorAll('.promotion-choice-content strong')].map(x=>x.textContent)"),['Базовая','Ускоренная','Максимальная','Премиум-витрина']);
-  assert.deepEqual(await evaluate("[...document.querySelectorAll('.promotion-features')].map(x=>x.children.length)"),[2,2,3,4]);
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('.promotion-features')].map(x=>x.children.length)"),[1,2,3,4]);
   assert.equal(await evaluate("document.querySelectorAll('.promotion-description:not([hidden])').length"),0);
   for(let i=1;i<=4;i++){
     await click('.publish-promotion-option:nth-child('+i+') .promotion-info');
@@ -147,5 +147,8 @@ try{
   await until("document.activeElement.classList.contains('promotion-gold-button')");
   report.push({profile:[width,height],saveReopenOptOut:'PASS',escape:'PASS'});
  }
+ locked=true;await open('?profile');await click('.owner-listing-actions .promotion-gold-button');await until("!!document.querySelector('.promotion-dialog .publish-promotions')");
+ assert.equal(await evaluate("document.querySelector('.publish-advertise').disabled && document.querySelector('.publish-without-promotion').disabled"),true);
+ assert.match(await evaluate("document.querySelector('.promotion-dialog').textContent"),/Продвижение уже активно/);report.push({activePackageBlocksStacking:'PASS'});
  assert.deepEqual(errors,[]);await writeFile(join(out,'browser-result.json'),JSON.stringify({status:'PASS',scenarios:report.length,report,errors},null,2));console.log(JSON.stringify({status:'PASS',scenarios:report.length,errors}));await send('Browser.close').catch(()=>{});
 }finally{socket?.close();child.kill();server.close();delete globalThis.__publishClient;}

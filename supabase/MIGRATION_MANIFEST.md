@@ -83,3 +83,19 @@ Targeted rehearsal: tests/promotion-choices.test.mjs checks owner isolation,
 anonymous/direct-write denial, account/status guards, atomic rollback,
 idempotent updates, and opt-out. Browser tests cover the actual submit route
 and shared publish/profile chooser.
+
+## Real free promotions and listing lifetime 2026-09-20
+
+0038_listing_promotion_lifecycle.sql extends the existing chooser state and
+CITY_PREMIUM placement ledger. VIP/X2 dates and unique private bump events are
+server-owned. The existing minute archive job handles scheduled bumps, expiry,
+and the same placement queue; no extra scheduler or payment path is added.
+First publication is preserved through editing, with an exact 720-hour term.
+Promotion extends expiry only when its promised end requires it. Previous dates
+are retained in admin_audit_log before historical first-publication backfill.
+Legacy standalone showcase activation loses browser execution privileges.
+
+Targeted rehearsal: tests/promotion-lifecycle.test.mjs applies every historical
+migration and 0038 to isolated PostgreSQL, then exercises moderation, all packages,
+late activation, queue/capacity, retries, protected timestamps and ownership.
+See docs/PROMOTION_LIFECYCLE.md for the contracts and focused UI/API checks.

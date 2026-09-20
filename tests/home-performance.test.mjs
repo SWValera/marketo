@@ -112,6 +112,25 @@ test("Home listing preview is one bounded data RPC without exact count or attrib
   assert.equal(fixture.calls.some((call) => call.options?.count === "exact" || call.options?.head === true), false);
 });
 
+test("catalog freshness uses server bumps while price sorting and filters stay intact", async () => {
+  for (const sort of ["new", "cheap", "expensive"]) {
+    const fixture = catalogPageOneClient({ data: [], error: null, count: 0 });
+    await listPublishedListingCards(fixture.client, {
+      sort, categoryIds: ["category"], settlementId: "city", query: " phone ",
+      minPriceMinor: 10, maxPriceMinor: 100, attributeFilters: { fuel: "petrol" },
+    });
+    assert.deepEqual(fixture.calls.filter(x => x.operation === "order"), [
+      { operation: "order", column: sort === "new" ? "sort_at" : "price_minor",
+        options: sort === "new" ? { ascending: false } : { ascending: sort === "cheap", nullsFirst: false } },
+      { operation: "order", column: "id", options: { ascending: false } },
+    ]);
+    assert.deepEqual(fixture.calls.find(x => x.operation === "rpc").args, {
+      p_category_ids: ["category"], p_settlement_id: "city", p_query: "phone",
+      p_min_price_minor: 10, p_max_price_minor: 100, p_attribute_filters: { fuel: "petrol" },
+    });
+  }
+});
+
 test("Home listing preview remains bounded and propagates data failures", async () => {
   const bounded = previewClient(Array.from({ length: 40 }, (_, index) => listingRow(index + 1)));
   const rows = await listPublishedListingPreview(bounded.client, { limit: Number.MAX_SAFE_INTEGER });
@@ -354,9 +373,10 @@ test("Home initial render omits listing I/O and loads a bounded preview only aft
   assert.match(referenceServer, /getCategoryReferences[\s\S]*?listActiveCategories/);
   assert.match(repositories, /async\s+preview[\s\S]*?listPublishedListingPreview[\s\S]*?mapCatalogListingSummary/);
 
-  const previewMethod = repositories.match(/async\s+preview[\s\S]*?\n\s*},\n\s*async\s+list/)?.[0] ?? "";
+  const source = repositories.replaceAll("\r\n", "\n");
+  const previewMethod = source.match(/async\s+preview[\s\S]*?\n\s*},\n\s*async\s+list/)?.[0] ?? "";
   assert.doesNotMatch(previewMethod, /hydrateAttributes|getListingAttributeRecords/);
-  const listMethod = repositories.match(/async\s+list[\s\S]*?\n\s*},\n\s*async\s+favorites/)?.[0] ?? "";
+  const listMethod = source.match(/async\s+list[\s\S]*?\n\s*},\n\s*async\s+favorites/)?.[0] ?? "";
   assert.match(listMethod, /listPublishedListingCards/);
   assert.doesNotMatch(listMethod, /hydrateAttributes|getListingAttributeRecords/);
   const catalogClient = await readFile(new URL("components/catalog-client.tsx", root), "utf8");
