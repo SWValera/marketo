@@ -126,7 +126,7 @@ try{
     for(const pseudo of [[],["hover"],["active"],["focus"],["focus-visible"],["hover","focus"]]){
      await send("CSS.forcePseudoState",{nodeId,forcedPseudoClasses:pseudo});
      const style=await evaluate("(()=>{const b=document.querySelector('.showcase-view-all'),s=getComputedStyle(b);return {text:b.textContent,color:s.color,bg:s.backgroundImage,icon:getComputedStyle(b.querySelector('svg')).color}})()");
-     assert.equal(style.color,"rgb(240, 255, 232)");assert.ok(style.bg.includes("gradient"));assert.equal(style.icon,style.color);assert.ok(style.text.includes("Свернуть"));
+     assert.equal(style.color,"rgb(43, 37, 24)");assert.ok(style.bg.includes("gradient"));assert.equal(style.icon,style.color);assert.ok(style.text.includes("Свернуть"));
     }await send("CSS.forcePseudoState",{nodeId,forcedPseudoClasses:[]});
    }
    await evaluate("window.__fakeNow=43400;document.querySelector('.showcase-view-all').click()");await until("document.querySelector('.showcase-view-all').getAttribute('aria-expanded')==='false'");

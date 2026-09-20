@@ -13,7 +13,6 @@ import {
   MapPin,
   PackageOpen,
   RefreshCcw,
-  Star,
   Store,
   Wrench,
 } from "lucide-react";
@@ -241,7 +240,7 @@ export function CityPremiumShowcase() {
         if (item.kind === "paid") {
           const price = item.priceMinor === null ? t("listing.negotiable") : `${item.priceMinor.toLocaleString(localeTag(locale))} ${item.currencyCode === "KZT" ? "₸" : item.currencyCode}`;
           return <Link hidden={!visible} aria-busy={pending || undefined} className="showcase-card showcase-paid-card" href={`/listing/${item.listingId}-${item.slug}`} key={item.kind + "-" + item.id}>
-            <span className="showcase-badge"><Star size={13} /> {t("showcase.premium")}</span>
+            <span className="showcase-badge"><Crown size={13} aria-hidden="true" /> {t("showcase.premium")}</span>
             <div className="showcase-media listing-image-wrap">
               <span className="listing-placeholder" aria-hidden="true"><PackageOpen size={42} /></span>
               {item.imageUrl ? <ShowcaseImage key={item.imageUrl} src={item.imageUrl} prepare={!viewAll && prepared.has(index)} expanded={viewAll} current={!viewAll && currentItems.has(item)} onSettled={imageSettled} /> : null}
