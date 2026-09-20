@@ -15,7 +15,7 @@ const f=()=>globalThis.__photoRouteTest;
 const fixtureUrl=data(`
 const f=()=>globalThis.__photoRouteTest;
 export const createSupabaseServerClient=async()=>f().client;
-export const createSupabasePublicServerClient=()=>f().client;
+export const createSupabasePublicServerClient=()=>({from(){return{select(){return this},eq(){return this},maybeSingle:async()=>({data:null,error:f().readError?Error('read failure'):null})}}});
 export const createSupabaseAdminClient=()=>f().admin;
 export const getListingMediaBucket=()=>f().bucket;
 export const getListingImageProcessor=()=>f().processor;

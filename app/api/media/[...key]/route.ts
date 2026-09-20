@@ -3,7 +3,7 @@ import { getListingMediaBucket } from "@/lib/media/bucket";
 import { isListingMediaFilename, trustedListingMediaContentType } from "@/lib/media/storage-key";
 
 import { getListingImageProcessor } from "@/lib/media/photo-service";
-import { listingThumbnail } from "@/lib/media/listing-thumbnail";
+import { listingThumbnail, listingDetailImage } from "@/lib/media/listing-thumbnail";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const avatarFilename = /^[a-z0-9][a-z0-9_-]{0,127}\.(?:jpe?g|png|webp|avif)$/i;
@@ -113,26 +113,53 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
   }
   if (!object) return new Response("Not found", { status: 404 });
 
+  const variant = new URL(request.url).searchParams.get("variant");
+  const transform = variant === listingThumbnail.variant ? listingThumbnail : variant === listingDetailImage.variant ? listingDetailImage : null;
+  const etag = transform ? 'W/"' + object.httpEtag.replaceAll('"', '') + '-' + transform.variant + '-v1"' : object.httpEtag;
   const headers = new Headers({
-    "content-type": contentType,
-    etag: object.httpEtag,
+    "content-type": transform ? "image/webp" : contentType,
+    etag,
     "x-content-type-options": "nosniff",
+    // Revalidate public eligibility before browser reuse; private images are never stored.
+    "cache-control": isPublic ? "private, no-cache, must-revalidate" : "private, no-store, max-age=0",
+    vary: "Cookie, Authorization",
   });
-  if (isPublic) {
-    headers.set("cache-control", "private, no-store, max-age=0");
-  } else {
-    headers.set("cache-control", "private, no-store, max-age=0");
-    headers.set("vary", "Cookie, Authorization");
+  const tags = request.headers.get("if-none-match")?.split(",").map((tag) => tag.trim().replace(/^W\//, ""));
+  if (isPublic && tags?.some((tag) => tag === "*" || tag === etag.replace(/^W\//, ""))) {
+    void object.body.cancel().catch(() => {});
+    return new Response(null, { status: 304, headers });
   }
-  if (new URL(request.url).searchParams.get("variant") === listingThumbnail.variant) {
+  if (transform) {
+    // This key is internal only. An edge hit can NEVER bypass the live RLS check above.
+    const cache = isPublic && typeof caches !== "undefined" ? (caches as CacheStorage & { default?: Cache }).default : undefined;
+    const cacheUrl = new URL(request.url);
+    cacheUrl.search = "";
+    cacheUrl.searchParams.set("variant", transform.variant);
+    cacheUrl.searchParams.set("media-etag", etag);
+    const cacheKey = new Request(cacheUrl);
+    try {
+      const cached = await cache?.match(cacheKey);
+      if (cached) {
+        void object.body.cancel().catch(() => {});
+        headers.set("x-media-cache", "hit");
+        return new Response(cached.body, { headers });
+      }
+    } catch { /* Cache availability must not determine image availability. */ }
     try {
       const output = await getListingImageProcessor().input(object.body).transform({
-        width: listingThumbnail.width, height: listingThumbnail.height, fit: "cover",
-      }).output({ format: "image/webp", quality: listingThumbnail.quality, anim: false });
+        width: transform.width, height: transform.height, fit: transform.variant === "card" ? "cover" : "scale-down",
+      }).output({ format: "image/webp", quality: transform.quality, anim: false });
       const thumbnail = output.response();
       if (!thumbnail.ok || !thumbnail.body) throw new Error("thumbnail_unavailable");
-      headers.set("content-type", "image/webp");
-      headers.set("etag", 'W/"' + object.httpEtag.replaceAll('"', '') + '-card-v1"');
+      headers.set("x-media-cache", "miss");
+      if (cache) {
+        const copy = thumbnail.clone();
+        try {
+          await cache.put(cacheKey, new Response(copy.body, { headers: {
+            "content-type": "image/webp", "cache-control": "public, max-age=86400",
+          } }));
+        } catch { /* Deliver the authorized image even when the edge cache is unavailable. */ }
+      }
       return new Response(thumbnail.body, { headers });
     } catch {
       return new Response("Media unavailable", { status: 503 });

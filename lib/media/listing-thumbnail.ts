@@ -8,3 +8,13 @@ export function listingThumbnailUrl(url: string | null): string | null {
   parsed.searchParams.set("variant", listingThumbnail.variant);
   return parsed.pathname + parsed.search;
 }
+
+
+export const listingDetailImage = { variant: "detail", width: 1024, height: 1024, quality: 80 } as const;
+
+export function listingDetailImageUrl(url: string): string {
+  if (!url.startsWith("/api/media/listings/")) return url;
+  const parsed = new URL(url, "https://media.invalid");
+  parsed.searchParams.set("variant", listingDetailImage.variant);
+  return parsed.pathname + parsed.search;
+}

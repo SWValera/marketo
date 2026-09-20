@@ -43,9 +43,9 @@ let socket;const report=[];try{
   await send('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:900,deviceScaleFactor:mobile?2:1,mobile});await send('Emulation.setTouchEmulationEnabled',{enabled:mobile});
   await send('Page.navigate',{url});await until(`document.querySelectorAll('.gallery-open').length===2`);
   await until(`[...document.querySelectorAll('#cards img')].every(x=>x.complete&&x.naturalWidth>0)`);
-  const cards=await evaluate(`([...document.querySelectorAll('#cards img')].map(i=>({fit:getComputedStyle(i).objectFit,background:getComputedStyle(i).backgroundColor,ratio:i.naturalWidth/i.naturalHeight,box:i.parentElement.getBoundingClientRect().toJSON(),image:i.getBoundingClientRect().toJSON()})))`);
+  const cards=await evaluate(`([...document.querySelectorAll('#cards img')].map(i=>({fit:getComputedStyle(i).objectFit,background:getComputedStyle(i).backgroundColor,ratio:i.naturalWidth/i.naturalHeight,maxHeight:parseFloat(getComputedStyle(i.parentElement).maxHeight)||null,box:i.parentElement.getBoundingClientRect().toJSON(),image:i.getBoundingClientRect().toJSON()})))`);
   await writeFile(join(out,mobile?'cards-mobile.json':'cards-desktop.json'),JSON.stringify(cards,null,2));
-  for(let i=0;i<cards.length;i++){const c=cards[i];assert.equal(c.fit,'contain');if(i%2===0)assert.notEqual(c.background,'rgba(0, 0, 0, 0)');assert.ok(Math.abs(c.box.width/c.box.height-(i%2===0?4/3:16/9))<.03);assert.ok(c.image.width<=c.box.width+1&&c.image.height<=c.box.height+1);}
+  for(let i=0;i<cards.length;i++){const c=cards[i];assert.equal(c.fit,i%2===0?'cover':'contain');if(i%2===0)assert.notEqual(c.background,'rgba(0, 0, 0, 0)');assert.ok(Math.abs(c.box.height-(i%2===0?Math.min(c.box.width*.75,c.maxHeight??Infinity):c.box.width*9/16))<1);assert.ok(c.image.width<=c.box.width+1&&c.image.height<=c.box.height+1);}
   for(const count of [1,2,3,7]){
    await evaluate(`window.showGallery(${count})`);await until(`document.querySelectorAll('.gallery-open').length===${count}`);
    if(count>1){await click('.gallery-selectors button:nth-child(2)');assert.equal(await selected(),2);}

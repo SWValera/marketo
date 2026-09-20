@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { getShowcaseResponse } from "@/lib/showcase/server";
+import type { ShowcaseSnapshot } from "@/components/city-premium-showcase";
 import { Brand } from "@/components/brand";
 import { Suspense } from "react";
 import { AppLink as Link } from "@/components/app-link";
@@ -43,14 +46,26 @@ async function HomeCatalogPanel({ locale }: { locale: Locale }) {
 }
 
 export default async function Home() {
-  const i18n = await getServerI18n();
+  const initialRead = (async (): Promise<ShowcaseSnapshot> => {
+    const storedCity = (await cookies()).get("jevu-showcase-city")?.value;
+    const city = storedCity && (storedCity === "all" || /^[0-9a-f-]{36}$/i.test(storedCity)) ? storedCity : "all";
+    try {
+      const response = await getShowcaseResponse(city);
+      if (!response.ok) throw new Error("showcase_unavailable");
+      const result = await response.json() as { placements: ShowcaseSnapshot["items"]; capacity: number | null };
+      return { city, items: result.placements, capacity: result.capacity, status: "ready" };
+    } catch {
+      return { city, items: [], capacity: null, status: "error" };
+    }
+  })();
+  const [i18n, initialShowcase] = await Promise.all([getServerI18n(), initialRead]);
   const { locale, t } = i18n;
   const catalogPanel = <Suspense fallback={<HomeCatalogFallback locale={locale} />}><HomeCatalogPanel locale={locale} /></Suspense>;
 
   return <>
     <Header />
     <main id="main-content" tabIndex={-1}>
-      <section className="home-showcase-shell page-shell"><CityPremiumShowcase /></section>
+      <section className="home-showcase-shell page-shell"><CityPremiumShowcase initial={initialShowcase} /></section>
       <HomeMarketplaceTabs catalog={catalogPanel} />
       <section className="trust-row home-trust-row page-shell"><div><ShieldCheck size={24} /><span><strong>{t("home.safety")}</strong><small>{t("home.safetyNote")}</small></span></div><div><Search size={24} /><span><strong>{t("home.preciseSearch")}</strong><small>{t("home.preciseSearchNote")}</small></span></div><div><MessageCircle size={24} /><span><strong>{t("home.chat")}</strong><small>{t("home.chatNote")}</small></span></div><div><Heart size={24} /><span><strong>{t("nav.favorites")}</strong><small>{t("home.favoritesNote")}</small></span></div></section>
       <section className="cta-section page-shell"><div><span className="section-kicker">{t("home.startNow")}</span><h2>{t("home.prepareFirst")}</h2><p>{t("home.prepareFirstNote")}</p></div><Link href="/publish" prefetch={false} className="primary-action">{t("header.publish")} <ArrowRight size={18} /></Link></section>

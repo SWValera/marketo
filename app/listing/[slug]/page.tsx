@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { listingDetailImageUrl } from "@/lib/media/listing-thumbnail";
 import { SITE_ORIGIN } from "@/lib/site-origin";
 import { PublicationRefresh } from "@/components/publication-refresh";
 import { AppLink as Link } from "@/components/app-link";
@@ -65,6 +66,7 @@ async function ListingPageContent({ params }: ListingPageProps) {
     engine_volume: { ru: "Объём", kk: "Көлемі" }, condition: { ru: "Состояние", kk: "Күйі" },
   };
   return <>
+    {listing.imageUrls[0] ? <link rel="preload" as="image" href={listingDetailImageUrl(listing.imageUrls[0])} fetchPriority="high" /> : null}
     <PublicationRefresh expiresAt={listing.expiresAt ?? null} />
     <Header categorySlug={listing.categorySlug} searchPlaceholder={localize(listing.categorySearchPlaceholder, locale)} />
     <main id="main-content" tabIndex={-1} className="page-shell listing-page">

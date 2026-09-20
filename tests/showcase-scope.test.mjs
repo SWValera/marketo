@@ -4,9 +4,10 @@ import {readFile} from "node:fs/promises";
 import ts from "typescript";
 const moduleUrl=code=>"data:text/javascript;base64,"+Buffer.from(code).toString("base64");
 const fixture=moduleUrl('export const createSupabasePublicServerClient=()=>globalThis.__showcaseTest.client; export const publicMediaUrl=k=>k?"/api/media/"+k:null; export const NextResponse={json:(body,init)=>Response.json(body,init)};');
-const source=await readFile(new URL("../app/api/showcase/route.ts",import.meta.url),"utf8");
+const source=await readFile(new URL("../lib/showcase/server.ts",import.meta.url),"utf8");
 const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replace(/from ["'][^"']+["']/g,()=>"from "+JSON.stringify(fixture));
-const {GET}=await import(moduleUrl(code));
+const {getShowcaseResponse}=await import(moduleUrl(code));
+const GET=request=>getShowcaseResponse(new URL(request.url).searchParams.get("city"));
 const city="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 function setup({rows=[],groups={},fail=false}={}){
  const calls=[],ranges=[],filters=[];let concurrent=0,maxConcurrent=0;

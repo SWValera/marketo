@@ -57,7 +57,7 @@ export function HomeMarketplaceTabs({ catalog }: { catalog: ReactNode }) {
     <div className="section-heading"><div><span className="section-kicker">{t("home.newOffers")}</span><h2 id="home-listings-title">{t("home.recommended")}</h2></div><Link href="/search">{t("home.allListings")} <ArrowRight size={16} /></Link></div>
     {listingState === "loading" || listingState === "idle" ? <div className="listing-grid" aria-label={t("common.loading")}><div className="skeleton-card" /></div> : null}
     {listingState === "error" ? <div className="empty-state" role="alert"><h2>{t("state.error")}</h2><p>{t("state.errorNote")}</p><button type="button" onClick={() => void loadListings()}>{t("common.retry")}</button></div> : null}
-    {listingState === "ready" && listings.length > 0 ? <div className="listing-grid">{listings.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div> : null}
+    {listingState === "ready" && listings.length > 0 ? <div className="listing-grid">{listings.map((listing, index) => <ListingCard eager={index < 4} listing={listing} key={listing.id} />)}</div> : null}
     {listingState === "ready" && listings.length === 0 ? <EmptyState title={t("home.emptyTitle")} description={t("home.emptyDescription")} actionHref="/publish" actionLabel={t("nav.publish")} actionPrefetch={false} /> : null}
   </section>;
 

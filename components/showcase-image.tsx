@@ -15,6 +15,8 @@ export function ShowcaseImage({ src, prepare, expanded, current, onSettled }: {
   const ref = useRef<HTMLImageElement>(null);
   const [failed, setFailed] = useState(false);
   const settled = useRef<ShowcaseImageState | null>(null);
+  const [requested, setRequested] = useState(prepare || expanded);
+  if (!requested && (prepare || expanded)) setRequested(true);
   const startedAt = useRef<number | null>(null);
   const report = useRef(onSettled);
   useEffect(() => {
@@ -47,7 +49,6 @@ export function ShowcaseImage({ src, prepare, expanded, current, onSettled }: {
     image.addEventListener("load", loaded);
     image.addEventListener("error", error);
     // Assign exactly once. No blob cache, URL churn, or new request on each cycle.
-    if (image.getAttribute("src") !== src) image.src = src;
     if (prepare) startDeadline();
     if (image.complete && image.naturalWidth) void decode();
     return () => {
@@ -57,6 +58,6 @@ export function ShowcaseImage({ src, prepare, expanded, current, onSettled }: {
       image.removeEventListener("error", error);
     };
   }, [src, prepare, expanded]);
-  return <img ref={ref} className="listing-image" alt="" loading={prepare ? "eager" : "lazy"}
+  return <img ref={ref} src={!failed && (requested || prepare || expanded) ? src : undefined} className="listing-image" alt="" loading={prepare ? "eager" : "lazy"}
     fetchPriority={current ? "high" : "low"} decoding="async" style={failed ? { display: "none" } : undefined} />;
 }

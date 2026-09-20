@@ -6,6 +6,7 @@ import {createPortal} from 'react-dom';
 import {ChevronLeft, ChevronRight, Maximize, X} from 'lucide-react';
 import {useI18n} from '@/components/i18n-provider';
 import {activateModalFocus} from '@/lib/browser/modal';
+import {listingDetailImageUrl} from '@/lib/media/listing-thumbnail';
 import {galleryIndex, galleryTarget} from '@/lib/media/gallery-position';
 
 export function ListingGallery({images, title}: {images: readonly string[]; title: string}) {
@@ -92,9 +93,10 @@ export function ListingGallery({images, title}: {images: readonly string[]; titl
       onKeyDown={navigateKeys}>
       {images.map((url, index) => {
         // Reuse the same URLs; mount only the visible slide and its swipe neighbours in the viewer.
-        const photo = !fullscreen || Math.abs(index - current) <= 1 ? <img src={url}
+        const photo = !fullscreen || Math.abs(index - current) <= 1 ? <img src={fullscreen ? url : listingDetailImageUrl(url)}
           alt={`${title} — ${t('listing.photoNumber', {current:index + 1, total:images.length})}`}
-          loading={(fullscreen ? index === current : index === 0) ? 'eager' : 'lazy'} decoding="async" draggable={false} /> : null;
+          loading={(fullscreen ? index === current : index === 0) ? 'eager' : 'lazy'}
+          fetchPriority={index === current ? 'high' : 'low'} decoding="async" draggable={false} /> : null;
         return <figure className="gallery-main gallery-slide" key={url}
           aria-label={t('listing.photoNumber', {current:index + 1, total:images.length})}>
           {fullscreen ? photo : <button type="button" className="gallery-open" tabIndex={index === current ? 0 : -1}

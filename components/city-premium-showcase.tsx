@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { AppLink as Link } from "@/components/app-link";
 import { CategoryLink } from "@/components/category-link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
 import { useReferenceGeography } from "@/components/reference-geography-provider";
@@ -47,8 +47,12 @@ type PaidPlacement = {
 };
 
 type PaidResult = { placements: PaidPlacement[]; capacity: number | null };
+export type ShowcaseSnapshot = { city: string; items: PaidPlacement[]; capacity: number | null; status: "idle" | "ready" | "error" };
+const subscribeHydration = () => () => {};
+const browserHydrated = () => true;
+const serverHydrated = () => false;
 
-const paidPlacementCache = createSingleFlightTtlCache<string, PaidResult>({
+const createPaidPlacementCache = () => createSingleFlightTtlCache<string, PaidResult>({
   maxEntries: 20,
   ttlMilliseconds: () => 60 * 1000,
 });
@@ -95,19 +99,27 @@ function stableHash(value: string) {
   return hash >>> 0;
 }
 
-export function CityPremiumShowcase() {
+export function CityPremiumShowcase({ initial }: { initial?: ShowcaseSnapshot }) {
+  const hydrated = useSyncExternalStore(subscribeHydration, browserHydrated, serverHydrated);
   const { locale, t } = useI18n();
   const geography = useReferenceGeography();
   const ensureGeographyLoaded = geography.ensureLoaded;
-  const selectedLocation = useStoredLocation();
+  const selectedLocation = useStoredLocation(initial?.city ?? "all");
   const cityKey = selectedLocation === "all" ? "all-kazakhstan" : selectedLocation;
   const selectedCity = selectedLocation === "all" ? undefined : getSettlement(geography.data, selectedLocation);
-  const [paidState, setPaidState] = useState<{ city: string; items: PaidPlacement[]; capacity: number | null; status: "idle" | "ready" | "error" }>({ city: "", items: [], capacity: null, status: "idle" });
+  const [paidState, setPaidState] = useState<ShowcaseSnapshot>(initial ?? { city: "", items: [], capacity: null, status: "idle" });
   const [paidRetry, setPaidRetry] = useState(0);
+  const initialSeen = useRef<ShowcaseSnapshot | undefined>(undefined);
+  const [cacheScope, setCacheScope] = useState(() => ({ initial, cache: createPaidPlacementCache() }));
+  if (cacheScope.initial !== initial) {
+    setCacheScope({ initial, cache: createPaidPlacementCache() });
+    if (initial) setPaidState(initial);
+  }
+  const paidPlacementCache = cacheScope.cache;
   const [expandedState, setExpandedState] = useState({ scope: cityKey, expanded: false });
   if (expandedState.scope !== cityKey) setExpandedState({ scope: cityKey, expanded: false });
   const viewAll = expandedState.scope === cityKey && expandedState.expanded;
-  const { ref: showcaseRef, cardsPerPage } = useShowcaseWidth();
+  const { ref: showcaseRef, cardsPerPage, layoutReady } = useShowcaseWidth();
   const [imageState, setImageState] = useState<{ scope: string; images: Record<string, ShowcaseImageState> }>({ scope: cityKey, images: {} });
   if (imageState.scope !== cityKey) setImageState({ scope: cityKey, images: {} });
   const imageStates = imageState.scope === cityKey ? imageState.images : {};
@@ -142,20 +154,29 @@ export function CityPremiumShowcase() {
   }, [ensureGeographyLoaded, selectedLocation]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    // Seed the existing short-lived cache once, without repeating the server read.
+    const seed = initialSeen.current !== initial ? initial : undefined;
+    initialSeen.current = initial;
+    const useSeed = paidRetry === 0 && seed?.city === selectedLocation;
+    if (useSeed && seed.status !== "ready") return;
     let active = true;
-    void paidPlacementCache.getOrLoad(selectedLocation, () => requestPaidPlacements(selectedLocation))
+    void paidPlacementCache.getOrLoad(selectedLocation, () => useSeed
+      ? Promise.resolve({ placements: seed.items, capacity: seed.capacity })
+      : requestPaidPlacements(selectedLocation))
       .then((result) => { if (active) setPaidState({ city: selectedLocation, items: result.placements, capacity: result.capacity, status: "ready" }); })
       .catch(() => { if (active) setPaidState({ city: selectedLocation, items: [], capacity: null, status: "error" }); });
     return () => { active = false; };
-  }, [paidRetry, selectedLocation]);
+  }, [hydrated, initial, paidPlacementCache, paidRetry, selectedLocation]);
 
   const paid = useMemo(
     () => paidState.city === selectedLocation && paidState.status === "ready" ? paidState.items.filter((item) => !item.expiresAt || Date.parse(item.expiresAt) > deadlineNow) : [],
     [paidState, selectedLocation, deadlineNow],
   );
   const capacity = selectedLocation === "all" ? null : paidState.city === selectedLocation ? paidState.capacity ?? 0 : 0;
-  const carouselDemoCount = premiumDemoCount(paid.length, cardsPerPage);
-  const expandedDemoCount = premiumExpandedDemoCount(paid.length, capacity, cardsPerPage);
+  const dataReady = paidState.city === selectedLocation && paidState.status === "ready";
+  const carouselDemoCount = dataReady ? premiumDemoCount(paid.length, cardsPerPage) : 0;
+  const expandedDemoCount = dataReady ? premiumExpandedDemoCount(paid.length, capacity, cardsPerPage) : 0;
   const items = useMemo(() => {
     const paidItems = paid.map((placement) => ({ kind: "paid" as const, ...placement, imageUrl: listingThumbnailUrl(placement.imageUrl) }));
     const brandedCount = Math.max(carouselDemoCount, expandedDemoCount);
@@ -169,10 +190,23 @@ export function CityPremiumShowcase() {
   const carouselItems = items.slice(0, paid.length + carouselDemoCount);
 
   const carousel = useShowcaseTimeline(Math.ceil(carouselItems.length / cardsPerPage), viewAll, cityKey + ":" + cardsPerPage);
-  const page = premiumCarouselPage(carouselItems, carousel.page, cardsPerPage);
+  const targetPage = premiumCarouselPage(carouselItems, carousel.page, cardsPerPage);
+  const isPageReady = (page: typeof targetPage) => dataReady && page.items.every((item) => item.kind !== "paid" || !item.imageUrl || imageStates[item.imageUrl]);
+  const frameScope = cityKey + ":" + cardsPerPage + ":" + carouselItems.map((item) => item.id).join(",");
+  const [lastFrame, setLastFrame] = useState({ scope: "", page: 0 });
+  const targetReady = isPageReady(targetPage);
+  // Keep decoded pixels visible when the absolute clock advances ahead of the network.
+  // The clock is never paused/restarted; catch up to its current target as soon as ready.
+  if (targetReady && (lastFrame.scope !== frameScope || lastFrame.page !== targetPage.pageIndex)) {
+    setLastFrame({ scope: frameScope, page: targetPage.pageIndex });
+  }
+  const page = !targetReady && lastFrame.scope === frameScope
+    ? premiumCarouselPage(carouselItems, lastFrame.page, cardsPerPage) : targetPage;
   const currentItems = new Set(page.items);
-  const prepared = premiumPreparedIndexes(carouselItems.length, page.pageIndex, cardsPerPage);
-  const pageReady = page.items.every((item) => item.kind !== "paid" || !item.imageUrl || imageStates[item.imageUrl]);
+  const targetItems = new Set(targetPage.items);
+  const pageReady = isPageReady(page);
+  const prepared = premiumPreparedIndexes(carouselItems.length, targetPage.pageIndex, cardsPerPage);
+  const initialLoading = !hydrated || !layoutReady || !pageReady;
   const moveToPage = carousel.selectPage;
   const paidLoading = paidState.city !== selectedLocation || paidState.status === "idle";
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
@@ -180,16 +214,20 @@ export function CityPremiumShowcase() {
   return <section
     ref={showcaseRef}
     style={{ "--showcase-columns": cardsPerPage, "--showcase-media-max": cardsPerPage > 2 ? "180px" : "240px" } as CSSProperties}
+    data-layout-ready={layoutReady}
+    data-four-pages={Math.max(1, Math.ceil(paid.length / 4))}
     data-cards-per-page={cardsPerPage}
     data-scope={selectedLocation}
-    className="city-premium-showcase"
+    className={"city-premium-showcase" + (initialLoading && paidState.status !== "error" ? " showcase-initial-loading" : "")}
+    aria-busy={initialLoading || undefined}
+    data-loading-label={t("common.loading") + "…"}
     aria-label={t("showcase.aria")}
   >
     <div className="showcase-heading">
       <div className="showcase-heading-copy">
         <h1><Crown size={24} aria-hidden="true" />{t("showcase.title")}</h1>
         <p className="showcase-city"><MapPin size={16} aria-hidden="true" /><span>{cityLabel}</span></p>
-        {paidState.city === selectedLocation && paidState.status === "ready" ? <p className="showcase-status" role="status">{t(selectedLocation === "all" ? "showcase.nationalTotal" : "showcase.total", { count: paid.length, capacity: capacity ?? 0 })}</p> : null}
+        {dataReady ? <p className="showcase-status" role="status">{t(selectedLocation === "all" ? "showcase.nationalTotal" : "showcase.total", { count: paid.length, capacity: capacity ?? 0 })}</p> : <p className="showcase-status" aria-hidden="true">&nbsp;</p>}
       </div>
       <button className="showcase-view-all" type="button" aria-expanded={viewAll} aria-controls="city-premium-items" onClick={() => setExpandedState({ scope: cityKey, expanded: !viewAll })}>{t(viewAll ? "showcase.collapse" : "showcase.viewAll")}<ArrowRight size={16} aria-hidden="true" /></button>
     </div>
@@ -234,6 +272,7 @@ export function CityPremiumShowcase() {
         }
       }}
     >
+      {!dataReady ? <div className="showcase-size-reserve" aria-hidden="true"><div className="showcase-media listing-image-wrap" /><div className="showcase-card-copy"><strong /><b /><small /></div></div> : null}
       {items.map((item, index) => {
         const visible = viewAll ? index < paid.length + expandedDemoCount : currentItems.has(item);
         const pending = item.kind === "paid" && Boolean(item.imageUrl) && !imageStates[item.imageUrl!];
@@ -243,7 +282,7 @@ export function CityPremiumShowcase() {
             <span className="showcase-badge"><Crown size={13} aria-hidden="true" /> {t("showcase.premium")}</span>
             <div className="showcase-media listing-image-wrap">
               <span className="listing-placeholder" aria-hidden="true"><PackageOpen size={42} /></span>
-              {item.imageUrl ? <ShowcaseImage key={item.imageUrl} src={item.imageUrl} prepare={!viewAll && prepared.has(index)} expanded={viewAll} current={!viewAll && currentItems.has(item)} onSettled={imageSettled} /> : null}
+              {item.imageUrl ? <ShowcaseImage key={item.imageUrl} src={item.imageUrl} prepare={!viewAll && prepared.has(index)} expanded={viewAll} current={!viewAll && targetItems.has(item)} onSettled={imageSettled} /> : null}
             </div>
             <div className="showcase-card-copy"><strong>{item.title}</strong><b>{price}</b><small><MapPin size={13} /><span>{locale === "kk" ? item.locationKk : item.locationRu}</span></small></div>
           </Link>;

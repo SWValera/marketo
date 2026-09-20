@@ -31,9 +31,16 @@ function readStoredLocation() {
   return safeReadBrowserStorage("localStorage", LOCATION_STORAGE_KEY) || "all";
 }
 
-export function useStoredLocation() {
+export function useStoredLocation(initialLocation = "all") {
   const geography = useReferenceGeography();
-  const stored = useSyncExternalStore(subscribeToLocation, readStoredLocation, () => "all");
+  const stored = useSyncExternalStore(subscribeToLocation, readStoredLocation, () => initialLocation);
+  useEffect(() => {
+    // Migrate the existing browser preference without replacing it during hydration.
+    if (stored !== readStoredLocation()) return;
+    if (stored === "all" || /^[0-9a-f-]{36}$/i.test(stored)) {
+      document.cookie = "jevu-showcase-city=" + encodeURIComponent(stored) + "; Path=/; Max-Age=31536000; SameSite=Lax";
+    }
+  }, [stored]);
   if (stored === "all") return stored;
   return getSettlement(geography.data, stored)?.id ?? (geography.status === "ready" ? "all" : stored);
 }

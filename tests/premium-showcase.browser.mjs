@@ -20,12 +20,13 @@ const mocks={
  "@/components/reference-geography-provider":"const value={data:{regions:[],settlements:[{id:'fixture-city',name:{ru:'Петропавловск',kk:'Петропавл'}}]},ensureLoaded:()=>{}};export const useReferenceGeography=()=>value;",
 };
 const entry=`
-import React from 'react';import{createRoot}from'react-dom/client';import{CityPremiumShowcase}from'./components/city-premium-showcase';import{Header}from'./components/header';
+import React from 'react';import{createRoot,hydrateRoot}from'react-dom/client';import{renderToString}from'react-dom/server';import{CityPremiumShowcase}from'./components/city-premium-showcase';import{Header}from'./components/header';
 const params=new URLSearchParams(location.search),count=Number(params.get('count')||0);window.lang=params.get('lang')||'ru';window.ready=false;window.fixtureCounts={'fixture-city':count};window.scopeDelay=0;window.requestScopes=[];
 const shapes=params.has('healthy')?['landscape','portrait','square']:['landscape','portrait','square','missing','broken'];
 const placementsFor=count=>Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:'listing-'+i,slug:'fixture',title:i===0?'Длинное название объявления для проверки переноса текста':'Объявление '+(i+1),priceMinor:i===0?100000000:1000000,currencyCode:'KZT',locationRu:'Петропавловск',locationKk:'Петропавл',imageUrl:shapes[i%shapes.length]==='missing'?null:'/api/media/listings/fixture/'+i+'/'+shapes[i%shapes.length]+'.svg?delay='+Number(params.get('delay')||180),expiresAt:new Date(Date.now()+86400000).toISOString()}));
 window.fetch=async url=>{const city=new URL(url,location.origin).searchParams.get('city');window.requestScopes.push(city);const count=window.fixtureCounts[city]??0;const ms=window.scopeDelay;await new Promise(r=>setTimeout(r,ms));window.ready=true;return new Response(JSON.stringify({capacity:city==='all'?null:15,placements:placementsFor(count)}),{headers:{'content-type':'application/json'}})};
-createRoot(document.getElementById('app')).render(<><Header/><main className="page-shell home-showcase-shell"><CityPremiumShowcase/></main><section className="page-shell home-marketplace"><div className="home-marketplace-tabs"><button>Каталог</button><button>Объявления</button></div><div className="section-heading"><div><span className="section-kicker">Полный каталог</span><h2>Популярные категории</h2></div></div><div style={{height:180}}/></section><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>);
+const initial=params.has("ssr")?{city:"fixture-city",items:placementsFor(count),capacity:15,status:"ready"}:undefined;const tree=<><Header/><main className="page-shell home-showcase-shell"><CityPremiumShowcase initial={initial}/></main><section className="page-shell home-marketplace"><div className="home-marketplace-tabs"><button>Каталог</button><button>Объявления</button></div><div className="section-heading"><div><span className="section-kicker">Полный каталог</span><h2>Популярные категории</h2></div></div><div style={{height:180}}/></section><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>;
+if(initial){window.ready=true;document.getElementById('app').innerHTML=renderToString(tree);window.ssrHtml=document.getElementById('app').innerHTML;hydrateRoot(document.getElementById('app'),tree)}else createRoot(document.getElementById('app')).render(tree);
 `;
 const bundle=await build({stdin:{contents:entry,loader:"tsx",resolveDir:root},bundle:true,write:false,platform:"browser",format:"iife",jsx:"automatic",define:{"process.env.NODE_ENV":'"production"'},plugins:[{name:"showcase-fixture",setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:"fixture"}:null);b.onLoad({filter:/.*/,namespace:"fixture"},a=>({contents:mocks[a.path],loader:"tsx",resolveDir:root}));}}]});
 const css=(await readFile("app/globals.css","utf8")).replace('@import "tailwindcss";',"")+'\n.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }';
@@ -194,6 +195,27 @@ try{
  await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});await checkPage(1);assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),3000);
  await evaluate("window.__advance(6000)");await checkPage(0);assert.ok((await evaluate("location.href")).startsWith(origin));
  results.push({swipe:"PASS"});
+
+ // SSR has URLs before hydration and no duplicate API. Slow scopes never manufacture demos.
+ await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await navigate(origin+"/?count=3&healthy=1&ssr=1&delay=900&now=0");await settle();
+ assert.equal(await evaluate("window.requestScopes.length"),0);
+ assert.equal(await evaluate("window.ssrHtml.includes('showcase-initial-loading') && window.ssrHtml.includes('variant=card')"),true);
+ assert.equal(await evaluate("window.__partialFrames"),0);
+ const loadedHeight=await evaluate("document.querySelector('.city-premium-showcase').getBoundingClientRect().height");
+ await evaluate("window.changeLocation('loading-city',3,900)");await delay(80);
+ assert.equal(await evaluate("document.querySelectorAll('.showcase-brand-card').length"),0);
+ assert.equal(await evaluate("document.querySelectorAll('.showcase-paid-card').length"),0);
+ assert.equal(await evaluate("!!document.querySelector('.showcase-initial-loading')"),true);
+ await until("document.querySelectorAll('.showcase-paid-card').length===3");await until(imageReady);
+ assert.equal(await evaluate("document.querySelector('.city-premium-showcase').getBoundingClientRect().height"),loadedHeight);
+ await evaluate("window.changeLocation('empty-city',0,600)");await delay(60);
+ assert.equal(await evaluate("document.querySelectorAll('.showcase-brand-card').length"),0);
+ await until("document.querySelectorAll('.showcase-brand-card').length===15");await until(imageReady);
+ assert.equal((await evaluate(geometry)).demo,2);
+ await evaluate("window.changeLocation('fixture-city',3)");await until("document.querySelectorAll('.showcase-paid-card').length===3");await until(imageReady);
+ assert.equal(await evaluate("window.requestScopes.includes('fixture-city')"),false);
+ results.push({serverSnapshot:"PASS",noDuplicateHydrationRead:"PASS",noTemporaryDemos:"PASS",emptyCity:"PASS",returnToServerScope:"PASS"});
  assert.deepEqual(errors,[]);
  await writeFile(join(out,"browser-result.json"),JSON.stringify({status:"PASS",scenarios:results.length,results,errors,environment:"Chromium, actual components/CSS, fixture data; no physical Safari/PWA"},null,2));
  console.log(JSON.stringify({status:"PASS",scenarios:results.length,errors}));

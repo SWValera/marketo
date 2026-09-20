@@ -1674,3 +1674,36 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 .listing-vip-badge { position: absolute; z-index: 2; left: 9px; top: 9px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: linear-gradient(115deg,#fae9b8,#dbb968); color: #2b2518; font-size: 12px; font-weight: 800; }
 .listing-grid > .listing-card.listing-card-x2 { grid-column: span 2; max-width: none; width: 100%; }
 .listing-card.listing-card-x2 > .listing-image-wrap { aspect-ratio: 2/1; height: auto; max-height: none; }
+
+
+/* A single event-driven initial state; the final content reserves its own geometry. */
+.showcase-initial-loading { min-height: var(--showcase-loaded-height, 0px); position: relative; background: var(--canvas); border-color: var(--line); box-shadow: none; }
+.showcase-initial-loading > * { visibility: hidden; }
+.showcase-initial-loading::after { content: attr(data-loading-label); position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.showcase-size-reserve { border: 1px solid transparent; grid-column: 1; }
+
+
+/* Match the existing four-card geometry before ResizeObserver/hydration, too. */
+.home-showcase-shell { container-type: inline-size; }
+@container (min-width: 1390px) {
+  .city-premium-showcase[data-layout-ready="false"] { --showcase-columns: 4 !important; --showcase-media-max: 180px !important; }
+  .city-premium-showcase[data-layout-ready="false"] .showcase-heading { gap: 12px; margin-bottom: 14px; }
+  .city-premium-showcase[data-layout-ready="false"] .showcase-heading h1 { font-size: 1.35rem; margin-bottom: 5px; }
+  .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy { padding: 10px; gap: 5px; }
+  .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy strong { font-size: .9375rem; }
+  .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy b,
+  .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy p { font-size: 1.125rem; }
+  .city-premium-showcase[data-layout-ready="false"][data-four-pages="1"] .showcase-dots { display: none; }
+}
+@media (orientation: landscape) and (min-height: 501px) {
+  @container (min-width: 910px) {
+    .city-premium-showcase[data-layout-ready="false"] { --showcase-columns: 4 !important; --showcase-media-max: 180px !important; }
+    .city-premium-showcase[data-layout-ready="false"] .showcase-heading { gap: 12px; margin-bottom: 14px; }
+    .city-premium-showcase[data-layout-ready="false"] .showcase-heading h1 { font-size: 1.35rem; margin-bottom: 5px; }
+    .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy { padding: 10px; gap: 5px; }
+    .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy strong { font-size: .9375rem; }
+    .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy b,
+    .city-premium-showcase[data-layout-ready="false"] .showcase-card-copy p { font-size: 1.125rem; }
+    .city-premium-showcase[data-layout-ready="false"][data-four-pages="1"] .showcase-dots { display: none; }
+  }
+}

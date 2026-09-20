@@ -360,7 +360,7 @@ export function CatalogClient({
         <div className="catalog-toolbar catalog-toolbar-compact"><div className="active-filter-chips">{activeChips.length > 0 ? activeChips.map((chip) => <span key={chip}>{chip}</span>) : <span className="muted-chip">{t("catalog.noExtraFilters")}</span>}</div><label>{t("catalog.sort")}<select value={sort} onChange={(event) => { const nextSort = event.target.value; setSort(nextSort); navigateWithFilters({ sort: nextSort }); }}><option value="new">{t("catalog.sortNew")}</option><option value="cheap">{t("catalog.sortCheap")}</option><option value="expensive">{t("catalog.sortExpensive")}</option></select></label></div>
         {initialState === "out_of_range" ? <EmptyState icon={<Search size={30} />} title={t("catalog.emptyTitle")} description={t("catalog.emptyDescription")} actionHref={filterUrl({ page: 1 })} actionLabel={t("profile.firstPage")} />
           : result.length ? <>
-            <div className="listing-grid catalog-grid">{result.map((listing) => <ListingCard listing={listing} key={listing.id} />)}</div>
+            <div className="listing-grid catalog-grid">{result.map((listing, index) => <ListingCard eager={index < 4} listing={listing} key={listing.id} />)}</div>
             {initialPage > 1 || initialPage < initialTotalPages ? <nav className="owner-listing-pagination" aria-label={t("catalog.listings")}>
               {initialPage > 1 ? <Link href={filterUrl({ page: initialPage - 1 })}>{t("seller.previousPage")}</Link> : <span />}
               {initialPage < initialTotalPages ? <Link href={filterUrl({ page: initialPage + 1 })}>{t("seller.nextPage")}</Link> : null}
