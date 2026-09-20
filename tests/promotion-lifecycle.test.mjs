@@ -43,6 +43,11 @@ test('real promotion lifecycle, moderation, 30 days, scheduled bumps, queue, sec
   // It is test-only; production accepts no caller-supplied clock or date.
   const lifecycle=(await readFile('supabase/migrations/0038_listing_promotion_lifecycle.sql','utf8')).replaceAll('clock_timestamp()','public.fixture_clock()').replaceAll('statement_timestamp()','public.fixture_clock()');
   await db.exec(lifecycle);
+  await db.exec((await readFile("supabase/migrations/0039_bump_execution_freshness.sql","utf8")).replaceAll("clock_timestamp()","public.fixture_clock()").replaceAll("statement_timestamp()","public.fixture_clock()"));
+  // The existing showcase reader predates 0038 and uses CURRENT_TIMESTAMP.
+  // Give it the same isolated clock as lifecycle writes, without editing migrations.
+  const reader=(await db.query("select pg_get_functiondef('public.get_city_premium_placements(uuid,integer)'::regprocedure) definition")).rows[0].definition;
+  await db.exec(reader.replaceAll('CURRENT_TIMESTAMP','public.fixture_clock()').replaceAll('current_timestamp','public.fixture_clock()').replaceAll('statement_timestamp()','public.fixture_clock()'));
   console.log('all real migrations applied to isolated PostgreSQL');
   await db.exec(`insert into public.locales(code,name_ru,name_kk) values('ru','Russian','Russian') on conflict do nothing;
    insert into public.countries(code,slug,name_ru,name_kk,currency_code,currency_symbol,phone_code) values('KZ','fixture-kz','KZ','KZ','KZT','T','+7') on conflict do nothing;`);
@@ -127,6 +132,35 @@ test('real promotion lifecycle, moderation, 30 days, scheduled bumps, queue, sec
    const entered=(await placement(ids[15]))[0],row=await read(ids[15]);assert.equal(entered.id,waiting.id);assert.equal(entered.status,'active');assert.equal(time(entered.starts_at),now);assert.equal(time(entered.ends_at),now+7*day);assert.equal(time(row.expires_at),now+7*day);
    assert.equal(time(row.published_at),start);assert.equal((await choice(ids[15])).run_id,selected.run_id);assert.equal((await bumps(ids[15])).length,14);
    await clock(now+7*day);await tick();assert.equal((await read(ids[15])).status,'archived');
+  });
+  await t.test('freshness A/B/C, delayed actual bump, newer free publication, stable ties and unchanged created_at',async()=>{
+   await clock(now+40*day);const start=now,a=await active(cities[2]);await pick(a,'maximum');const original=await read(a);
+   await clock(start+60000);const b=await active(cities[2]);await clock(start+120000);const c=await active(cities[2]);
+   const ids=[a,b,c],ordered=async()=> (await db.query('select id from public.catalog_listing_cards where id=any($1::uuid[]) order by sort_at desc,id desc',[ids])).rows.map(x=>x.id);
+   assert.deepEqual(await ordered(),[c,b,a]);
+   await clock(start+24*hour+10000);const between=await active(cities[2]);ids.push(between);assert.equal((await ordered())[0],between);
+   await clock(start+24*hour+30000);await tick();assert.equal((await ordered())[0],a);assert.equal(time((await read(a)).bumped_at),now);
+   const applied=now;await clock(now+1000);await tick();assert.equal(time((await read(a)).bumped_at),applied);
+   const newer=await active(cities[2]);ids.push(newer);assert.deepEqual((await ordered()).slice(0,3),[newer,a,between]);
+   const tied=await active(cities[2]);ids.push(tied);assert.deepEqual((await ordered()).slice(0,2),[newer,tied].sort().reverse());
+   assert.equal(time((await read(a)).created_at),time(original.created_at));assert.equal(time((await read(a)).published_at),start);
+   assert.equal((time((await bumps(a))[0].scheduled_at)-start)/hour,24);
+  });
+  await t.test('three explicit city packages are readable, maximum is not showcase, plain edit retains exact entitlements',async()=>{
+   await clock(now+40*day);const start=now,ids=[];
+   for(let i=0;i<3;i++){const id=await make(cities[2]);await submit(id,'city_premium');await approve(id);ids.push(id);}
+   const rows=(await db.query('select listing_id from public.get_city_premium_placements($1)',[cities[2]])).rows;
+   assert.deepEqual(rows.map(x=>x.listing_id).sort(),[...ids].sort());
+   const maximum=await active(cities[2]);await pick(maximum,'maximum');assert.equal((await placement(maximum)).length,0);
+   const ordinary=await active(cities[2]);
+   for(const id of [ordinary,maximum,ids[0]]){
+    const l=await read(id),c=await choice(id),p=await placement(id),b=await bumps(id);
+    await clock(start+3*day);await as(owner,"select public.owner_listing_transition($1,'edit')",[id]);
+    await as(owner,'select public.submit_listing($1)',[id]);await approve(id);
+    const after=await read(id);for(const key of ['created_at','published_at','expires_at','vip_until','x2_until'])assert.equal(time(after[key]),time(l[key]),key);
+    assert.deepEqual(await choice(id),c);assert.deepEqual(await placement(id),p);assert.deepEqual(await bumps(id),b);
+   }
+   assert.equal((await db.query('select count(*)::int n from public.get_city_premium_placements($1)',[cities[2]])).rows[0].n,3);
   });
   await t.test('owner/anonymous authorization, immutable dates, package whitelist, standalone showcase denied',async()=>{
    await clock(now+40*day);const id=await active(cities[2]);

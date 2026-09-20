@@ -99,3 +99,10 @@ Targeted rehearsal: tests/promotion-lifecycle.test.mjs applies every historical
 migration and 0038 to isolated PostgreSQL, then exercises moderation, all packages,
 late activation, queue/capacity, retries, protected timestamps and ownership.
 See docs/PROMOTION_LIFECYCLE.md for the contracts and focused UI/API checks.
+
+## Actual bump freshness 2026-09-20
+
+0039_bump_execution_freshness.sql replaces only the existing private bump processor.
+It records freshness from applied_at instead of scheduled_at, so an executed bump
+can overtake earlier publications and any later publication can overtake it.
+Schedules, counts, idempotency, security and publication lifetime are unchanged.

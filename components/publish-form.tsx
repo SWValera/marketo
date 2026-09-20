@@ -132,6 +132,7 @@ export function PublishForm({
   const storedLocation = useStoredLocation();
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(Boolean(initialDraft));
   const [saving, setSaving] = useState(false);
   const submissionInFlight = useRef(false);
   const [selectedPromotion, setSelectedPromotion] = useState<PromotionChoice>("accelerated");
@@ -176,7 +177,7 @@ export function PublishForm({
   const categoryPath = getCategoryPath(catalogView, category);
   const pageTitle = submitted
     ? t("publish.draftSaved")
-    : initialDraft || listingId
+    : isEditMode
       ? t("publish.editPageTitle", { step: steps[step] })
       : t("publish.pageTitle", { step: steps[step] });
   useEffect(() => { photosRef.current = photos; }, [photos]);
@@ -469,6 +470,7 @@ export function PublishForm({
     if (!recoveryCandidate) return;
     const server = recoveryServerDraft;
     if (server) {
+      setIsEditMode(true);
       setListingId(server.id);
       setListingStatus(server.status);
       setExistingImages(server.images);
@@ -510,6 +512,7 @@ export function PublishForm({
     setPhotos([]);
     setExistingImages([]);
     setSubmitted(false);
+    setIsEditMode(false);
     setSelectedPromotion("accelerated");
     setListingId(null);
     setListingStatus("draft");
@@ -537,7 +540,7 @@ export function PublishForm({
     return true;
   }
 
-  async function submitForModeration(promotionChoice: PromotionChoice | null) {
+  async function submitForModeration(promotionChoice?: PromotionChoice | null) {
     if (submissionInFlight.current || processingPhotosRef.current) return;
     if (!validateCurrent(step, true)) return;
     submissionInFlight.current = true;
@@ -627,8 +630,8 @@ export function PublishForm({
       const submittedResponse = await fetch(`/api/listings/${currentListingId}/submit`, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        // Save the choice atomically with moderation submission; no promotion is activated.
-        body: JSON.stringify({ promotionChoice }),
+        // Editing uses the existing submission RPC without touching promotion state.
+        body: promotionChoice === undefined ? undefined : JSON.stringify({ promotionChoice }),
       });
       const submittedBody = await submittedResponse.json().catch(() => ({})) as ApiErrorBody;
       if (!submittedResponse.ok) {
@@ -653,7 +656,7 @@ export function PublishForm({
     <>
       <PageHeader
         fallback="/profile"
-        eyebrow={initialDraft || listingId ? t("publish.editEyebrow") : t("publish.eyebrow")}
+        eyebrow={isEditMode ? t("publish.editEyebrow") : t("publish.eyebrow")}
         title={pageTitle}
         description={submitted ? t("publish.savedDescription") : t("publish.stepDescription", { current: step + 1, total: steps.length })}
         onBack={step > 0 && !submitted ? previousStep : undefined}
@@ -820,7 +823,7 @@ export function PublishForm({
               <label className="option-row form-field-wide"><input type="checkbox" checked={allowMessages} onChange={(event) => setAllowMessages(event.target.checked)} /><span><strong>{t("publish.allowMessages")}</strong><small>{t("publish.allowMessagesNote")}</small></span></label>
             </div>
             <div className="publish-review"><strong>{t("publish.beforeSend")}</strong><p>{summary.length ? summary.join(" · ") : t("publish.review")}</p></div>
-            <PromotionChooser value={selectedPromotion} onChange={setSelectedPromotion} disabled={saving || processingPhotos} />
+            {!isEditMode && <PromotionChooser value={selectedPromotion} onChange={setSelectedPromotion} disabled={saving || processingPhotos} />}
           </div>}
 
           {globalError && <div className="form-error" role="alert">{globalError}</div>}
@@ -828,6 +831,8 @@ export function PublishForm({
             <button type="button" className="secondary-control" disabled={step === 0 || saving || processingPhotos} onClick={previousStep}><ChevronLeft size={18} />{t("common.back")}</button>
             {step < steps.length - 1
               ? <button type="button" className="primary-control" disabled={processingPhotos} onClick={validateAndContinue}>{t("common.next")}<ChevronRight size={18} /></button>
+              : isEditMode
+                ? <button type="button" className="primary-control publish-edit-submit" disabled={saving || processingPhotos} onClick={() => void submitForModeration()}>{t(saving ? "publish.saving" : "publish.submitForModeration")}</button>
               : <PromotionSubmitActions value={selectedPromotion} onSubmit={(choice) => void submitForModeration(choice)} disabled={processingPhotos} saving={saving} />}
           </div>
         </div>

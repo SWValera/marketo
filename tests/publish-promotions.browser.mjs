@@ -27,7 +27,7 @@ const mocks={
  '@/lib/media/photo-preview':`export const createPhotoPreview=async file=>URL.createObjectURL(file);`,
 };
 const fixturePlugin=mocks=>({name:'fixture-boundaries',setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:'fixture'}:null);b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'tsx',resolveDir:root}));}});
-const entry=`import React from 'react';import{createRoot}from'react-dom/client';import{PublishForm}from'./components/publish-form';import{OwnerListingActions}from'./components/owner-listing-actions';localStorage.clear();const p=new URLSearchParams(location.search);const draft=${JSON.stringify(draft)};if(p.has('rejected'))draft.status='rejected';createRoot(document.getElementById('app')).render(p.has('profile')?<OwnerListingActions listing={{id:draft.id,slug:'fixture',status:'active'}}/>:<><main className='page-shell publish-page'><PublishForm userId='fixture-user' catalog={{status:'ready',data:{categories:[${JSON.stringify(category)}]}}} profileDefaults={{displayName:'Тест',contactPhone:'+77001234567',cityId:${JSON.stringify(cityId)}}} initialDraft={p.has('new')?null:draft}/></main><nav className='mobile-bottom-nav'><a>Главная</a><a>Подать</a><a>Профиль</a></nav></>);`;
+const entry=`import React from 'react';import{createRoot}from'react-dom/client';import{PublishForm}from'./components/publish-form';import{OwnerListingActions}from'./components/owner-listing-actions';localStorage.clear();const p=new URLSearchParams(location.search);const draft=${JSON.stringify(draft)};if(p.has('rejected'))draft.status='rejected';createRoot(document.getElementById('app')).render(p.has('profile')?<OwnerListingActions listing={{id:draft.id,slug:'fixture',status:'active'}}/>:<><main className='page-shell publish-page'><PublishForm userId='fixture-user' catalog={{status:'ready',data:{categories:[${JSON.stringify(category)}]}}} profileDefaults={{displayName:'Тест',contactPhone:'+77001234567',cityId:${JSON.stringify(cityId)}}} initialDraft={p.has('edit')||p.has('rejected')?draft:null}/></main><nav className='mobile-bottom-nav'><a>Главная</a><a>Подать</a><a>Профиль</a></nav></>);`;
 const app=await build({stdin:{contents:entry,loader:'tsx',resolveDir:root},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins:[fixturePlugin(mocks)]});
 const routePath=join(out,'submit-route.mjs');
 await build({entryPoints:['app/api/listings/[id]/submit/route.ts'],outfile:routePath,bundle:true,platform:'node',format:'esm',plugins:[fixturePlugin({
@@ -44,7 +44,7 @@ await build({entryPoints:['app/api/listings/[id]/promotion-choice/route.ts'],out
 const profileRoute=await import(pathToFileURL(profileRoutePath));
 
 let mode='success',locked=false;const requests=[],rpcCalls=[];const statuses=new Map(),choices=new Map();
-globalThis.__publishClient={auth:{getUser:async()=>({data:{user:{id:'fixture-user'}},error:null})},from:(table)=>{const query={select:()=>query,eq:()=>query,is:()=>query,maybeSingle:async()=>({data:table==='listings'?{id:listingId,status:'active'}:choices.has(listingId)?{promotion_type:choices.get(listingId)}:null,error:null})};return query;},rpc:async(name,args)=>{if(name==='get_listing_promotion_state')return {error:null,data:{promotionChoice:choices.get(args.target_listing_id)??null,locked}};rpcCalls.push({name,args});if(mode==='submit-error')return {error:{code:'42501'}};if(name==='submit_listing_with_promotion_choice')statuses.set(args.target_listing_id,'pending');choices.set(args.target_listing_id,args.promotion_choice);return {error:null};}};
+globalThis.__publishClient={auth:{getUser:async()=>({data:{user:{id:'fixture-user'}},error:null})},from:(table)=>{const query={select:()=>query,eq:()=>query,is:()=>query,maybeSingle:async()=>({data:table==='listings'?{id:listingId,status:'active'}:choices.has(listingId)?{promotion_type:choices.get(listingId)}:null,error:null})};return query;},rpc:async(name,args)=>{if(name==='get_listing_promotion_state')return {error:null,data:{promotionChoice:choices.get(args.target_listing_id)??null,locked}};rpcCalls.push({name,args});if(mode==='submit-error')return {error:{code:'42501'}};if(name==='submit_listing_with_promotion_choice'||name==='submit_listing')statuses.set(args.target_listing_id,'pending');if(Object.hasOwn(args,'promotion_choice'))choices.set(args.target_listing_id,args.promotion_choice);return {error:null};}};
 const css=(await readFile('app/globals.css','utf8')).replace('@import "tailwindcss";','');
 const server=createServer(async(req,res)=>{try{
  const path=new URL(req.url,'http://fixture').pathname;
@@ -76,7 +76,17 @@ try{
  const click=async selector=>{await evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.focus();el.click();})()`);await delay(60);};
  const fill=async(selector,value)=>evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)}),proto=el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
  const open=async(query='')=>{requests.length=0;rpcCalls.length=0;statuses.clear();await send('Page.navigate',{url:origin+'/'+query});await until(query.includes("profile")?"!!document.querySelector('.owner-listing-actions')":"!!document.querySelector('[data-category]')");await delay(80);};
- const step4=async()=>{for(let i=0;i<3;i++)await click('.publish-controls .primary-control');await until("!!document.querySelector('.publish-promotions')");};
+ const step4=async()=>{
+  if(await evaluate("new URLSearchParams(location.search).has('edit')||new URLSearchParams(location.search).has('rejected')")){
+    for(let i=0;i<3;i++)await click('.publish-controls .primary-control');
+  }else{
+    await click('[data-category]');await click('.publish-controls .primary-control');
+    await fill('input[maxlength="70"]','Новое тестовое объявление');await fill('textarea','Подробное описание для проверки новой публикации');await click('.publish-controls .primary-control');
+    await evaluate("(()=>{const canvas=document.createElement('canvas');canvas.width=80;canvas.height=60;const c=canvas.getContext('2d');c.fillStyle='#14713d';c.fillRect(0,0,80,60);return new Promise(r=>canvas.toBlob(blob=>{const dt=new DataTransfer();dt.items.add(new File([blob],'fixture.png',{type:'image/png'}));const input=document.querySelector('input[type=file]');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));r();}));})()");
+    await until("document.querySelectorAll('.photo-preview-grid article').length===1");await click('.publish-controls .primary-control');
+  }
+  await until("!!document.querySelector('input[autocomplete=name]')");
+ };
  const selected=()=>evaluate("[...document.querySelectorAll('input[type=radio]:checked')].map(x=>x.value)");
  await send('Page.enable');await send('Runtime.enable');await send('DOM.enable');await send('CSS.enable');
  for(const [width,height] of [[390,844],[430,932],[768,1024],[1366,768]]){
@@ -109,7 +119,7 @@ try{
  for(const value of ['basic','accelerated','maximum','city_premium'])for(const without of [false,true]){
   await open();await step4();await click(`[value=${value}] + span`);await click(without?'.publish-without-promotion':'.publish-advertise');await until("!!document.querySelector('.publish-success')");
   assert.equal(statuses.get(listingId),'pending');assert.equal(choices.get(listingId),without?null:value);assert.deepEqual(rpcCalls,[{name:'submit_listing_with_promotion_choice',args:{target_listing_id:listingId,promotion_choice:without?null:value}}]);
-  assert.equal(requests.length,2);assert.equal(requests[0].method,'PATCH');assert.equal(requests[1].path,`/api/listings/${listingId}/submit`);assert.deepEqual(requests[1].body,{promotionChoice:without?null:value});assert.ok(!requests.some(r=>/promotion|premium/.test(r.path)));
+  assert.equal(requests.length,3);assert.equal(requests[0].method,'POST');assert.equal(requests[2].path,`/api/listings/${listingId}/submit`);assert.deepEqual(requests[2].body,{promotionChoice:without?null:value});assert.ok(!requests.some(r=>/promotion|premium/.test(r.path)));
   report.push({choice:value,without,moderation:'PASS'});
  }
  // Brand new listing: actual UI fields + photo selection -> create -> upload -> same submit endpoint.
@@ -120,11 +130,25 @@ try{
   assert.deepEqual(requests.map(r=>[r.method,r.path]),[['POST','/api/listings'],['POST',`/api/listings/${listingId}/images`],['POST',`/api/listings/${listingId}/submit`]]);assert.deepEqual(requests[2].body,{promotionChoice:without?null:'accelerated'});assert.equal(statuses.get(listingId),'pending');report.push({newListing:true,without,moderation:'PASS'});
  }
  // Same-event double clicks must not create two saves/submits.
- await open();await step4();await evaluate("document.querySelector('.publish-advertise').click();document.querySelector('.publish-without-promotion').click()");await until("!!document.querySelector('.publish-success')");assert.equal(requests.length,2);assert.equal(rpcCalls.length,1);report.push({doubleClick:'PASS'});
+ await open();await step4();await evaluate("document.querySelector('.publish-advertise').click();document.querySelector('.publish-without-promotion').click()");await until("!!document.querySelector('.publish-success')");assert.equal(requests.length,3);assert.equal(rpcCalls.length,1);report.push({doubleClick:'PASS'});
  for(const failure of ['save-error','submit-error']){mode=failure;await open();await step4();await click('.publish-advertise');await until("!!document.querySelector('.form-error')");assert.equal(await evaluate("!!document.querySelector('.publish-success')"),false);assert.equal(await evaluate("document.querySelector('.publish-advertise').disabled"),false);assert.equal(rpcCalls.length,failure==='save-error'?0:1);mode='success';await click('.publish-without-promotion');await until("!!document.querySelector('.publish-success')");assert.equal(statuses.get(listingId),'pending');assert.deepEqual(requests.at(-1).body,{promotionChoice:null});report.push({failure,retry:'PASS'});}
  await open();await step4();await fill('input[autocomplete=tel]','123');await click('.publish-advertise');assert.equal(requests.length,0);await click('.publish-without-promotion');assert.equal(requests.length,0);report.push({validation:'PASS'});
- await open('?rejected');await step4();await click('.publish-without-promotion');await until("!!document.querySelector('.publish-success')");assert.equal(statuses.get(listingId),'pending');report.push({resubmit:'PASS'});
+ await open('?rejected');await step4();assert.equal(await evaluate("document.querySelectorAll('.publish-promotions,.publish-submit-actions').length"),0);await click('.publish-edit-submit');await until("!!document.querySelector('.publish-success')");assert.equal(statuses.get(listingId),'pending');report.push({resubmit:'PASS'});
  await open('?lang=kk');await step4();assert.equal(await evaluate("document.querySelector('.publish-promotions legend').textContent"),'Хабарландыруды ілгерілету');assert.deepEqual(await selected(),['accelerated']);report.push({kazakh:'PASS'});
+
+ // Existing listings use the original submit RPC, without a package argument.
+ for(const [width,height] of [[390,844],[430,932],[1366,768]])for(const existing of [null,'maximum','city_premium']){
+  await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<500});
+  choices.set(listingId,existing);await open('?edit');await step4();
+  assert.equal(await evaluate("document.querySelectorAll('.publish-promotions,.publish-submit-actions,.publish-advertise,.publish-without-promotion').length"),0);
+  assert.equal(await evaluate("document.querySelectorAll('.publish-edit-submit').length"),1);
+  assert.equal(await evaluate("document.querySelector('.publish-edit-submit').textContent"),'Отправить на модерацию');
+  await click('.publish-edit-submit');await until("!!document.querySelector('.publish-success')");
+  assert.deepEqual(rpcCalls,[{name:'submit_listing',args:{target_listing_id:listingId}}]);
+  assert.equal(choices.get(listingId),existing);assert.equal(statuses.get(listingId),'pending');
+  assert.deepEqual(requests.map(r=>[r.method,r.path]),[['PATCH',`/api/listings/${listingId}`],['POST',`/api/listings/${listingId}/submit`]]);
+  assert.equal(requests[1].body,null);report.push({edit:[width,height],existing,preserveChoice:'PASS'});
+ }
 
  for(const [width,height] of [[390,844],[430,932],[1366,768]]){
   await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<500});

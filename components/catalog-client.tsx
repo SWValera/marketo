@@ -212,7 +212,8 @@ export function CatalogClient({
           if (b.priceAmount === null) return -1;
           return sort === "cheap" ? a.priceAmount - b.priceAmount : b.priceAmount - a.priceAmount;
         }
-        return Number(b.promoted) - Number(a.promoted);
+        // Freshness and its stable id tie-breaker are authoritative server order.
+        return 0;
       });
   }, [activeAttributes, catalog.status, catalogView, categorySlug, cityId, dynamicFilters, initialListings, initialQuery, maxPrice, minPrice, query, sort]);
 

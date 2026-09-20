@@ -22,7 +22,8 @@ blocks replacement and stacking. Editing preserves a running package.
 
 The first publication is not a bump. Private bump events have a unique
 (run_id, ordinal), and processing locks the listing. A retry cannot apply an event
-twice. Catch-up uses scheduled_at for bumped_at, not the late execution time.
+twice. With 0039, bumped_at uses the actual applied_at. A retry with no new event
+does not move it; a later publication can overtake a processed bump.
 created_at and published_at never change when a bump runs.
 
 ## Publication term
@@ -60,7 +61,7 @@ RLS is not loosened. Helpers are private with fixed search_path and revoked EXEC
 The existing owner-only selection table remains the package state record.
 
 Catalog freshness is greatest(published_at, bumped_at); price sorting and filters
-remain unchanged. VIP changes only the ordinary card's info surface/border/badge.
+remain unchanged. VIP changes only the ordinary card's gold 2px border/badge; its info surface stays white.
 X2 spans two grid columns with a horizontal photo. Browser deadline hooks only
 remove expired presentation using server-issued dates; they never activate or
 schedule benefits. Premium showcase components, CSS and carousel are unchanged.
@@ -72,8 +73,11 @@ schedule benefits. Premium showcase components, CSS and carousel are unchanged.
   queue/capacity, expiry, retry idempotency, ownership and protected fields.
   The test-only clock is installed after historical security inventory checks.
 - tests/promotion-choice-routes.test.mjs: actual route authorization/whitelist/errors.
-- tests/publish-promotions.browser.mjs: shared chooser and actual submit/profile routes.
-- tests/promotion-cards.browser.mjs: six viewport geometries, mint/gold VIP, two-slot
+- tests/publish-promotions.browser.mjs: shared chooser and actual submit/profile routes;
+  create retains the chooser, edit submits without a promotion parameter.
+- tests/catalog-freshness.browser.mjs: actual CatalogClient keeps server freshness
+  order even for legacy promoted rows; explicit ascending/descending price remains primary.
+- tests/promotion-cards.browser.mjs: six viewport geometries, white/gold VIP, two-slot
   X2, combined state and visual expiry without removing the still-live listing.
 
 On memory-limited Windows, use Node flags --disable-wasm-trap-handler --liftoff-only
