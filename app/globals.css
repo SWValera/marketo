@@ -1616,3 +1616,27 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
   .home-marketplace { margin-top: 4px; }
   .home-marketplace-tabs { margin-bottom: 2px; }
 }
+
+/* Publish step 4 only. Gold matches the existing showcase CTA without changing it. */
+.publish-promotions { min-width: 0; margin: 24px 0 0; padding: 0; border: 0; }
+.publish-promotions legend { padding: 0; margin-bottom: 12px; color: var(--ink); font-size: 1.125rem; font-weight: 800; }
+.publish-promotion-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.publish-promotion-option { min-width: 0; min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: #fff; cursor: pointer; }
+.publish-promotion-option.is-selected { border-color: var(--green); background: var(--primary-soft); }
+.publish-promotion-option input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--green); }
+.publish-promotion-option strong, .publish-promotion-option small { display: block; }
+.publish-promotion-option strong { color: var(--ink); font-weight: 750; }
+.publish-promotion-option small { margin-top: 4px; color: var(--text-muted); }
+.publish-promotion-option:focus-within { outline: 2px solid var(--green); outline-offset: 2px; }
+.publish-controls.publish-controls-final { display: grid; }
+.publish-controls-final > .secondary-control { justify-self: start; }
+.publish-submit-actions { display: grid; gap: 10px; min-width: 0; }
+.publish-submit-actions button { width: 100%; padding: 12px 16px; }
+.publish-submit-actions .publish-advertise { border: 1px solid #e6cb89; background: linear-gradient(145deg,#fae9b8,#dbb968); color: #2b2518; box-shadow: 0 5px 14px #00180f40, inset 0 1px 0 #fff7dc; }
+.publish-submit-actions .publish-advertise:is(:hover,:active,:focus-visible) { background: linear-gradient(145deg,#fff0c8,#e7c57f); color: #2b2518; border-color: #f5dea3; }
+.publish-submit-actions .publish-without-promotion { border: 1px solid var(--border); background: #fff; color: var(--ink); }
+.publish-submit-actions .publish-without-promotion:is(:hover,:active) { border-color: var(--green); background: #fff; color: var(--ink); }
+.publish-submit-actions button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .publish-promotion-options { grid-template-columns: minmax(0, 1fr); }
+}

@@ -72,6 +72,14 @@ import type { CategoryReferenceData, ReferenceDataEnvelope } from "@/lib/referen
 type PhotoPreview = { name: string; url: string; file: File };
 type UploadedPhoto = { id: string; storageKey: string; sortOrder: number };
 
+const promotionChoices = [
+  { value: "basic", label: "publish.promotionBasic" },
+  { value: "accelerated", label: "publish.promotionAccelerated" },
+  { value: "maximum", label: "publish.promotionMaximum" },
+  { value: "city_premium", label: "publish.promotionShowcase" },
+] as const;
+type PublishPromotionChoice = typeof promotionChoices[number]["value"];
+
 function isUploadedPhoto(value: unknown): value is UploadedPhoto {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const photo = value as Partial<UploadedPhoto>;
@@ -130,6 +138,8 @@ export function PublishForm({
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const submissionInFlight = useRef(false);
+  const [selectedPromotion, setSelectedPromotion] = useState<PublishPromotionChoice>("accelerated");
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const processingPhotosRef = useRef(false);
   const [categorySlug, setCategorySlug] = useState(initialDraft?.categorySlug ?? "");
@@ -505,6 +515,7 @@ export function PublishForm({
     setPhotos([]);
     setExistingImages([]);
     setSubmitted(false);
+    setSelectedPromotion("accelerated");
     setListingId(null);
     setListingStatus("draft");
     setRejectionReasonCode(null);
@@ -531,9 +542,10 @@ export function PublishForm({
     return true;
   }
 
-  async function submitForModeration() {
-    if (processingPhotosRef.current) return;
+  async function submitForModeration(promotionChoice: PublishPromotionChoice | null) {
+    if (submissionInFlight.current || processingPhotosRef.current) return;
     if (!validateCurrent(step, true)) return;
+    submissionInFlight.current = true;
     const input = buildDraftInput();
     savePublishRecovery(safeBrowserStorage("localStorage"), createPublishRecovery(userId, recoveryFields, listingId));
     setSaving(true);
@@ -619,7 +631,10 @@ export function PublishForm({
 
       const submittedResponse = await fetch(`/api/listings/${currentListingId}/submit`, {
         method: "POST",
-        headers: { accept: "application/json" },
+        headers: { "content-type": "application/json", accept: "application/json" },
+        // UI intent only. The existing endpoint still submits for moderation;
+        // it does not persist, activate or purchase a promotion at this stage.
+        body: JSON.stringify({ promotionChoice }),
       });
       const submittedBody = await submittedResponse.json().catch(() => ({})) as ApiErrorBody;
       if (!submittedResponse.ok) {
@@ -633,6 +648,7 @@ export function PublishForm({
     } catch {
       setGlobalError(t("publish.saveFailedOffline"));
     } finally {
+      submissionInFlight.current = false;
       setSaving(false);
     }
   }
@@ -811,14 +827,26 @@ export function PublishForm({
               <label className="option-row form-field-wide"><input type="checkbox" checked={allowMessages} onChange={(event) => setAllowMessages(event.target.checked)} /><span><strong>{t("publish.allowMessages")}</strong><small>{t("publish.allowMessagesNote")}</small></span></label>
             </div>
             <div className="publish-review"><strong>{t("publish.beforeSend")}</strong><p>{summary.length ? summary.join(" · ") : t("publish.review")}</p></div>
+            <fieldset className="publish-promotions" disabled={saving || processingPhotos}>
+              <legend>{t("publish.promotionTitle")}</legend>
+              <div className="publish-promotion-options">
+                {promotionChoices.map((choice) => <label key={choice.value} className={`publish-promotion-option${selectedPromotion === choice.value ? " is-selected" : ""}`}>
+                  <input type="radio" name="publish-promotion" value={choice.value} checked={selectedPromotion === choice.value} onChange={() => setSelectedPromotion(choice.value)} />
+                  <span><strong>{t(choice.label)}</strong><small>{t("publish.promotionFree")}</small></span>
+                </label>)}
+              </div>
+            </fieldset>
           </div>}
 
           {globalError && <div className="form-error" role="alert">{globalError}</div>}
-          <div className="publish-controls">
+          <div className={`publish-controls${step === 3 ? " publish-controls-final" : ""}`}>
             <button type="button" className="secondary-control" disabled={step === 0 || saving || processingPhotos} onClick={previousStep}><ChevronLeft size={18} />{t("common.back")}</button>
             {step < steps.length - 1
               ? <button type="button" className="primary-control" disabled={processingPhotos} onClick={validateAndContinue}>{t("common.next")}<ChevronRight size={18} /></button>
-              : <button type="button" className="primary-control" disabled={saving || processingPhotos} onClick={() => void submitForModeration()}>{saving ? t("publish.saving") : listingStatus === "rejected" ? t("publish.resubmitForModeration") : t("publish.submitForModeration")}<Check size={18} /></button>}
+              : <div className="publish-submit-actions" aria-busy={saving}>
+                <button type="button" className="publish-advertise" disabled={saving || processingPhotos} onClick={() => void submitForModeration(selectedPromotion)}>{saving ? t("publish.saving") : t("publish.advertise")}</button>
+                <button type="button" className="publish-without-promotion" disabled={saving || processingPhotos} onClick={() => void submitForModeration(null)}>{t("publish.advertiseWithoutPromotion")}</button>
+              </div>}
           </div>
         </div>
       )}
