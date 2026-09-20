@@ -2,16 +2,20 @@
 
 import { AppLink as Link } from "@/components/app-link";
 import { useRouter } from "next/navigation";
-import { Archive, CheckCircle2, ExternalLink, PenLine, RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Archive, Megaphone, PenLine, Trash2 } from "lucide-react";
+import { useCallback, useState } from "react";
+import { OwnerPromotionDialog } from "@/components/owner-promotion-dialog";
 import { useI18n } from "@/components/i18n-provider";
 import type { MyListingSummary } from "@/lib/data/types";
 
 export function OwnerListingActions({ listing }: { listing: Pick<MyListingSummary, "id" | "slug" | "status"> }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [pending, setPending] = useState<"archive" | "sold" | "edit" | "restore" | "delete" | null>(null);
+  const [pending, setPending] = useState<"archive" | "edit" | "delete" | null>(null);
   const [error, setError] = useState("");
+  const [promotionOpen, setPromotionOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const closePromotion = useCallback(() => setPromotionOpen(false), []);
   const editable = listing.status === "draft" || listing.status === "rejected";
   const archivable = ["draft", "pending", "active", "rejected"].includes(listing.status);
 
@@ -35,7 +39,7 @@ export function OwnerListingActions({ listing }: { listing: Pick<MyListingSummar
         if (response.status === 409) router.refresh();
         return;
       }
-      if (action === "edit" || action === "restore") router.push(`/publish?listing=${listing.id}`);
+      if (action === "edit") router.push(`/publish?listing=${listing.id}`);
       else router.refresh();
     } catch {
       setError(t("profile.listingActionFailed"));
@@ -48,12 +52,15 @@ export function OwnerListingActions({ listing }: { listing: Pick<MyListingSummar
     <div>
       {editable ? <Link prefetch={false} className="secondary-button" href={`/publish?listing=${listing.id}`}><PenLine size={16} />{t("common.edit")}</Link> : null}
       {!editable ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("edit")}><PenLine size={16} />{t("common.edit")}</button> : null}
-      {["archived", "expired", "sold"].includes(listing.status) ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("restore")}><RotateCcw size={16} />{t("profile.restoreListing")}</button> : null}
-      {listing.status === "active" ? <Link className="secondary-button" href={`/listing/${listing.id}-${listing.slug}`}><ExternalLink size={16} />{t("profile.openListing")}</Link> : null}
-      {archivable ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("archive")}><Archive size={16} />{pending === "archive" ? t("profile.actionWorking") : listing.status === "pending" ? t("profile.withdrawListing") : t("profile.archiveListing")}</button> : null}
-      {listing.status === "active" ? <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("sold")}><CheckCircle2 size={16} />{pending === "sold" ? t("profile.actionWorking") : t("profile.markSold")}</button> : null}
       <button type="button" className="secondary-button" disabled={pending !== null} onClick={() => void mutate("delete")}><Trash2 size={16} />{t("profile.deleteListing")}</button>
+      <button type="button" className="secondary-button" disabled={pending !== null || !archivable} onClick={() => void mutate("archive")}><Archive size={16} />{pending === "archive" ? t("profile.actionWorking") : t("profile.archiveListing")}</button>
+      <button type="button" className="promotion-gold-button" disabled={pending !== null || !archivable} onClick={() => { setNotice(""); setPromotionOpen(true); }}><Megaphone size={16} />{t("publish.advertise")}</button>
     </div>
+    {promotionOpen ? <OwnerPromotionDialog listingId={listing.id} onClose={closePromotion} onSaved={(choice) => {
+      setPromotionOpen(false);
+      setNotice(t(choice === null ? "promotion.removed" : "promotion.saved"));
+    }} /> : null}
+    {notice ? <p role="status">{notice}</p> : null}
     {error ? <p className="owner-listing-action-error" role="alert">{error}</p> : null}
   </div>;
 }

@@ -1,4 +1,3 @@
-import { OwnerCityPremium } from "@/components/city-premium-offer";
 /* eslint-disable @next/next/no-img-element -- Owner media is served through the authenticated same-origin media route. */
 import type { Metadata } from "next";
 import { AppLink as Link } from "@/components/app-link";
@@ -200,7 +199,6 @@ export default async function ProfilePage({
                 <span>{rejectionLabel(listing.rejectionReasonCode)}</span>
               </div> : null}
               <OwnerListingActions listing={listing} />
-              <OwnerCityPremium listingId={listing.id} />
             </div>
           </article>)}
         </div>

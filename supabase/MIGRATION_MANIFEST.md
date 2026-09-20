@@ -71,3 +71,15 @@ their original releases; they are not the current file count.
 Catalog values are a separate generated release, with reviewed scalar transforms
 in supabase/catalog-releases/2026-09-13.1-type-transforms.json. Use the release
 procedure in docs/CATALOG_NORMALIZATION_2026-09-13.md; do not seed production.
+
+## Promotion choices 2026-09-20
+
+0037_listing_promotion_choices.sql adds owner-only, unactivated promotion choices.
+The new submit wrapper calls the existing submit_listing and saves the choice in
+one transaction. Neither the profile save nor the wrapper grants entitlements,
+changes ranking, or touches CITY_PREMIUM capacity or activation.
+
+Targeted rehearsal: tests/promotion-choices.test.mjs checks owner isolation,
+anonymous/direct-write denial, account/status guards, atomic rollback,
+idempotent updates, and opt-out. Browser tests cover the actual submit route
+and shared publish/profile chooser.

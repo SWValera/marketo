@@ -1,3 +1,4 @@
+import type { PromotionChoice } from "@/lib/publish/promotion-choice";
 import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
 import { normalizePageSize, normalizePositivePage, pageWindow } from "../pagination.ts";
 import type { Json, TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
@@ -390,8 +391,10 @@ export async function upsertListingScalarAttribute(client: JevuSupabaseClient, v
   return data;
 }
 
-export async function submitListing(client: JevuSupabaseClient, listingId: string) {
-  const { error } = await client.rpc("submit_listing", { target_listing_id: listingId });
+export async function submitListing(client: JevuSupabaseClient, listingId: string, promotionChoice?: PromotionChoice | null) {
+  const { error } = promotionChoice === undefined
+    ? await client.rpc("submit_listing", { target_listing_id: listingId })
+    : await client.rpc("submit_listing_with_promotion_choice", { target_listing_id: listingId, promotion_choice: promotionChoice });
   if (error) throw error;
 }
 

@@ -131,7 +131,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .visual-phone-top { position: absolute; top: 10px; left: 50%; width: 64px; height: 8px; border-radius: 8px; background: #193729; transform: translateX(-50%); }
 .mini-search { height: 27px; display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid #dbe5df; border-radius: 7px; color: #84958b; font-size: var(--font-ui); }
 .mini-card { margin-top: 12px; height: 120px; border-radius: 10px; background: linear-gradient(140deg,#dbe9de,#91b79c); }
-.mini-card::after { content: "8 500 000 ₸"; display: block; padding-top: 126px; color: #123425; font-size: var(--font-ui); font-weight: 800; }
+.mini-card::after { content: "8 500 000 в‚ё"; display: block; padding-top: 126px; color: #123425; font-size: var(--font-ui); font-weight: 800; }
 .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 29px; }
 .mini-grid div { height: 65px; border-radius: 8px; background: #e5ece7; }
 .visual-orbit { position: absolute; display: grid; place-items: center; color: var(--green); background: white; border-radius: 15px; box-shadow: 0 15px 30px rgba(0,0,0,.2); }
@@ -307,7 +307,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .category-picker-sheet > header > div { flex: 1; }.category-picker-sheet h2 { margin: 5px 0 4px; }.category-picker-sheet header p { margin: 0; color: var(--muted); font-size: var(--font-ui); }
 .category-level-back { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-muted); color: var(--ink); }
 .category-search { flex: 0 0 auto; }
-.category-level-path { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 24px 12px; color: var(--text-muted); font-size: var(--font-ui); }.category-level-path span:not(:last-child)::after { content: "›"; margin-left: 5px; }.category-level-path span:last-child { color: var(--primary-strong); font-weight: 750; }
+.category-level-path { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 24px 12px; color: var(--text-muted); font-size: var(--font-ui); }.category-level-path span:not(:last-child)::after { content: "вЂє"; margin-left: 5px; }.category-level-path span:last-child { color: var(--primary-strong); font-weight: 750; }
 .category-picker-results { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 0 18px 18px; -webkit-overflow-scrolling: touch; }
 .category-picker-results button { width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 14px; border: 0; border-bottom: 1px solid #eef1ef; background: transparent; text-align: left; touch-action: manipulation; }
 .category-picker-results button:hover, .category-picker-results button.selected { border-radius: 11px; background: var(--green-soft); }
@@ -804,7 +804,7 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 
-/* Каталог */
+/* РљР°С‚Р°Р»РѕРі */
 .subpage-main { min-height: calc(100vh - 74px); padding-block: 32px 80px; }
 .catalog-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; align-items: start; }
 .filters-panel { padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: white; }
@@ -842,7 +842,7 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .empty-state h2, .empty-state p { margin: 0; }
 .empty-state button { border: 0; background: transparent; color: var(--green-dark); font-weight: 700; cursor: pointer; }
 
-/* Страница объявления */
+/* РЎС‚СЂР°РЅРёС†Р° РѕР±СЉСЏРІР»РµРЅРёСЏ */
 .listing-page { padding-block: 26px 85px; }
 .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: var(--font-ui); font-weight: 700; }
 .breadcrumbs { margin: 14px 0 22px; color: #98a2b3; font-size: var(--font-ui); }
@@ -1617,11 +1617,11 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
   .home-marketplace-tabs { margin-bottom: 2px; }
 }
 
-/* Publish step 4 only. Gold matches the existing showcase CTA without changing it. */
+/* Promotion controls. Gold matches the existing showcase CTA without changing it. */
 .publish-promotions { min-width: 0; margin: 24px 0 0; padding: 0; border: 0; }
 .publish-promotions legend { padding: 0; margin-bottom: 12px; color: var(--ink); font-size: 1.125rem; font-weight: 800; }
 .publish-promotion-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.publish-promotion-option { min-width: 0; min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: #fff; cursor: pointer; }
+.publish-promotion-option { min-width: 0; position: relative; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; background: #fff; overflow: hidden; }
 .publish-promotion-option.is-selected { border-color: var(--green); background: var(--primary-soft); }
 .publish-promotion-option input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--green); }
 .publish-promotion-option strong, .publish-promotion-option small { display: block; }
@@ -1631,12 +1631,40 @@ button svg, .primary-action svg, .secondary-action svg, .secondary-button svg,
 .publish-controls.publish-controls-final { display: grid; }
 .publish-controls-final > .secondary-control { justify-self: start; }
 .publish-submit-actions { display: grid; gap: 10px; min-width: 0; }
-.publish-submit-actions button { width: 100%; padding: 12px 16px; }
-.publish-submit-actions .publish-advertise { border: 1px solid #e6cb89; background: linear-gradient(145deg,#fae9b8,#dbb968); color: #2b2518; box-shadow: 0 5px 14px #00180f40, inset 0 1px 0 #fff7dc; }
-.publish-submit-actions .publish-advertise:is(:hover,:active,:focus-visible) { background: linear-gradient(145deg,#fff0c8,#e7c57f); color: #2b2518; border-color: #f5dea3; }
+.publish-submit-actions button { width: 100%; padding: 12px 16px; border-radius: 12px; }
+.promotion-gold-button, .publish-submit-actions .publish-advertise { border: 1px solid #e6cb89; background: linear-gradient(145deg,#fae9b8,#dbb968); color: #2b2518; box-shadow: 0 5px 14px #00180f40, inset 0 1px 0 #fff7dc; }
+.promotion-gold-button:is(:hover,:active,:focus-visible), .publish-submit-actions .publish-advertise:is(:hover,:active,:focus-visible) { background: linear-gradient(145deg,#fff0c8,#e7c57f); color: #2b2518; border-color: #f5dea3; }
 .publish-submit-actions .publish-without-promotion { border: 1px solid var(--border); background: #fff; color: var(--ink); }
 .publish-submit-actions .publish-without-promotion:is(:hover,:active) { border-color: var(--green); background: #fff; color: var(--ink); }
 .publish-submit-actions button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
 @media (max-width: 600px) {
   .publish-promotion-options { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Shared promotion chooser: step 4 and the owner's listing dialog. */
+.promotion-intro { margin: 0 0 14px; color: var(--text-muted); font-size: .9rem; line-height: 1.5; }
+.promotion-choice-label { display: flex; align-items: flex-start; gap: 12px; flex: 1; padding: 16px 46px 16px 14px; cursor: pointer; }
+.promotion-choice-content { min-width: 0; }
+.promotion-features { display: grid; gap: 7px; margin-top: 12px; font-size: .86rem; line-height: 1.4; color: var(--ink); }
+.promotion-features > span { display: flex; align-items: flex-start; gap: 7px; }
+.promotion-features svg { flex: 0 0 15px; margin-top: 2px; color: var(--green); }
+.promotion-info { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; color: var(--green); background: transparent; }
+.promotion-info:hover, .promotion-info[aria-expanded="true"] { background: var(--primary-soft); }
+.promotion-info:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.promotion-description { margin: 0; padding: 14px; border-top: 1px solid var(--border); font-size: .88rem; line-height: 1.55; color: var(--ink); background: rgba(255,255,255,.65); }
+.promotion-description[hidden] { display: none; }
+.promotion-gold-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 12px; padding: 10px 14px; font-weight: 750; }
+.promotion-gold-button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.promotion-gold-button:disabled { opacity: .55; cursor: not-allowed; }
+.promotion-dialog-overlay { position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; padding: 16px; }
+.promotion-dialog-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 0; background: rgba(7,20,13,.65); }
+.promotion-dialog { position: relative; width: min(100%, 700px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: 20px; background: #fff; box-shadow: 0 24px 80px #00180f40; }
+.promotion-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.promotion-dialog-heading h2 { margin: 0; font-size: 1.25rem; }
+.promotion-dialog .publish-promotions { margin-top: 12px; }
+.promotion-dialog .publish-promotions legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.promotion-dialog .publish-submit-actions { margin-top: 18px; }
+@media (max-width: 600px) {
+  .promotion-dialog { padding: 16px; max-height: calc(100dvh - 20px); }
+  .promotion-dialog-overlay { padding: 10px; }
 }

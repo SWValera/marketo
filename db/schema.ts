@@ -230,6 +230,13 @@ export const listings = pgTable("listings", {
   index("listings_status_created_idx").on(table.status, table.createdAt, table.id),
 ]);
 
+export const listingPromotionChoices = pgTable("listing_promotion_choices", {
+  listingId: uuid("listing_id").primaryKey().references(() => listings.id, { onDelete: "cascade" }),
+  promotionType: text("promotion_type").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+});
+
 export const listingContacts = pgTable("listing_contacts", {
   listingId: uuid("listing_id").primaryKey().references(() => listings.id, { onDelete: "cascade" }),
   contactName: text("contact_name").notNull(),

@@ -1,3 +1,4 @@
+import { isPromotionChoice, type PromotionChoice } from "@/lib/publish/promotion-choice";
 import { NextResponse } from "next/server";
 import { OwnerListingDataError } from "@/lib/data/supabase/my-listings";
 import { submitListing } from "@/lib/data/supabase/listings";
@@ -16,13 +17,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const client = await createSupabaseServerClient();
   const { data, error: authError } = await client.auth.getUser();
   if (authError || !data.user) return NextResponse.json({ error: "authentication_required" }, { status: 401 });
+  let promotionChoice: PromotionChoice | null | undefined;
+  const rawBody = await request.text();
+  if (rawBody) {
+    try {
+      const body: unknown = JSON.parse(rawBody);
+      if (!body || typeof body !== "object" || !("promotionChoice" in body)
+        || (body.promotionChoice !== null && !isPromotionChoice(body.promotionChoice))) {
+        return NextResponse.json({ error: "invalid_promotion_choice" }, { status: 400 });
+      }
+      promotionChoice = body.promotionChoice;
+    } catch {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+  }
   try {
     const validation = await validateStoredListingForSubmit(client, id);
     if (validation.status === "not_found") return NextResponse.json({ error: "listing_not_found" }, { status: 404 });
     if (validation.status === "invalid") {
       return NextResponse.json({ error: "invalid_draft", details: validation.errors }, { status: 422 });
     }
-    await submitListing(client, id);
+    await submitListing(client, id, promotionChoice);
     return NextResponse.json({ listing: { id, status: "pending" } });
   } catch (error) {
     if (error instanceof OwnerListingDataError) {

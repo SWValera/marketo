@@ -21,6 +21,7 @@ import type {
   listingAttributeOptionValues,
   listingAttributeValues,
   listingContacts,
+  listingPromotionChoices,
   listingImages,
   listings,
   locales,
@@ -78,6 +79,7 @@ export type Database = {
       category_attribute_options: Contract<typeof categoryAttributeOptions>;
       listings: Contract<typeof listings>;
       listing_contacts: Contract<typeof listingContacts>;
+      listing_promotion_choices: Contract<typeof listingPromotionChoices>;
       listing_attribute_values: Contract<typeof listingAttributeValues>;
       listing_attribute_option_values: Contract<typeof listingAttributeOptionValues>;
       listing_images: Contract<typeof listingImages>;
@@ -116,6 +118,8 @@ export type Database = {
       };
     };
     Functions: {
+      set_listing_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };
+      submit_listing_with_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };
       connect_city_premium: { Args: { target_listing_id: string }; Returns: Json };
       activate_city_premium: { Args: { target_listing_id: string }; Returns: string };
       get_city_premium_offer: { Args: { target_listing_id: string }; Returns: Json };
