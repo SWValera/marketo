@@ -26,6 +26,7 @@ import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
 import { getSettlement } from "@/lib/reference-data/geography";
+import { useServerDeadlines } from "@/components/use-publication-deadline";
 import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
 import { premiumCarouselPage, premiumDemoCount, premiumExpandedDemoCount, premiumPreparedIndexes } from "@/lib/premium-showcase-presentation";
 
@@ -131,22 +132,7 @@ export function CityPremiumShowcase({ initial }: { initial?: ShowcaseSnapshot })
   }, [cityKey]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClickUntil = useRef(0);
-  const [deadlineNow, setDeadlineNow] = useState(0);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const check = () => {
-      clearTimeout(timer);
-      setDeadlineNow(Date.now());
-      const next = paidState.items.map((item) => Date.parse(item.expiresAt ?? "")).filter((date) => date > Date.now()).sort((a,b) => a-b)[0];
-      if (next) timer = setTimeout(check, Math.min(next - Date.now(), 2147483647));
-    };
-    let active = true;
-    queueMicrotask(() => { if (active) check(); });
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", check);
-    return () => { active = false; clearTimeout(timer); window.removeEventListener("focus", check); document.removeEventListener("visibilitychange", check); };
-  }, [paidState]);
+  const deadlineNow = useServerDeadlines(paidState.items.map((item) => item.expiresAt));
 
   useEffect(() => {
     if (selectedLocation === "all") return;

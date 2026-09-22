@@ -117,6 +117,20 @@ test('real promotion lifecycle, moderation, 30 days, scheduled bumps, queue, sec
    assert.equal(time(row.published_at),start);assert.equal(time(row.expires_at),Math.max(start+30*day,now+7*day));assert.equal(row.status,'active');
    assert.equal(time((await choice(id)).started_at),now);
   });
+  await t.test('server archive is persisted, owner/public agree, extended expiry is respected and repeated jobs are safe',async()=>{
+   await clock(now+40*day);const start=now,plain=await active(),extended=await active();
+   await clock(start+29*day);await pick(extended,'maximum');
+   await clock(start+30*day);await tick();await tick();
+   assert.equal((await read(plain)).status,'archived');
+   assert.equal((await as(owner,'select status from public.listings where id=$1',[plain])).rows[0].status,'archived');
+   assert.equal((await db.query('select id from public.catalog_listing_cards where id=$1',[plain])).rows.length,0);
+   assert.equal((await read(extended)).status,'active');
+   assert.equal((await db.query('select id from public.catalog_listing_cards where id=$1',[extended])).rows.length,1);
+   const current=await read(extended);assert.equal(time(current.expires_at),start+36*day);
+   await clock(start+36*day);await tick();const archived=await read(extended);await tick();
+   assert.equal(archived.status,'archived');assert.equal((await read(extended)).status,'archived');
+   assert.equal(time(archived.expires_at),time(current.expires_at));assert.equal(time(archived.published_at),start);
+  });
   await t.test('basic near expiry gives only full 72h',async()=>{
    await clock(now+40*day);const start=now,id=await active();await clock(start+29*day);await pick(id,'basic');assert.equal(time((await read(id)).expires_at),now+3*day);
   });
