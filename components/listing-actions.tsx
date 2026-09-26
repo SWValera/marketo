@@ -22,7 +22,7 @@ type ListingActionsProps = {
 };
 
 export function ListingActions({ listingId, listingSlug, title }: ListingActionsProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [status, setStatus] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [favoritePending, setFavoritePending] = useState(false);
@@ -108,6 +108,10 @@ export function ListingActions({ listingId, listingSlug, title }: ListingActions
           <option value="listing.spam">{t("listing.reportReasonSpam")}</option>
           <option value="listing.fraud">{t("listing.reportReasonFraud")}</option>
           <option value="listing.prohibited">{t("listing.reportReasonProhibited")}</option>
+          <option value="listing.inaccurate">{locale === "kk" ? "Қате ақпарат" : "Неверная информация"}</option>
+          <option value="listing.stolen_photos">{locale === "kk" ? "Бөтен фотосуреттер" : "Чужие фотографии"}</option>
+          <option value="listing.counterfeit">{locale === "kk" ? "Жалған тауар" : "Подделка"}</option>
+          <option value="listing.personal_data">{locale === "kk" ? "Дербес деректер" : "Персональные данные"}</option>
           <option value="listing.other">{t("listing.reportReasonOther")}</option>
         </select></label>
         <label className="form-field"><span>{t("listing.reportDetails")}</span><textarea maxLength={4000} rows={3} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} /></label>

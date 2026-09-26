@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- Owner media is served through the authenticated same-origin media route. */
+import { ModerationStatus, SellerVerificationStatus } from "@/components/moderation-status";
 import type { Metadata } from "next";
 import { AppLink as Link } from "@/components/app-link";
 import {
@@ -125,6 +126,7 @@ export default async function ProfilePage({
     authContext={authContext}
     fallback="/"
   >
+    <SellerVerificationStatus />
     {params.registered === "success" ? <p className="auth-feedback is-success" role="status">{t("auth.registeredSuccess")}</p> : null}
     <section className="dashboard-card profile-hero">
       <span className="profile-avatar" aria-hidden="true">
@@ -198,6 +200,7 @@ export default async function ProfilePage({
                 <strong>{t("profile.rejectionReason")}</strong>
                 <span>{rejectionLabel(listing.rejectionReasonCode)}</span>
               </div> : null}
+              {listing.status === "pending" || listing.status === "rejected" ? <ModerationStatus listingId={listing.id} /> : null}
               <OwnerListingActions listing={listing} />
             </div>
           </article>)}

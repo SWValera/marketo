@@ -63,6 +63,7 @@ async function AdminPageContent({ searchParams }: AdminPageProps) {
   }
 
   return <DashboardShell title={t("admin.title")} description={t("admin.description")} active="/admin" authContext={authContext} fallback="/">
+    <Link href="/admin/moderation">{locale === "kk" ? "Шағымдар және ережелер" : "Жалобы и правила"}</Link>
     {queue.state === "empty" ? <EmptyState
       icon={<ShieldCheck size={30} />}
       title={t("admin.empty")}

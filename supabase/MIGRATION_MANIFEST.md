@@ -106,3 +106,13 @@ See docs/PROMOTION_LIFECYCLE.md for the contracts and focused UI/API checks.
 It records freshness from applied_at instead of scheduled_at, so an executed bump
 can overtake earlier publications and any later publication can overtake it.
 Schedules, counts, idempotency, security and publication lifetime are unchanged.
+
+## 0040 — automated moderation foundation
+
+`0040_automated_moderation.sql` follows 0039. Adds private revision/ruleset/run/
+finding/image-hash/override/appeal/SMS tables, narrow RPCs, parent-row serialization,
+controlled rule activation, report deduplication and scheduler watchdog. Existing
+publication/promotion triggers remain authoritative. No historical migration,
+public listing lifetime or approved brand asset is rewritten. Automatic approval
+and SMS enforcement default off. See `docs/AUTOMATED_MODERATION.md` for deployment
+order, provider dependencies and rollback without deleting history.

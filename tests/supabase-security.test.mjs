@@ -207,13 +207,18 @@ async function buildRequiredAttributePayload(db, categoryId, overrides = {}) {
     where category_id = $1
       and is_active
       and is_visible
-      and (is_required or key = any($2::text[]))
+      and (is_required or validation ? 'requiredWhen' or validation ? 'requiredForNewListingsSince' or key = any($2::text[]))
     order by sort_order, id
   `, [categoryId, Object.keys(overrides)]);
   const selectedOptionValues = new Map();
   const payload = [];
 
   for (const attribute of required.rows) {
+    // Current catalog fixtures must include 0032's conditional requirements.
+    const visible = attribute.validation?.visibleWhen;
+    if (visible && !visible.values.includes(selectedOptionValues.get(visible.key))) continue;
+    const conditional = attribute.validation?.requiredWhen;
+    if (conditional && !conditional.values.includes(selectedOptionValues.get(conditional.key)) && !overrides[attribute.key]) continue;
     const override = overrides[attribute.key];
     if (override) {
       const { selectedValue, ...fields } = override;
@@ -575,8 +580,8 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           )::int as invalid_options
       `);
       assert.deepEqual(result.rows[0], {
-        attributes: 14345,
-        options: 116412,
+        attributes: 15784,
+        options: 172849,
         orphan_attributes: 0,
         orphan_options: 0,
         invalid_attributes: 0,
@@ -1290,10 +1295,11 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           db.query("insert into public.favorites (user_id, listing_id) values ($1, $2)", [users.buyer, listings.archivedOwner]),
           /row-level security|violates/i,
         );
-        await db.query(
+        await assert.rejects(db.query(
           "insert into public.reports (reporter_id, listing_id, reason_code) values ($1, $2, 'listing.spam')",
           [users.buyer, listings.activeOwner],
-        );
+        ), /permission denied/i);
+        await db.query("select public.report_listing($1, 'listing.spam')", [listings.activeOwner]);
         await assert.rejects(db.query("update public.reports set status = 'resolved' where reporter_id = $1", [users.buyer]), /permission denied/i);
         const notifications = await db.query("select id from public.notifications where user_id = $1", [users.buyer]);
         assert.equal(notifications.rows.length, 1);
@@ -1376,14 +1382,14 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 31);
+      assert.equal(functions.rows.length, 66); // Reviewed through 0040, including private job primitives.
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
-      assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_listing_contact_options"]);
+      assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_city_premium_availability", "get_listing_contact_options"]);
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
-      assert.deepEqual(notClientCallable, ["enforce_listing_publication_period", "handle_new_auth_user", "require_writable_account_owner", "touch_conversation_after_message", "advance_account_deletion", "archive_expired_listings", "begin_account_deletion", "finish_account_deletion", "registration_handoff", "reveal_listing_phone"]);
+      assert.deepEqual(notClientCallable, ["activate_city_premium_for_owner", "apply_listing_moderation", "archive_expired_listings_before_moderation", "cancel_unavailable_listing_promotions", "capture_moderation_submission", "clear_moderation_identity", "enforce_listing_publication_period", "enqueue_moderation", "handle_new_auth_user", "listing_has_live_promotion", "lock_moderation_content", "moderation_content", "moderation_watchdog", "process_city_premium_queue", "process_listing_promotion_bumps", "recheck_confirmed_report", "require_writable_account_owner", "resolve_city_premium_approval", "start_listing_promotion", "touch_conversation_after_message", "activate_city_premium", "advance_account_deletion", "archive_expired_listings", "begin_account_deletion", "claim_moderation_job", "connect_city_premium", "count_moderation_image_reuse", "expire_listing_promotions", "fail_moderation_job", "finish_account_deletion", "finish_moderation_job", "registration_handoff", "reveal_listing_phone", "seller_phone_challenge"]);
     });
 
-    await t.test("0028 owner lifecycle, calendar month, exact public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
+    await t.test("0038/0040 owner lifecycle, original 720-hour term, public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));
     await t.test("0029 messages and 0030 protected phone metadata", () => auditListingMessaging(db, users, listings.activeOwner, conversationId, { protectedPhones: true }));
     await t.test("0033 sender-only edits, deletion, stale writes and reconnect", () => auditMessageActions(db, users, conversationId));
     await t.test("0028 private PKCE mailbox capabilities, leases, cancellation and rate limits", () => auditRegistrationHandoff(db, users.owner));

@@ -46,6 +46,7 @@ const expectedMigrations = [
   "0037_listing_promotion_choices.sql",
   "0038_listing_promotion_lifecycle.sql",
   "0039_bump_execution_freshness.sql",
+  "0040_automated_moderation.sql",
 ];
 
 const immutableMigrationHashes = {

@@ -81,7 +81,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:33},(_,index)=>String(index+1).padStart(4,'0')));
+    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:40},(_,index)=>String(index+1).padStart(4,'0')));
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -89,7 +89,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       join pg_namespace as namespace on namespace.oid = relation.relnamespace
       where namespace.nspname = 'public' and relation.relkind = 'r'
     `);
-    assert.deepEqual(rlsCoverage.rows[0], { total: 30, rls: 30 });
+    assert.deepEqual(rlsCoverage.rows[0], { total: 31, rls: 31 });
     const elevatedFunctions = await db.query(`
       select procedure.proname, procedure.proconfig
       from pg_proc as procedure
@@ -97,8 +97,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       where procedure.prosecdef
         and namespace.nspname in ('public', 'private')
     `);
-    // 0030 adds reveal_listing_phone; 0031 adds five elevated account guards/RPCs.
-    assert.equal(elevatedFunctions.rows.length, 35);
+    // Reviewed elevated inventory through 0040, including promotion and moderation RPCs.
+    assert.equal(elevatedFunctions.rows.length, 66);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select
@@ -673,7 +673,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
         (select count(*) from public.category_attributes where is_active)::int as attributes,
         (select count(*) from public.category_attribute_options where is_active)::int as options
     `);
-    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 14345, options: 116412 });
+    assert.deepEqual(repeatedReferenceCounts.rows[0], { attributes: 15784, options: 172849 });
 
     const repeatedSecurityBoundary = await db.query(`
       select

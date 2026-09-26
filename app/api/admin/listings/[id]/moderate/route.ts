@@ -11,7 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const bodySchema = z.object({
-  decision: z.enum(["approve", "reject"]),
+  decision: z.enum(["approve", "reject", "needs_fix"]),
   reasonCode: z.string().trim().max(64).nullable().optional(),
   note: z.string().trim().max(MODERATION_NOTE_MAX_LENGTH).nullable().optional(),
 }).strict();
@@ -66,10 +66,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "invalid_moderation_input" }, { status: 400 });
-  if (parsed.data.decision === "reject" && !isModerationRejectionReason(parsed.data.reasonCode)) {
+  if (parsed.data.decision !== "approve" && !isModerationRejectionReason(parsed.data.reasonCode)) {
     return NextResponse.json({ error: "rejection_reason_required" }, { status: 422 });
   }
-  const reasonCode = parsed.data.decision === "reject" && isModerationRejectionReason(parsed.data.reasonCode)
+  const reasonCode = parsed.data.decision !== "approve" && isModerationRejectionReason(parsed.data.reasonCode)
     ? parsed.data.reasonCode
     : undefined;
 

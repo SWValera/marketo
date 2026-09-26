@@ -4,6 +4,7 @@ import { createSitesEnvironment, projectRoot, reportFailure, runNodeScript, runP
 import { pgliteRunScopes } from "./lib/test-plan.mjs";
 
 const PGLITE_TEST_NAMES = new Set([
+  "moderation-db.test.mjs",
   "premium-commercial-security.test.mjs",
   "supabase-migrations.test.mjs",
   "supabase-security.test.mjs",

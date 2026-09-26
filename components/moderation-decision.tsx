@@ -10,7 +10,7 @@ import {
   type ModerationRejectionReason,
 } from "@/lib/moderation/policy";
 
-type Submission = "approve" | "reject" | null;
+type Submission = "approve" | "reject" | "needs_fix" | null;
 
 export function ModerationDecision({ listingId }: { listingId: string }) {
   const router = useRouter();
@@ -22,7 +22,8 @@ export function ModerationDecision({ listingId }: { listingId: string }) {
 
   async function decide(decision: Exclude<Submission, null>) {
     if (submitting) return;
-    if (decision === "reject" && !reasonCode) {
+    if (!note.trim()) { setFeedback(locale === "kk" ? "Шешім себебін жазыңыз." : "Укажите причину решения."); return; }
+    if (decision !== "approve" && !reasonCode) {
       setFeedback(t("admin.reasonRequired"));
       return;
     }
@@ -34,7 +35,7 @@ export function ModerationDecision({ listingId }: { listingId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           decision,
-          reasonCode: decision === "reject" ? reasonCode : null,
+          reasonCode: decision !== "approve" ? reasonCode : null,
           note: note.trim() || null,
         }),
       });
@@ -97,6 +98,7 @@ export function ModerationDecision({ listingId }: { listingId: string }) {
     <button className="reject-action" type="button" disabled={Boolean(submitting)} onClick={() => void decide("reject")}>
       <X size={18} /> {submitting === "reject" ? t("admin.submitting") : t("admin.reject")}
     </button>
+    <button type="button" className="secondary-button" disabled={Boolean(submitting)} onClick={() => void decide("needs_fix")}>{locale === "kk" ? "Түзетуге қайтару" : "Вернуть на исправление"}</button>
     {feedback ? <p className="inline-feedback" role="status" aria-live="polite">{feedback}</p> : null}
   </aside>;
 }

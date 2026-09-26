@@ -235,7 +235,7 @@ export async function getModerationListingDetail(
 ): Promise<ModerationListingDetail | null> {
   try {
     const row = await getListingDetail(client, listingId);
-    if (!row || row.status !== "pending") return null;
+    if (!row || !["pending","rejected","active","archived"].includes(row.status)) return null;
     const category = singleRelation<{ id: string; parent_id: string | null; name_ru: string; name_kk: string }>(row.categories);
     const settlement = singleRelation<{ name_ru: string; name_kk: string }>(row.settlements);
     if (!category || !settlement) throw new ModerationDataError("DETAIL_UNAVAILABLE");
@@ -260,7 +260,7 @@ export async function getModerationListingDetail(
       createdLabel: dateLabel(row.created_at, locale),
       sellerId: row.owner_id,
       sellerName: seller?.display_name ?? (locale === "kk" ? "Сатушы" : "Продавец"),
-      status: "pending",
+      status: row.status as ModerationListingDetail["status"],
       attributes: mapModerationAttributes(attributes, locale),
       images,
     };
@@ -280,7 +280,7 @@ export async function moderateListing(
   const { error } = await client.rpc("moderate_listing", {
     target_listing_id: listingId,
     decision,
-    reason_code: decision === "reject" ? reasonCode ?? null : null,
+    reason_code: decision !== "approve" ? reasonCode ?? null : null,
     note: note?.trim() || null,
   });
   if (error) throw error;
@@ -290,13 +290,10 @@ export async function createReport(
   client: JevuSupabaseClient,
   input: { reporterId: string; listingId?: string; reportedUserId?: string; reasonCode: string; details?: string },
 ) {
-  const { data, error } = await client.from("reports").insert({
-    reporter_id: input.reporterId,
-    listing_id: input.listingId ?? null,
-    reported_user_id: input.reportedUserId ?? null,
-    reason_code: input.reasonCode,
-    details: input.details ?? null,
-  }).select("*").single();
+  if (!input.listingId) throw new Error("listing_report_required");
+  const { data, error } = await client.rpc("report_listing", {
+    target_listing_id: input.listingId, reason: input.reasonCode, details: input.details ?? null,
+  });
   if (error) throw error;
   return data;
 }

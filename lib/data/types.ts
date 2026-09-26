@@ -181,9 +181,9 @@ export type ModerationListingDetail = {
   createdLabel: string;
   sellerId: string | null;
   sellerName: string;
-  status: "pending";
+  status: "pending" | "rejected" | "active" | "archived";
   attributes: ModerationAttribute[];
   images: Array<{ id: string; url: string; sortOrder: number }>;
 };
 
-export type ModerationDecision = "approve" | "reject";
+export type ModerationDecision = "approve" | "reject" | "needs_fix";

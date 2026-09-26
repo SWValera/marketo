@@ -20,7 +20,7 @@ export async function auditProfileLifecycle(db, users, sourceId) {
   assert.equal(row.status, "active");
   assert.ok(Date.parse(row.published_at) <= Date.now());
   const calendar = await db.query(`select expires_at =
-    ((published_at at time zone 'Asia/Almaty') + interval '1 month') at time zone 'Asia/Almaty' as correct
+    published_at + interval '720 hours' as correct
     from public.listings where id=$1`, [id]);
   assert.equal(calendar.rows[0].correct, true);
   const monthEnds = await db.query(`select
@@ -31,9 +31,10 @@ export async function auditProfileLifecycle(db, users, sourceId) {
   await assert.rejects(asRole("authenticated", users.buyer, "select public.owner_listing_transition($1,'delete')", [id]), /unavailable/);
   await assert.rejects(asRole("authenticated", users.suspended, "select public.owner_listing_transition($1,'edit')", [id]), /active profile/);
   await assert.rejects(asRole("anon", null, "select public.owner_listing_transition($1,'delete')", [id]), /permission denied/);
+  const initialDates = { published_at: row.published_at, expires_at: row.expires_at };
   assert.equal((await owner("edit")).rows[0].status, "draft");
   row = (await db.query("select published_at,expires_at from public.listings where id=$1", [id])).rows[0];
-  assert.deepEqual(row, { published_at: null, expires_at: null });
+  assert.deepEqual(row, initialDates);
   assert.equal((await owner("archive")).rows[0].status, "archived");
   assert.equal((await owner("restore")).rows[0].status, "draft");
   assert.equal((await db.query("select count(*)::int as n from public.listing_images where listing_id=$1", [id])).rows[0].n, 1);

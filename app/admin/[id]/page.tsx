@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- Pending media must keep the moderator session and private cache policy. */
+import { ModerationAudit } from "@/components/moderation-audit";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ImageOff } from "lucide-react";
@@ -67,7 +68,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
 
   return <DashboardShell
     title={item.title}
-    description={t("admin.statusCreated", { status: t("admin.pending"), date: item.createdLabel })}
+    description={t("admin.statusCreated", { status: item.status === "pending" ? t("admin.pending") : item.status, date: item.createdLabel })}
     active="/admin"
     authContext={authContext}
     fallback="/admin"
@@ -87,7 +88,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
         </section>
         <dl>
           <div><dt>{t("admin.listingId")}</dt><dd>{item.id}</dd></div>
-          <div><dt>{t("admin.status")}</dt><dd>{t("admin.pending")}</dd></div>
+          <div><dt>{t("admin.status")}</dt><dd>{item.status === "pending" ? t("admin.pending") : item.status}</dd></div>
           <div><dt>{t("admin.price")}</dt><dd>{item.priceLabel}</dd></div>
           <div><dt>{t("admin.category")}</dt><dd>{item.categoryPath.join(" → ")}</dd></div>
           <div><dt>{t("admin.city")}</dt><dd>{item.cityLabel}</dd></div>
@@ -102,7 +103,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
           </dl> : <p className="moderation-empty-inline">{t("admin.noAttributes")}</p>}
         </section>
       </section>
-      <ModerationDecision listingId={item.id} />
+      <div>{item.status === "pending" ? <ModerationDecision listingId={item.id} /> : null}<ModerationAudit listingId={item.id} locale={locale} /></div>
     </div>
   </DashboardShell>;
 }

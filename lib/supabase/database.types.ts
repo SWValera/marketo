@@ -121,6 +121,17 @@ export type Database = {
       };
     };
     Functions: {
+      count_moderation_image_reuse: { Args: {target_listing_id:string;hashes:string[]}; Returns: number };
+      claim_moderation_job: { Args: Record<string, never>; Returns: Json };
+      finish_moderation_job: { Args: {job_id:string;token:string;result:Json}; Returns: string };
+      fail_moderation_job: { Args: {job_id:string;token:string}; Returns: undefined };
+      get_listing_moderation: { Args: {target_listing_id:string;staff_view?:boolean}; Returns: Json };
+      appeal_listing_moderation: { Args: {target_run:string;message:string}; Returns: string };
+      resolve_moderation_appeal: { Args: {target_appeal:string;resolution:string;reason:string}; Returns: undefined };
+      report_listing: { Args: {target_listing_id:string;reason:string;details?:string|null}; Returns: string };
+      moderation_admin: { Args: {operation:string;payload?:Json}; Returns: Json };
+      get_seller_verification: { Args: Record<string, never>; Returns: Json };
+      seller_phone_challenge: { Args: {operation:string;payload:Json}; Returns: Json };
       get_listing_promotion_state: { Args: { target_listing_id: string }; Returns: Json };
       set_listing_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };
       submit_listing_with_promotion_choice: { Args: { target_listing_id: string; promotion_choice: string | null }; Returns: undefined };

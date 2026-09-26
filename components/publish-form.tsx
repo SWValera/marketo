@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
+import { ModerationStatus } from "./moderation-status";
 
 import { PromotionChooser, PromotionSubmitActions } from "@/components/promotion-chooser";
 import type { PromotionChoice } from "@/lib/publish/promotion-choice";
@@ -679,6 +680,7 @@ export function PublishForm({
           <span><Check size={30} /></span>
           <h2>{t("publish.savedTitle")}</h2>
           <p>{t("publish.savedNote")}</p>
+          {listingId ? <ModerationStatus listingId={listingId} /> : null}
           <div className="publish-summary">{summary.map((item) => <span key={item}>{item}</span>)}</div>
           <button type="button" onClick={reset}>{t("publish.createAnother")}</button>
         </div>
