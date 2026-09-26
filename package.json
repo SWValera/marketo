@@ -24,7 +24,9 @@
     "category:coverage": "node scripts/run-with-sites-env.mjs --node scripts/generate-category-coverage.mjs",
     "db:checksums": "node scripts/run-with-sites-env.mjs --node scripts/generate-supabase-checksums.mjs",
     "db:export": "node scripts/run-with-sites-env.mjs --bin drizzle-kit export",
-    "db:generate": "node scripts/run-with-sites-env.mjs --bin drizzle-kit export"
+    "db:generate": "node scripts/run-with-sites-env.mjs --bin drizzle-kit export",
+    "moderation:benchmark": "node scripts/moderation-benchmark.mjs",
+    "moderation:benchmark:validate": "node tests/moderation/benchmark/validate.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

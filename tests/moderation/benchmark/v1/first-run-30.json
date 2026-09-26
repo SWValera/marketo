@@ -1,0 +1,8 @@
+{
+  "benchmark_version": "moderation-benchmark-v1",
+  "selection": "Frozen before real calls; decision/language/difficulty strata plus risk-feature coverage; not the first 30 IDs.",
+  "expected_distribution": {"APPROVE":13,"NEEDS_FIX":5,"REJECT":6,"HUMAN_REVIEW":6},
+  "language_distribution": {"RU":15,"KK":9,"MIXED_RU_KK":6},
+  "difficulty_distribution": {"EASY":10,"MEDIUM":12,"HARD":8},
+  "ids": ["BENCH-0001","BENCH-0002","BENCH-0003","BENCH-0005","BENCH-0036","BENCH-0059","BENCH-0066","BENCH-0067","BENCH-0087","BENCH-0100","BENCH-0105","BENCH-0119","BENCH-0128","BENCH-0131","BENCH-0142","BENCH-0146","BENCH-0161","BENCH-0180","BENCH-0181","BENCH-0196","BENCH-0207","BENCH-0215","BENCH-0228","BENCH-0229","BENCH-0241","BENCH-0242","BENCH-0251","BENCH-0258","BENCH-0269","BENCH-0288"]
+}

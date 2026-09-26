@@ -1,0 +1,432 @@
+{
+  "version": "moderation-benchmark-v1",
+  "origin": "programmatic synthetic vectors; no real photographs",
+  "fixtures": {
+    "car": {
+      "file": "images/car.jpg",
+      "sha256": "46afd526a95277da84efb996d48c143726cc0eb5c63211fc24d10a8facc393b3",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "car-resized": {
+      "file": "images/car-resized.jpg",
+      "sha256": "0cc6aa603d07c72d6d52c9c07d081ef9d40e9483d9451b7df1cadcffe6d3b727",
+      "width": 450,
+      "height": 285,
+      "kind": "duplicate_variant",
+      "reference": "car",
+      "transform": "resize"
+    },
+    "car-bright": {
+      "file": "images/car-bright.jpg",
+      "sha256": "8c0b25a999cf41c35fc3e82539622c8031cdfb2a19261eb3eb3c493de8bca441",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "car",
+      "transform": "brightness"
+    },
+    "car-compressed": {
+      "file": "images/car-compressed.jpg",
+      "sha256": "786521033af01588dcf6fcfaf83ff0a7400fa93d41aa1ba79697878af14f2828",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "car",
+      "transform": "compression"
+    },
+    "phone": {
+      "file": "images/phone.jpg",
+      "sha256": "36b3f4c1c73bc34f1ff4785b2cbb417fe555d5414f53159e8436523b0aff88a4",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "phone-resized": {
+      "file": "images/phone-resized.jpg",
+      "sha256": "c08e7b4a1379896351350109c12a709b753294a445ef5f0c070209d8fa4881c5",
+      "width": 450,
+      "height": 285,
+      "kind": "duplicate_variant",
+      "reference": "phone",
+      "transform": "resize"
+    },
+    "phone-bright": {
+      "file": "images/phone-bright.jpg",
+      "sha256": "86fb44f31562e0569eb8137799a953eb8e27f1808355a5ea4004d10c6087e9fe",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "phone",
+      "transform": "brightness"
+    },
+    "phone-compressed": {
+      "file": "images/phone-compressed.jpg",
+      "sha256": "dd9b564cb9ed7f214c4764aae00ce7d5f0b66634d084eaef7dd7ae01f118200e",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "phone",
+      "transform": "compression"
+    },
+    "laptop": {
+      "file": "images/laptop.jpg",
+      "sha256": "0179cb0dfac6f9cd84097e95f03a29a28c409b8609251d08093e9a47a7620986",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "laptop-resized": {
+      "file": "images/laptop-resized.jpg",
+      "sha256": "c7b88781f94b507a41d18324e5e4a2304655261badd99f47bd9f7d251fd319a5",
+      "width": 450,
+      "height": 285,
+      "kind": "duplicate_variant",
+      "reference": "laptop",
+      "transform": "resize"
+    },
+    "laptop-bright": {
+      "file": "images/laptop-bright.jpg",
+      "sha256": "1b4ca4478ae8cedbff9ee78d73b15d3fd662d8d0bf1346233b4fba75b77c8836",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "laptop",
+      "transform": "brightness"
+    },
+    "laptop-compressed": {
+      "file": "images/laptop-compressed.jpg",
+      "sha256": "2a7068d40831b23b48396385c36cb6966170c62f485c443175e41dc8fb1c2f0f",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "laptop",
+      "transform": "compression"
+    },
+    "sofa": {
+      "file": "images/sofa.jpg",
+      "sha256": "76df999f244e2122414f241a722502c5428f3dae9d8fda480ecf0b841ac26154",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "sofa-resized": {
+      "file": "images/sofa-resized.jpg",
+      "sha256": "915ff947b5f9ae84ffa8f30365f308eed9c2623a91f79b69df850fcf17777734",
+      "width": 450,
+      "height": 285,
+      "kind": "duplicate_variant",
+      "reference": "sofa",
+      "transform": "resize"
+    },
+    "sofa-bright": {
+      "file": "images/sofa-bright.jpg",
+      "sha256": "4ffad78c89c50dad0fdc738c2d12aa697dd5ba1abca3107f3e3d219ab9fb65cf",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "sofa",
+      "transform": "brightness"
+    },
+    "sofa-compressed": {
+      "file": "images/sofa-compressed.jpg",
+      "sha256": "5b94f74eeb70913bdcb6be44df01827b82119120a9be3c7ae5c72bb500dbe4f5",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "sofa",
+      "transform": "compression"
+    },
+    "tv": {
+      "file": "images/tv.jpg",
+      "sha256": "d79c02a83d20ee88d4db055089557a9ca356c56b3116ab8d32fdd49d2b433b57",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "tv-resized": {
+      "file": "images/tv-resized.jpg",
+      "sha256": "2a16aad9705fc8076b07eac4f43535c8e8df7715cb08ab328281552a308578c3",
+      "width": 450,
+      "height": 285,
+      "kind": "duplicate_variant",
+      "reference": "tv",
+      "transform": "resize"
+    },
+    "tv-bright": {
+      "file": "images/tv-bright.jpg",
+      "sha256": "48fdb89ddabc6433aeca47c0bcfc0127cceeee8d6daa7470d4edafbbb256df97",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "tv",
+      "transform": "brightness"
+    },
+    "tv-compressed": {
+      "file": "images/tv-compressed.jpg",
+      "sha256": "0f98fc686bd95aeafd331d7bd32a7d66325c0adea0f34e1d1bc81661d0eaf22f",
+      "width": 600,
+      "height": 380,
+      "kind": "duplicate_variant",
+      "reference": "tv",
+      "transform": "compression"
+    },
+    "washer": {
+      "file": "images/washer.jpg",
+      "sha256": "b1b0225f47394874c7f9aa2d1ec8a9734081a943db1953968c67bb05ab1c193a",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "house": {
+      "file": "images/house.jpg",
+      "sha256": "b75c3aac0f251bbd714486fa2ed0f928d37217a80fb42d82c7dd12950bdc600e",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "package": {
+      "file": "images/package.jpg",
+      "sha256": "f22b075b31f843806c7be4e9b1f39d837aa7d8652615c1c076fe12bab5ca0ac3",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "book": {
+      "file": "images/book.jpg",
+      "sha256": "7860faa9d116cf979e838ca146b09ab4e2054ca58fc722ea9cb67a9771501a91",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "toy": {
+      "file": "images/toy.jpg",
+      "sha256": "d98d747e552acf1bb58ef06546153fc6ed593270408eb47ca91326307aad6aa7",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "tools": {
+      "file": "images/tools.jpg",
+      "sha256": "44269981e44e616e98292aa0baddc07645885a0fd66bc47350ae2ae1a8c9367f",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "shoes": {
+      "file": "images/shoes.jpg",
+      "sha256": "e6b7cad15ac8e1c6063371477d75a86aeb1152d953d2635515a09d77627afc5d",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "jacket": {
+      "file": "images/jacket.jpg",
+      "sha256": "fbe2bbd634f1400f1739fa85a9f075d1adff5a6a019f3d8e2665fd0e70cf850e",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "stroller": {
+      "file": "images/stroller.jpg",
+      "sha256": "97e301d238f0d178b9568abaa602ef6a4f38f0b34767453c0264d7d50e2bdc1e",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "wheel": {
+      "file": "images/wheel.jpg",
+      "sha256": "0927f5c05f159214679b291a5323f4bdbb0d6177717fafa994dcd5855af0823c",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "lamp": {
+      "file": "images/lamp.jpg",
+      "sha256": "037c1567499772db442697863f3a39bfbb72646bb5bef99dbc9375eb223dc7dc",
+      "width": 600,
+      "height": 380,
+      "kind": "object"
+    },
+    "ocr-card": {
+      "file": "images/ocr-card.jpg",
+      "sha256": "faa3d11d3a106b02be0c243a093448f6f4f39e608ca576842e29674c14a4f084",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-card-rotated": {
+      "file": "images/ocr-card-rotated.jpg",
+      "sha256": "9df278ebcf40e19409ef11ab7dcf2b6d5a710208f28c887ceb82faa78b8e4111",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "rotation"
+    },
+    "ocr-card-small": {
+      "file": "images/ocr-card-small.jpg",
+      "sha256": "d9fae4b5c2a9a9026e6578ea1ce69c6a3d23994c4dd831005cd15cc6039a3dfb",
+      "width": 360,
+      "height": 228,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "small_text"
+    },
+    "ocr-document": {
+      "file": "images/ocr-document.jpg",
+      "sha256": "f8997477420d7093683c37837b57bbfcf184a4a9d3a38f3c9825661b7f158f42",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-document-rotated": {
+      "file": "images/ocr-document-rotated.jpg",
+      "sha256": "73641a3215651d1d7139701e2353bdec9c9e54718dc33f0bcc2e3f05d72e8a8f",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "rotation"
+    },
+    "ocr-document-small": {
+      "file": "images/ocr-document-small.jpg",
+      "sha256": "2b7a29d75bc24958056e2913df86f3fc9e4667dea97b287c48f7eb0dea3c0db9",
+      "width": 360,
+      "height": 228,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "small_text"
+    },
+    "ocr-ru": {
+      "file": "images/ocr-ru.jpg",
+      "sha256": "b89a0bb27250ad105150eae77c096d4b701114117ce96d50469dd63ac4ff1b36",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-ru-rotated": {
+      "file": "images/ocr-ru-rotated.jpg",
+      "sha256": "5933e9631b1777272298cbe6d30906cd3009e53f9f5d45e9dccac1ad45610e4b",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "rotation"
+    },
+    "ocr-ru-small": {
+      "file": "images/ocr-ru-small.jpg",
+      "sha256": "9bfb9b700e87a52aa21501a4bf12e5660460aaf3f0c1329bde84852689dadfd7",
+      "width": 360,
+      "height": 228,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "small_text"
+    },
+    "ocr-kk": {
+      "file": "images/ocr-kk.jpg",
+      "sha256": "359d78bdb25dc56196fdc0a702ac27c3bcf8e13875a553e3c9dd0c2cf2009d6f",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-kk-rotated": {
+      "file": "images/ocr-kk-rotated.jpg",
+      "sha256": "2a1b42735ab17a86b7314a494aac17b3b4f99b05d24b176c5c5c85071c3591c7",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "rotation"
+    },
+    "ocr-kk-small": {
+      "file": "images/ocr-kk-small.jpg",
+      "sha256": "c42d14210b42df43eb049dcbbeefb3c1be059c115ddcac66f98df320c105c793",
+      "width": 360,
+      "height": 228,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "small_text"
+    },
+    "ocr-mixed": {
+      "file": "images/ocr-mixed.jpg",
+      "sha256": "7e0cf083e13ad81beeb2d2054eded2adb9d73d2c33af32c2b60c47a1258a6a76",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-mixed-rotated": {
+      "file": "images/ocr-mixed-rotated.jpg",
+      "sha256": "f8e086045817f12c79f81220fcd2962d9baafeba0b31ead931f108b959d2f11a",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "rotation"
+    },
+    "ocr-mixed-small": {
+      "file": "images/ocr-mixed-small.jpg",
+      "sha256": "ff22e373a97eb367a76c8a3b50aafdd815d196aa3e1bff01a5c1827a3af0e96e",
+      "width": 360,
+      "height": 228,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "small_text"
+    },
+    "ocr-safe": {
+      "file": "images/ocr-safe.jpg",
+      "sha256": "0600715b1c4c507e48045bbff307d4bc83f474dab3288d92e4edf5b15c9c019e",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "ocr-vape": {
+      "file": "images/ocr-vape.jpg",
+      "sha256": "89b510060635f88142977f26b68b30c4aac37c44ab312971b792429053fb82b7",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true
+    },
+    "package-unclear": {
+      "file": "images/package-unclear.jpg",
+      "sha256": "b0753ce0890240d0909b4df260ffa78651156e20e7ccc819d6c61501e06b7929",
+      "width": 600,
+      "height": 380,
+      "kind": "ambiguous",
+      "transform": "blur_and_low_resolution"
+    },
+    "toy-unclear": {
+      "file": "images/toy-unclear.jpg",
+      "sha256": "674dd39089147f9899106cb4cc8c384131ddf70177a323ae45e5d510a90c21e4",
+      "width": 600,
+      "height": 380,
+      "kind": "ambiguous",
+      "transform": "blur_and_low_resolution"
+    },
+    "car-unclear": {
+      "file": "images/car-unclear.jpg",
+      "sha256": "44abf04ae41e6f9ee852dab527ca5d002d6db4edf80005be52277bb8cd983bd2",
+      "width": 600,
+      "height": 380,
+      "kind": "ambiguous",
+      "transform": "blur_and_low_resolution"
+    },
+    "ocr-low-contrast": {
+      "file": "images/ocr-low-contrast.jpg",
+      "sha256": "d212e227efdc8ae3cea30080d88c59ab3524cc04d69717a89c8d733686f92eaa",
+      "width": 600,
+      "height": 380,
+      "kind": "ocr",
+      "synthetic_identifiers": true,
+      "transform": "low_contrast"
+    }
+  }
+}

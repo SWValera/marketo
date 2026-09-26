@@ -1,0 +1,25 @@
+{
+  "benchmark_version": "moderation-benchmark-v1",
+  "case_count": 300,
+  "label_origin": "SYNTHETIC_EXPECTED_NOT_HUMAN_REVIEWED",
+  "cases_sha256": "17c17356a777740f929a0612f48f7bf7000f37de751b3be57c5b0d37195dec64",
+  "decisions": {
+    "APPROVE": 130,
+    "NEEDS_FIX": 50,
+    "REJECT": 60,
+    "HUMAN_REVIEW": 60
+  },
+  "languages": {
+    "RU": 150,
+    "KK": 90,
+    "MIXED_RU_KK": 60
+  },
+  "difficulty": {
+    "EASY": 100,
+    "MEDIUM": 120,
+    "HARD": 80
+  },
+  "ruleset_version": "kz-policy-2026-09-26.1",
+  "created_date": "2026-09-26",
+  "production_ground_truth": false
+}
