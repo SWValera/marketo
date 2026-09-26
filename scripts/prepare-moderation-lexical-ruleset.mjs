@@ -1,12 +1,13 @@
 // Controlled configuration release, not a schema migration. No network here.
 import {mkdir,writeFile} from 'node:fs/promises';import {resolve} from 'node:path';import {fileURLToPath} from 'node:url';
-import {lexicalConfigs,LEXICAL_RULESET_VERSION as version,LEXICAL_BASE_VERSION as base} from '../lib/moderation/rulesets/lexical-v1.ts';
-export function lexicalReleaseSQL(operation,release){
+import {lexicalConfigs,LEXICAL_RULESET_VERSION,LEXICAL_BASE_VERSION} from '../lib/moderation/rulesets/lexical-v2.ts';
+export function lexicalReleaseSQL(operation,release,definition={configs:lexicalConfigs,version:LEXICAL_RULESET_VERSION,base:LEXICAL_BASE_VERSION}){
+ const {version,base}=definition;
  if(!['prepare','activate','rollback'].includes(operation)||!/^[-a-zA-Z0-9_.]{7,80}$/.test(release))throw Error('Explicit operation and release reference required');
- const config=JSON.stringify(lexicalConfigs),actor=JSON.stringify({actor_kind:'authorized_database_operator',executor:'Codex',release,base_version:base,version,scope:'Technical lexical matcher review; existing policy and legal classification unchanged'});
+ const config=JSON.stringify(definition.configs),actor=JSON.stringify({actor_kind:'authorized_database_operator',executor:'Codex',release,base_version:base,version,scope:'Technical lexical matcher review; existing policy and legal classification unchanged'});
  const audit=op=>`insert into public.admin_audit_log(actor_id,action,entity_type,entity_id,metadata) values(null,'moderation.rules_${op}','moderation_ruleset','${version}',$audit$${actor}$audit$::jsonb);`;
  const verify=`if (select count(*) from private.moderation_rules where ruleset_version='${version}')<>13 or exists(select 1 from private.moderation_rules r full join jsonb_each(configs) j on r.code=j.key where r.ruleset_version='${version}' and r.config->'lexical' is distinct from j.value) then raise exception 'lexical config verification failed';end if;
- if exists(select 1 from private.moderation_rules n join private.moderation_rules b on b.code=n.code and b.ruleset_version='${base}' where n.ruleset_version='${version}' and ((n.config-'lexical') is distinct from b.config or (to_jsonb(n)-array['id','created_at','updated_at','ruleset_version','config']) is distinct from (to_jsonb(b)-array['id','created_at','updated_at','ruleset_version','config']))) then raise exception 'policy metadata changed';end if;`;
+ if exists(select 1 from private.moderation_rules n join private.moderation_rules b on b.code=n.code and b.ruleset_version='${base}' where n.ruleset_version='${version}' and ((n.config-'lexical') is distinct from (b.config-'lexical') or (to_jsonb(n)-array['id','created_at','updated_at','ruleset_version','config']) is distinct from (to_jsonb(b)-array['id','created_at','updated_at','ruleset_version','config']))) then raise exception 'policy metadata changed';end if;`;
  let action;
  if(operation==='prepare')action=`
  if exists(select 1 from private.moderation_rulesets where version='${version}') then ${verify} return;end if;
@@ -35,5 +36,5 @@ export function lexicalReleaseSQL(operation,release){
  return `-- Authorized operator configuration release ${release}; no identity impersonation.\nbegin;\nset local lock_timeout='5s';\ndo $release$\ndeclare configs jsonb:=$configs$${config}$configs$::jsonb;\nbegin\nperform pg_advisory_xact_lock(400040);\nif (select auto_approve from private.moderation_settings) is distinct from false then raise exception 'auto approval must remain off';end if;\n${action}\nend;\n$release$;\ncommit;\nselect version,status from private.moderation_rulesets where version in ('${base}','${version}') order by version;\n`;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- const [operation,release]=process.argv.slice(2),sql=lexicalReleaseSQL(operation,release);await mkdir('artifacts/moderation-lexical-v1',{recursive:true});const path='artifacts/moderation-lexical-v1/'+operation+'.sql';await writeFile(path,sql,{mode:0o600});console.log(JSON.stringify({operation,path,bytes:Buffer.byteLength(sql),network_calls:0}));
+ const [operation,release]=process.argv.slice(2),sql=lexicalReleaseSQL(operation,release);await mkdir('artifacts/moderation-lexical-v2',{recursive:true});const path='artifacts/moderation-lexical-v2/'+operation+'.sql';await writeFile(path,sql,{mode:0o600});console.log(JSON.stringify({operation,path,bytes:Buffer.byteLength(sql),network_calls:0}));
 }

@@ -12,6 +12,7 @@ import {moderationDerivatives} from './image-derivatives';
 import {executeShadow} from './ai-execution';
 import {emptyShadow,enforceShadowDecision} from './shadow';
 import {semanticCallRequired} from './lexical';
+import {recordLexicalExecution,lexicalAIStateAfterShadow} from './lexical-execution';
 import {bounded} from './providers';
 import type {AIInput} from './ai-contract';
 import type {Json} from '../supabase/database.types';
@@ -31,7 +32,7 @@ export async function processModerationQueue(){
     const config=moderationAIConfig(env,job.created_at),loaded=new Map<string,Uint8Array>();
     // Preserve the deterministic engine. New provider-derived data is strictly
     // separate and cannot enter its findings or publication path.
-    const result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,lexicalAIAvailable:config.enabled&&config.eligible&&Boolean(config.key&&config.model),
+    const result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,lexicalAIState:env.MODERATION_EXTERNAL_AI_ENABLED!=='true'?'DISABLED':config.enabled&&config.eligible&&config.key&&config.model?'READY':'UNAVAILABLE',
       loadImage:async key=>{const object=await getListingMediaBucket().get(key);if(!object||object.size>4*1024*1024)throw new Error('image_unavailable');const bytes=new Uint8Array(await object.arrayBuffer());loaded.set(key,bytes);return bytes;}});
     let shadow=emptyShadow(!config.enabled?'disabled':!config.eligible?'not_eligible':!config.key||!config.model?'configuration_missing':'content_unavailable');
     const vision=config.enabled&&config.eligible&&Boolean(config.key&&config.model)&&semanticCallRequired(result.lexical,job.snapshot.images.length>0),derivatives:AIInput['images']=[];
@@ -63,9 +64,10 @@ export async function processModerationQueue(){
     if(reused.error)throw new Error('fraud_read_failed');
     if(reused.data>3){result.findings.push(finding('reused_images','HUMAN_REVIEW','fraud'));result.risk_score=Math.max(40,result.risk_score);if(result.decision!=='REJECTED')result.decision='HUMAN_REVIEW';}
     enforceShadowDecision(result);
+    if(result.lexical)recordLexicalExecution(result.lexical,result.stages,env.MODERATION_EXTERNAL_AI_ENABLED!=='true'?'DISABLED':!config.enabled?'UNAVAILABLE':lexicalAIStateAfterShadow(shadow.status));
     const finished=await client.rpc('finish_moderation_job',{job_id:job.id,token:job.claim_token,result:{...result,shadow} as unknown as Json});
     if(finished.error)throw new Error('moderation_finish_failed');
-    console.info(JSON.stringify({event:'moderation.completed',engine:ENGINE_VERSION,decision:finished.data,duration_ms:Date.now()-start,shadow_status:shadow.status,shadow_recommendation:shadow.recommendation,provider_error:result.error_code!==null,finding_codes:result.findings.map(f=>f.finding_code)}));
+    console.info(JSON.stringify({event:'moderation.completed',engine:ENGINE_VERSION,decision:finished.data,duration_ms:Date.now()-start,shadow_status:shadow.status,shadow_recommendation:shadow.recommendation,provider_error:lexicalAIStateAfterShadow(shadow.status)==='PROVIDER_ERROR',finding_codes:result.findings.map(f=>f.finding_code),...(result.lexical?{lexical_routing_decision:result.lexical.lexical_routing_decision,execution_decision:result.lexical.execution_decision,fallback_reason:result.lexical.fallback_reason,canonical_finding_families:result.lexical.canonical_finding_families}:{})}));
   }catch{
     await client.rpc('fail_moderation_job',{job_id:identity.id,token:identity.claim_token});
     console.warn(JSON.stringify({event:'moderation.system_error',engine:ENGINE_VERSION,duration_ms:Date.now()-start}));

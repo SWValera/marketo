@@ -1,6 +1,6 @@
 // Canonical authoring source for moderation_rules.config.lexical. Loaded by the
 // release/offline tools, not by React or the production matcher. No legal claims.
-import {lexicalConfigSchema,LEXICAL_VERSION,type LexicalConfig} from '../lexical-contract.ts';
+import {lexicalConfigSchema,type LexicalConfig} from '../lexical-contract.ts';
 import type {Rule} from '../contracts.ts';
 export const LEXICAL_RULESET_VERSION='kz-policy-2026-09-26.2';
 export const LEXICAL_BASE_VERSION='kz-policy-2026-09-26.1';
@@ -65,7 +65,7 @@ family('illegal_service',illegal,[],[
 // Existing review-only families remain review-only, with no new legal assertions.
 family('regulated',['лекарств*','дәрі дәрмек','алкогол*','ішімдік*','пестицид*','редкое животное'],[],[],[],true);
 family('adult_content',['порнограф*','порнография'],[]);
-export const lexicalConfigs=Object.fromEntries(Object.entries(patterns).map(([code,list])=>[code,lexicalConfigSchema.parse({version:LEXICAL_VERSION,ruleset_version:LEXICAL_RULESET_VERSION,rule_code:code,patterns:list})]));
+export const lexicalConfigs=Object.fromEntries(Object.entries(patterns).map(([code,list])=>[code,lexicalConfigSchema.parse({version:'jevu-lexical-1',ruleset_version:LEXICAL_RULESET_VERSION,rule_code:code,patterns:list})]));
 export function withLexicalRules<T extends Pick<Rule,'code'|'config'>>(rules:T[]){
  return rules.map(rule=>{const lexical=lexicalConfigs[rule.code];if(!lexical)throw Error('unknown_lexical_rule_code');return {...rule,ruleset_version:LEXICAL_RULESET_VERSION,config:{...rule.config,lexical}};});
 }

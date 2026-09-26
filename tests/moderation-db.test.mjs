@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile,readdir} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';import {pg_trgm} from '@electric-sql/pglite/contrib/pg_trgm';import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';
 import {lexicalReleaseSQL} from '../scripts/prepare-moderation-lexical-ruleset.mjs';
+import {lexicalConfigs as priorConfigs,LEXICAL_RULESET_VERSION as priorVersion,LEXICAL_BASE_VERSION as priorBase} from '../lib/moderation/rulesets/lexical-v1.ts';
+import {readLexicalAudit} from '../lib/moderation/lexical-execution.ts';
 import {moderate} from '../lib/moderation/engine.ts';
 import {UnavailableAIProvider,UnavailableOCRProvider} from '../lib/moderation/providers.ts';
 const owner='71000000-0000-4000-8000-000000000001',staff='72000000-0000-4000-8000-000000000002',buyer='73000000-0000-4000-8000-000000000003';
@@ -31,20 +33,26 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
  let id,job;
  await t.test('lexical config release is non-destructive, audited, private and uses unchanged publication gates',async()=>{
   const original=(await db.query("select jsonb_agg(to_jsonb(r) order by code) value from private.moderation_rules r")).rows[0].value;
+  const prior={configs:priorConfigs,version:priorVersion,base:priorBase};
+  await db.exec(lexicalReleaseSQL('prepare','previous-fixture',prior));await db.exec(lexicalReleaseSQL('activate','previous-fixture',prior));
   await db.exec(lexicalReleaseSQL('prepare','isolated-fixture'));
   assert.deepEqual((await db.query("select jsonb_agg(to_jsonb(r) order by code) value from private.moderation_rules r where ruleset_version='kz-policy-2026-09-26.1'")).rows[0].value,original);
   await assert.rejects(as(owner,"select public.moderation_admin('activate','{\"version\":\"kz-policy-2026-09-26.2\",\"reason\":\"forged\"}')"),/admin|required/);
   await db.exec(lexicalReleaseSQL('prepare','isolated-fixture')); // idempotent
   await db.exec(lexicalReleaseSQL('activate','isolated-fixture'));
   const jpeg=await readFile('tests/moderation/benchmark/v1/images/phone.jpg');
-  for(const [title,expected] of [['Обычный телефон','HUMAN_REVIEW'],['Продам вейп','REJECTED']]){
-   const listing=await make();await as(owner,'update public.listings set title=$2 where id=$1',[listing,title]);await submit(listing);const localJob=await claim();assert.equal(localJob.ruleset_version,'kz-policy-2026-09-26.2');
+  for(const [title,expected] of [['Обычный телефон','HUMAN_REVIEW'],['Продам вейп','REJECTED'],['Есть одноразка','HUMAN_REVIEW']]){
+   const listing=await make();await as(owner,'update public.listings set title=$2 where id=$1',[listing,title]);await submit(listing);const localJob=await claim();assert.equal(localJob.ruleset_version,'kz-policy-2026-09-26.3');
    const local=await moderate({snapshot:localJob.snapshot,rules:localJob.rules,fraud:localJob.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,loadImage:async()=>jpeg});
    assert.equal((await finish(localJob,local)).rows[0].result,expected);const listingState=(await db.query('select published_at,expires_at from public.listings where id=$1',[listing])).rows[0];assert.equal(listingState.published_at,null);assert.equal(listingState.expires_at,null);
-   const stored=(await db.query('select stages from private.moderation_runs where id=$1',[localJob.id])).rows[0].stages;assert.ok(stored.find(s=>s.code==='text').version.startsWith('jevu-lexical-1:'));
+   const stored=(await db.query('select stages from private.moderation_runs where id=$1',[localJob.id])).rows[0].stages;assert.ok(stored.find(s=>s.code==='text').version.startsWith('jevu-lexical-2:'));
+   const audit=readLexicalAudit(stored);assert.equal(audit.lexical_routing_decision,local.lexical.lexical_routing_decision);assert.equal(audit.execution_decision,local.lexical.execution_decision);
+   if(title==='Есть одноразка'){assert.equal(audit.lexical_routing_decision,'SEND_TO_AI');assert.equal(audit.execution_decision,'HUMAN_REVIEW');assert.equal(audit.fallback_reason,'AI_DISABLED');}
+   assert.ok(localJob.rules.every(r=>r.config.lexical.canonical_finding_family));
   }
-  assert.equal((await db.query("select count(*)::int n from public.admin_audit_log where entity_id='kz-policy-2026-09-26.2' and action like 'moderation.rules_%'")).rows[0].n,4);
+  assert.equal((await db.query("select count(*)::int n from public.admin_audit_log where entity_id='kz-policy-2026-09-26.3' and action like 'moderation.rules_%'")).rows[0].n,4);
   await db.exec(lexicalReleaseSQL('rollback','isolated-fixture'));
+  await db.exec(lexicalReleaseSQL('rollback','previous-fixture',prior));
  });
  await t.test('submit creates immutable revision and no browser can forge decision/rules',async()=>{
   id=await make();await submit(id);job=await claim();assert.equal(job.snapshot.title,'Ordinary furniture');assert.equal(job.content_revision_hash.length,64);

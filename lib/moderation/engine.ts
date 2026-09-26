@@ -4,6 +4,8 @@ import { bounded,ProviderUnavailable,type ModerationAIProvider,type ModerationOC
 import { sanitizeProcessedJpeg } from '../media/processed-jpeg.ts';
 import { validateListingImage } from '../media/image-validation.ts';
 import {compileLexicalRules,evaluateLexical} from './lexical.ts';
+import {recordLexicalExecution} from './lexical-execution.ts';
+import type {LexicalAIState} from './lexical-contract.ts';
 
 const review={ru:'Объявление требует дополнительной проверки.',kk:'Хабарландыру қосымша тексеруді қажет етеді.'};
 export function finding(code:string,action:Finding['recommended_action'],source:Finding['source_type']='system',index?:number):Finding{
@@ -43,13 +45,13 @@ export function decide(stages:Stage[],findings:Finding[],risk:number,imageCount=
   if(risk>=40)return 'HUMAN_REVIEW';
   return 'APPROVED';
 }
-export async function moderate(input:{snapshot:Snapshot;rules:Rule[];fraud:FraudSignals;ai:ModerationAIProvider;ocr:ModerationOCRProvider;loadImage:(key:string)=>Promise<Uint8Array>;allowExternal:boolean;timeoutMs?:number;lexicalAIAvailable?:boolean}):Promise<ModerationResult>{
+export async function moderate(input:{snapshot:Snapshot;rules:Rule[];fraud:FraudSignals;ai:ModerationAIProvider;ocr:ModerationOCRProvider;loadImage:(key:string)=>Promise<Uint8Array>;allowExternal:boolean;timeoutMs?:number;lexicalAIState?:LexicalAIState}):Promise<ModerationResult>{
   const {snapshot:s,ai,ocr}=input,stages:Stage[]=[],findings:Finding[]=[],images:ModerationResult['images']=[];
   const category=s.category_path.map(c=>`${c.slug} ${c.ru} ${c.kk}`).join(' / ');
   const rules=input.rules.filter(r=>r.enabled&&(r.applicable_categories.length===0||s.category_path.some(c=>r.applicable_categories.includes(c.slug))));
   const text=[s.title,s.description,...s.attributes.map(a=>JSON.stringify(a))].join('\n');
   const lexicalRules=rules.filter(r=>r.config.lexical&&(!r.scope||r.scope.includes('text')));
-  const lexical=lexicalRules.length?await evaluateLexical(text,compileLexicalRules(lexicalRules),{aiAvailable:input.lexicalAIAvailable??false}):undefined;
+  const lexical=lexicalRules.length?await evaluateLexical(text,compileLexicalRules(lexicalRules),{aiState:input.lexicalAIState??'DISABLED'}):undefined;
   if(lexical)for(const code of lexical.finding_codes){const rule=lexicalRules.find(r=>r.code===code)!;const hard=lexical.confirmed_rule_codes.includes(code);const f=finding(code,hard?'REJECTED':'HUMAN_REVIEW','text');
     if(hard){f.user_reason_ru='Размещение данного типа товара или услуги запрещено правилами JEVU.';f.user_reason_kk='JEVU ережелері бойынша тауардың немесе қызметтің осы түрін орналастыруға тыйым салынған.';}
     findings.push({...f,rule_id:rule.id,confidence:hard?1:0.6});}
@@ -57,7 +59,8 @@ export async function moderate(input:{snapshot:Snapshot;rules:Rule[];fraud:Fraud
   if(/(?:предоплат|аванс|алдын\s*ала|prepay).{0,70}(?:карт|сілтеме|ссылк|telegram|whatsapp)/iu.test(text))findings.push(finding('suspicious_payment','HUMAN_REVIEW','fraud'));
   const fraudRisk=Math.min(100,input.fraud.confirmed_reports*25+(input.fraud.recent_submissions>10?40:0)+(input.fraud.duplicate_content>0?40:0)+(input.fraud.reused_images>3?40:0)+(input.fraud.prior_rejections>=3?40:0));
   if(fraudRisk>=40)findings.push(finding('abuse_signals','HUMAN_REVIEW','fraud'));
-  stages.push({code:'rules',status:'PASS'},{code:'text',status:'PASS',...(lexical?{provider:'local_'+lexical.routing_decision.toLowerCase(),version:lexical.version+':'+lexical.normalized_text_hash}:{})},{code:'privacy',status:'PASS'},{code:'fraud',status:'PASS'});
+  stages.push({code:'rules',status:'PASS'},{code:'text',status:'PASS'},{code:'privacy',status:'PASS'},{code:'fraud',status:'PASS'});
+  if(lexical)recordLexicalExecution(lexical,stages,input.lexicalAIState??'DISABLED');
   if(!s.category_path.length){findings.push(finding('category_unavailable','HUMAN_REVIEW','category'));stages.push({code:'category',status:'ERROR'});}else stages.push({code:'category',status:'PASS'});
   // Coarse cross-category mismatch is a review signal, never a keyword rejection.
   if(/(?:phone|телефон)/iu.test(category)&&/(?:toyota\s*camry|тойота\s*камри|автомобил)/iu.test(s.title))findings.push(finding('category_mismatch','NEEDS_FIX','category'));
@@ -66,7 +69,7 @@ export async function moderate(input:{snapshot:Snapshot;rules:Rule[];fraud:Fraud
     try{if(!allowed(p,code))throw new ProviderUnavailable();await bounded(op,input.timeoutMs);stages.push({code,status:'PASS',provider:p.name,version:p.version});}
     catch(error){stages.push({code,status:error instanceof ProviderUnavailable?'UNAVAILABLE':'ERROR',provider:p.name,version:p.version});findings.push(finding(error instanceof ProviderUnavailable?'provider_unavailable':'provider_error','HUMAN_REVIEW'));}
   }
-  if(lexical?.routing_decision==='DETERMINISTIC_REJECT')stages.push({code:'ai_text',status:'UNAVAILABLE',provider:'local_hard_gate',version:lexical.version});
+  if(lexical&&['DETERMINISTIC_REJECT','HUMAN_REVIEW'].includes(lexical.lexical_routing_decision))stages.push({code:'ai_text',status:'UNAVAILABLE',provider:'local_route_gate',version:lexical.lexical_engine_version});
   else await analyze('ai_text',ai,async signal=>{const a=analysisSchema.parse(await ai.analyzeText({title:redactText(s.title),description:redactText(s.description),attributes:redactText(JSON.stringify(s.attributes)),category},signal));if(a.language==='other')throw new Error('unsupported_language');findings.push(...semanticFindings(a.observations,rules,'text'));});
   for(const [index,img] of s.images.entries()){
     let bytes:Uint8Array|undefined,mimeType='';

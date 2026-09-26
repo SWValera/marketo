@@ -1,12 +1,14 @@
 import type {Rule} from './contracts.ts';
 import {normalizeLexicalText,type LexicalToken} from './normalize.ts';
-import {LEXICAL_VERSION,lexicalConfigSchema,type LexicalResult,type LexicalConfig} from './lexical-contract.ts';
+import {LEXICAL_VERSION,lexicalConfigSchema,type LexicalResult,type LexicalConfig,type LexicalAIState} from './lexical-contract.ts';
+import {canonicalFindingFamily} from './finding-taxonomy.ts';
+import {resolveLexicalExecution} from './lexical-execution.ts';
 type Pattern=LexicalConfig['patterns'][number];
 type Occurrence={start:number;end:number;clause:number;parts?:Occurrence[]};
 type Term={key:string;words:string[];prefix:boolean};
 type CompiledPattern={pattern:Pattern;terms:string[];groups:string[][];regex?:RegExp};
 type CompiledRule={rule:Rule;patterns:CompiledPattern[]};
-export type CompiledLexical={rules:CompiledRule[];exact:Map<string,Term[]>;prefix:Map<string,Term[]>};
+export type CompiledLexical={rules:CompiledRule[];exact:Map<string,Term[]>;prefix:Map<string,Term[]>;ruleset_version:string};
 /** Compile each immutable job snapshot once; never issue word-by-word DB reads. */
 export function compileLexicalRules(rules:Rule[]):CompiledLexical{
  const exact=new Map<string,Term[]>(),prefix=new Map<string,Term[]>(),known=new Map<string,Term>();
@@ -21,7 +23,8 @@ export function compileLexicalRules(rules:Rule[]):CompiledLexical{
   if(config.rule_code!==rule.code||config.ruleset_version!==rule.ruleset_version)throw Error('lexical_ruleset_mismatch');
   compiled.push({rule,patterns:config.patterns.map(pattern=>({pattern,terms:(pattern.terms??[]).map(term),groups:(pattern.groups??[]).map(g=>g.map(term)),...(pattern.regex?{regex:new RegExp(pattern.regex,'u')}:{})}))});
  }
- return {rules:compiled,exact,prefix};
+ const versions=new Set(rules.filter(r=>r.config.lexical).map(r=>r.ruleset_version));if(versions.size>1)throw Error('mixed_lexical_rulesets');
+ return {rules:compiled,exact,prefix,ruleset_version:[...versions][0]??'none'};
 }
 function occurrences(tokens:LexicalToken[],compiled:CompiledLexical){
  const hits=new Map<string,Occurrence[]>();
@@ -52,38 +55,50 @@ function negated(tokens:LexicalToken[],o:Occurrence){
  return before.includes('не')||before.includes('нот')||after.includes('емес');
 }
 /** No raw text, excerpts, offsets or account data leave this function. */
-export async function evaluateLexical(text:string,compiled:CompiledLexical,{aiAvailable=true}:{aiAvailable?:boolean}={}):Promise<LexicalResult>{
+export async function evaluateLexical(text:string,compiled:CompiledLexical,{aiState='DISABLED'}:{aiState?:LexicalAIState}={}):Promise<LexicalResult>{
  const normalized=normalizeLexicalText(text),{tokens}=normalized,hits=occurrences(tokens,compiled);
- const hard=new Set<string>(),suspicious=new Set<string>(),exceptions=new Set<string>(),confirmed=new Set<string>(),review=new Set<string>(),benign=new Set<string>(),matched=new Set<string>(),reasons=new Set<string>();let obfuscated=false,transliterated=false;
- for(const {rule,patterns} of compiled.rules){
+ const hard=new Set<string>(),suspicious=new Set<string>(),exceptions=new Set<string>(),confirmed=new Set<string>(),review=new Set<string>(),direct=new Set<string>(),benign=new Set<string>(),matched=new Set<string>(),reasons=new Set<string>();let obfuscated=false,transliterated=false;
+ const prepared=compiled.rules.map(({rule,patterns})=>{
   const active=patterns.map(p=>({p,matches:matchPattern(p,hits,tokens)}));
   const exceptionMatches=active.filter(x=>x.p.pattern.level==='exception').flatMap(x=>x.matches.filter(o=>!negated(tokens,o)).map(o=>({o,p:x.p.pattern})));
+  return {rule,active,exceptionMatches};
+ });
+ const contains=(outer:Occurrence,inner:Occurrence)=>outer.clause===inner.clause&&outer.start<=inner.start&&outer.end>=inner.end;
+ const exceptionScope=(es:typeof prepared[number]['exceptionMatches'],o:Occurrence)=>es.filter(e=>e.p.anchor_scope==='contains'?contains(e.o,o):e.o.clause===o.clause&&Math.max(e.o.start-o.end,o.start-e.o.end,0)<=e.p.max_distance);
+ // Specific item+illegal-purpose+offer evidence may explain a general-family
+ // mention. Only the covered purpose span is contextualized, never the whole rule.
+ const contextual=prepared.flatMap(({rule,active,exceptionMatches})=>rule.legal_status==='JEVU_POLICY'&&rule.action==='REJECTED'?active.flatMap(({p,matches})=>p.pattern.contextualizes?matches.filter(o=>!exceptionScope(exceptionMatches,o).length&&!o.parts!.some(part=>negated(tokens,part))).map(o=>({rule_code:p.pattern.contextualizes!.rule_code,span:o.parts![p.pattern.contextualizes!.group_index]})):[]):[]);
+ for(const {rule,active,exceptionMatches} of prepared){
   let ruleRisk=false,ruleBenign=false;
   for(const {p,matches} of active.filter(x=>x.p.pattern.level!=='exception'))for(const occurrence of matches){
-   matched.add(rule.code);const scope=exceptionMatches.filter(e=>e.o.clause===occurrence.clause&&Math.max(e.o.start-occurrence.end,occurrence.start-e.o.end,0)<=e.p.max_distance);
+   matched.add(rule.code);const scope=exceptionScope(exceptionMatches,occurrence);
+   if(contextual.some(c=>c.rule_code===rule.code&&contains(c.span,occurrence))){reasons.add('contextual_purpose_mention');continue;}
    scope.forEach(e=>exceptions.add(e.p.code));
    const span=occurrence.parts??[occurrence];for(const part of span){obfuscated||=tokens.slice(part.start,part.end+1).some(t=>t.obfuscated);transliterated||=tokens.slice(part.start,part.end+1).some(t=>t.transliterated);}
    if(p.pattern.level==='hard'){
     hard.add(p.pattern.code);
-    if(scope.length||span.some(o=>negated(tokens,o))){ruleRisk=true;reasons.add('hard_context_conflict');}
+    if(scope.some(e=>e.p.effect==='benign'&&e.p.anchor_scope==='contains'&&span.every(o=>contains(e.o,o)))){ruleBenign=true;reasons.add('explicit_non_offer_context');}
+    else if(scope.length||span.some(o=>negated(tokens,o))){ruleRisk=true;reasons.add('hard_context_conflict');}
     else if(rule.legal_status==='JEVU_POLICY'&&rule.action==='REJECTED'&&rule.ruleset_version){confirmed.add(rule.code);reasons.add('confirmed_policy_offer');}
     else {ruleRisk=true;reasons.add('policy_review_required');}
    }else{
     suspicious.add(p.pattern.code);
-    if(scope.some(e=>e.p.effect==='benign')){ruleBenign=true;reasons.add('bounded_benign_context');}
+    if(p.pattern.routing==='HUMAN_REVIEW'){ruleRisk=true;direct.add(rule.code);reasons.add('accountable_human_review_required');}
+    else if(scope.some(e=>e.p.effect==='benign')){ruleBenign=true;reasons.add('bounded_benign_context');}
     else {ruleRisk=true;reasons.add('suspicious_lexical_context');}
    }
   }
   if(ruleRisk&&!confirmed.has(rule.code))review.add(rule.code);if(ruleBenign&&!ruleRisk&&!confirmed.has(rule.code))benign.add(rule.code);
  }
  obfuscated||=matched.size>0&&/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/.test(text);
- const routing=confirmed.size?'DETERMINISTIC_REJECT':review.size?(aiAvailable?'SEND_TO_AI':'HUMAN_REVIEW'):'NO_TEXT_RISK';
+ const routing=confirmed.size?'DETERMINISTIC_REJECT':direct.size?'HUMAN_REVIEW':review.size?'SEND_TO_AI':'NO_TEXT_RISK';
  if(routing==='NO_TEXT_RISK')reasons.add('no_text_risk_is_not_approval');
  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalized.normalized))),b=>b.toString(16).padStart(2,'0')).join('');
  const sorted=(set:Set<string>)=>[...set].sort();
- return {version:LEXICAL_VERSION,normalized_text_hash:hash,ruleset_versions:[...new Set(compiled.rules.map(r=>r.rule.ruleset_version))].sort(),matched_rule_codes:sorted(matched),matched_hard_patterns:sorted(hard),matched_suspicious_patterns:sorted(suspicious),matched_exception_patterns:sorted(exceptions),confirmed_rule_codes:sorted(confirmed),review_rule_codes:sorted(review),benign_rule_codes:sorted(benign),finding_codes:sorted(new Set([...confirmed,...review])),lexical_risk:confirmed.size?'high':review.size?'medium':benign.size?'low':'none',routing_decision:routing,reason_codes:sorted(reasons),obfuscation_detected:obfuscated,transliteration_detected:transliterated};
+ const codes=sorted(new Set([...confirmed,...review])),findings=codes.map(code=>({source_rule_code:code,canonical_finding_family:canonicalFindingFamily(code)}));
+ return {lexical_engine_version:LEXICAL_VERSION,normalized_text_hash:hash,ruleset_version:compiled.ruleset_version,matched_rule_codes:sorted(matched),matched_hard_patterns:sorted(hard),matched_suspicious_patterns:sorted(suspicious),matched_exception_patterns:sorted(exceptions),confirmed_rule_codes:sorted(confirmed),review_rule_codes:sorted(review),benign_rule_codes:sorted(benign),finding_codes:codes,findings,canonical_finding_families:[...new Set(findings.map(f=>f.canonical_finding_family))].sort(),lexical_risk:confirmed.size?'high':review.size?'medium':benign.size?'low':'none',lexical_routing_decision:routing,...resolveLexicalExecution(routing,aiState),reason_codes:sorted(reasons),obfuscation_detected:obfuscated,transliteration_detected:transliterated};
 }
 export function semanticCallRequired(local:LexicalResult|undefined,hasImages:boolean){
  // A local rejection needs no semantic call. Clean text never waives Vision/OCR.
- return local?.routing_decision!=='DETERMINISTIC_REJECT'&&(hasImages||local?.routing_decision!=='NO_TEXT_RISK');
+ return !['DETERMINISTIC_REJECT','HUMAN_REVIEW'].includes(local?.lexical_routing_decision??'')&&(hasImages||local?.lexical_routing_decision!=='NO_TEXT_RISK');
 }
