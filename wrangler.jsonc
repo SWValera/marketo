@@ -9,6 +9,10 @@
   "vars": {
     "MODERATION_FRAMEWORK_ENABLED": "true",
     "MODERATION_AI_ENABLED": "false",
+    "MODERATION_EXTERNAL_AI_ENABLED": "false",
+    "MODERATION_AI_MODEL": "gpt-5.6-luna",
+    "MODERATION_AI_SHADOW_MODE": "true",
+    "MODERATION_PERCEPTUAL_HASH_ENABLED": "true",
     "MODERATION_AI_PROVIDER": "unavailable",
     "MODERATION_OCR_PROVIDER": "unavailable",
     "MODERATION_SMS_ENABLED": "false",

@@ -122,6 +122,7 @@ export type Database = {
     };
     Functions: {
       count_moderation_image_reuse: { Args: {target_listing_id:string;hashes:string[]}; Returns: number };
+      moderation_shadow_job: { Args: {operation:string;job_id:string;token:string;payload?:Json}; Returns: Json };
       claim_moderation_job: { Args: Record<string, never>; Returns: Json };
       finish_moderation_job: { Args: {job_id:string;token:string;result:Json}; Returns: string };
       fail_moderation_job: { Args: {job_id:string;token:string}; Returns: undefined };

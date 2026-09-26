@@ -46,6 +46,7 @@ test('real promotion lifecycle, moderation, 30 days, scheduled bumps, queue, sec
   await db.exec((await readFile("supabase/migrations/0039_bump_execution_freshness.sql","utf8")).replaceAll("clock_timestamp()","public.fixture_clock()").replaceAll("statement_timestamp()","public.fixture_clock()"));
   await db.exec(await readFile("supabase/migrations/0040_automated_moderation.sql","utf8"));
   // The existing showcase reader predates 0038 and uses CURRENT_TIMESTAMP.
+  await db.exec(await readFile("supabase/migrations/0041_moderation_ai_shadow.sql","utf8"));
   // Give it the same isolated clock as lifecycle writes, without editing migrations.
   const reader=(await db.query("select pg_get_functiondef('public.get_city_premium_placements(uuid,integer)'::regprocedure) definition")).rows[0].definition;
   await db.exec(reader.replaceAll('CURRENT_TIMESTAMP','public.fixture_clock()').replaceAll('current_timestamp','public.fixture_clock()').replaceAll('statement_timestamp()','public.fixture_clock()'));

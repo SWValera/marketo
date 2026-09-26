@@ -184,3 +184,7 @@ No production fixtures or public listings are needed for these checks.
 The regression fixtures now reflect the already released 0032 catalog counts and
 conditional required attributes, and 0038's retained 720-hour publication dates.
 Only test expectations/fixtures changed; category data and lifecycle code did not.
+
+The optional OpenAI multimodal shadow extension (0041), current safe defaults,
+call budget, perceptual hashes and evaluation workflow are documented in
+[MODERATION_AI_SHADOW.md](MODERATION_AI_SHADOW.md). It cannot auto-publish.

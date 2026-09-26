@@ -38,7 +38,7 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
  await t.test('production defaults never auto-approve; missing required stages cannot approve',async()=>{
   assert.equal((await finish(job,result)).rows[0].result,'HUMAN_REVIEW');assert.equal((await db.query('select status from public.listings where id=$1',[id])).rows[0].status,'pending');
   assert.equal((await finish(job,result)).rows[0].result,'ignored');
-  await as(staff,"select public.moderation_admin('settings','{\"auto_approve\":true,\"reason\":\"isolated test\"}')");
+  await assert.rejects(as(staff,"select public.moderation_admin('settings','{\"auto_approve\":true,\"reason\":\"isolated test\"}')"),/automatic approval disabled/);
   const next=await make();await submit(next);const j=await claim();assert.equal((await finish(j,{...result,stages:[]})).rows[0].result,'HUMAN_REVIEW');
  });
  await t.test('manual override records actor/reason; edit reapproval and promotion preserve lifetime/hash',async()=>{
@@ -47,12 +47,12 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
   const before=(await db.query('select * from public.listings where id=$1',[id])).rows[0];
   const hash=(await db.query('select private.moderation_hash(private.moderation_content($1)) h',[id])).rows[0].h;
   await as(owner,"select public.set_listing_promotion_choice($1,'maximum')",[id]);assert.equal((await db.query('select private.moderation_hash(private.moderation_content($1)) h',[id])).rows[0].h,hash);
-  await as(owner,"select public.owner_listing_transition($1,'edit')",[id]);await as(owner,"update public.listings set title='Updated ordinary furniture' where id=$1",[id]);await submit(id);const j=await claim();assert.equal((await finish(j,result)).rows[0].result,'APPROVED');
+  await as(owner,"select public.owner_listing_transition($1,'edit')",[id]);await as(owner,"update public.listings set title='Updated ordinary furniture' where id=$1",[id]);await submit(id);const j=await claim();assert.equal((await finish(j,result)).rows[0].result,'HUMAN_REVIEW');await as(staff,"select public.moderate_listing($1,'approve',null,'Human reapproval in shadow mode')",[id]);
   assert.equal((await finish(j,result)).rows[0].result,'ignored');const after=(await db.query('select * from public.listings where id=$1',[id])).rows[0];assert.equal(+after.published_at,+before.published_at);assert.equal(+after.expires_at,+before.expires_at);assert.ok(after.vip_until);assert.ok(after.x2_until);
  });
  await t.test('late revision A cannot publish B',async()=>{
   const target=await make();await submit(target);const a=await claim();await as(owner,"select public.owner_listing_transition($1,'edit')",[target]);await as(owner,"update public.listings set title='Revised title B' where id=$1",[target]);await submit(target);
-  assert.equal((await finish(a,result)).rows[0].result,'stale');assert.equal((await db.query('select status from public.listings where id=$1',[target])).rows[0].status,'pending');const b=await claim();assert.notEqual(a.content_revision_hash,b.content_revision_hash);await finish(b,{...result,decision:'REJECTED'});
+  assert.equal((await finish(a,result)).rows[0].result,'stale');assert.equal((await db.query('select status from public.listings where id=$1',[target])).rows[0].status,'pending');const b=await claim();assert.notEqual(a.content_revision_hash,b.content_revision_hash);const rule=(await db.query("select id from private.moderation_rules where code='vape' and ruleset_version=$1",[b.ruleset_version])).rows[0].id;await finish(b,{...result,decision:'REJECTED',findings:[{rule_id:rule,finding_code:'vape',source_type:'text',confidence:1,recommended_action:'REJECTED',severity:'critical',evidence_summary:'vape',user_reason_ru:'JEVU policy',user_reason_kk:'JEVU ережесі'}]});
   const appeal=(await as(owner,'select public.appeal_listing_moderation($1,$2) id',[b.id,'Please review my ordinary furniture listing'])).rows[0].id;
   assert.equal((await as(owner,'select public.appeal_listing_moderation($1,$2) id',[b.id,'Please review my ordinary furniture listing'])).rows[0].id,appeal);
   await assert.rejects(as(owner,"select public.resolve_moderation_appeal($1,'upheld','Reason')",[appeal]),/staff/);await as(staff,"select public.resolve_moderation_appeal($1,'overturned','Human reviewed')",[appeal]);
@@ -110,6 +110,38 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
   assert.ok(!JSON.stringify(state).includes('claim_token'));assert.ok(!JSON.stringify(state).includes('rules_snapshot'));
   const q=(await as(staff,"select public.moderation_admin('queue') audit")).rows[0].audit;
   assert.ok(q.metrics.runs_total>0);assert.ok(q.appeal_count>0);assert.ok(q.override_count>0);
+ });
+ await t.test('shadow calls, budget, PII storage, private audit, human comparison, hashes and stale reservations',async()=>{
+  await db.query("delete from public.user_roles where user_id=$1 and role='moderator'",[buyer]);
+  const target=await make();await submit(target);const j=await claim();
+  const rpc=(operation,payload={})=>service('select public.moderation_shadow_job($1,$2,$3,$4) value',[operation,j.id,j.claim_token,payload]);
+  await assert.rejects(as(owner,"select public.moderation_shadow_job('reserve',$1,$2,'{}')",[j.id,j.claim_token]),/permission/);
+  assert.equal((await rpc('reserve',{model:'gpt-5.6-luna',eligible_since:'2099-01-01'})).rows[0].value,null);
+  await db.exec('update private.moderation_settings set shadow_daily_call_limit=0');
+  assert.equal((await rpc('reserve',{model:'gpt-5.6-luna',eligible_since:'2026-01-01'})).rows[0].value,null);
+  await db.exec('update private.moderation_settings set shadow_daily_call_limit=50');
+  for(let attempt=1;attempt<=2;attempt++){
+   assert.equal((await rpc('reserve',{model:'gpt-5.6-luna',eligible_since:'2026-01-01'})).rows[0].value,attempt);
+   const meta={attempt,status:attempt===1?'provider_rate_limit':'success',latency_ms:123,image_count:1,input_tokens:12,output_tokens:34,request_id:'req_fixture',raw_response:'TEST CARD 4242 4242 4242 4242',api_key:'synthetic-must-not-persist'};
+   assert.equal((await rpc('record',meta)).rows[0].value,true);assert.equal((await rpc('record',meta)).rows[0].value,false);
+  }
+  assert.equal((await rpc('reserve',{model:'gpt-5.6-luna',eligible_since:'2026-01-01'})).rows[0].value,null);
+  const shadow={schema_version:'moderation-ai-observation-v1',mode:'shadow',status:'success',recommendation:'SHADOW_APPROVE',findings:[{code:'document_visible',source:'image',image_index:0,confidence:.5,action:'SHADOW_HUMAN_REVIEW',rule_code:null,reason:'RAW PII 4242 4242 4242 4242'}],languages:['ru','kk'],uncertainty:.01,ocr_images:1,subjects:[{image_index:0,object_type:'phone',confidence:.99}],raw_response:'never store'};
+  assert.equal((await finish(j,{...result,shadow,images:[{...result.images[0],perceptual_hash:'0f0f0f0f0f0f0f0f',algorithm:'dhash64-v1'}]})).rows[0].result,'HUMAN_REVIEW');
+  const ownerState=(await as(owner,'select public.get_listing_moderation($1,true) value',[target])).rows[0].value;assert.ok(!JSON.stringify(ownerState).includes('shadow'));assert.ok(!JSON.stringify(ownerState).includes('gpt-5'));
+  await assert.rejects(as(buyer,'select public.get_listing_moderation($1,true)',[target]),/not authorized/);
+  const audit=(await as(staff,'select public.get_listing_moderation($1,true) value',[target])).rows[0].value;
+  assert.equal(audit.run.ai_calls.length,2);assert.equal(audit.run.ai_calls[1].input_tokens,12);assert.ok(!JSON.stringify(audit).includes('4242'));assert.ok(!JSON.stringify(audit).includes('synthetic-must'));assert.ok(!JSON.stringify(audit).includes('raw_response'));
+  assert.equal((await finish(j,result)).rows[0].result,'ignored');
+  await as(staff,"select public.moderate_listing($1,'approve',null,'Human agrees with shadow test')",[target]);
+  const metrics=(await as(staff,"select public.moderation_admin('queue') value")).rows[0].value.metrics;
+  assert.equal(metrics.ai_calls_total,2);assert.equal(metrics.ai_success,1);assert.equal(metrics.ai_human_agreement,1);assert.equal(metrics.total_evaluated,1);assert.equal(metrics.input_tokens,24);
+  const next=await make();await submit(next);const second=await claim();
+  const similar=(await service("select public.moderation_shadow_job('similar',$1,$2,$3) value",[second.id,second.claim_token,{sha256:'a'.repeat(64),perceptual_hash:'0f0f0f0f0f0f0f0e',algorithm:'dhash64-v1'}])).rows[0].value;assert.ok(similar.exact>=1);assert.ok(similar.perceptual>=1);
+  assert.equal((await finish(second,{...result,decision:'REJECTED',shadow:{...shadow,recommendation:'SHADOW_REJECT'}})).rows[0].result,'HUMAN_REVIEW');
+  const stale=await make();await submit(stale);const sj=await claim();await as(owner,"select public.owner_listing_transition($1,'edit')",[stale]);
+  assert.equal((await service("select public.moderation_shadow_job('reserve',$1,$2,$3) value",[sj.id,sj.claim_token,{model:'gpt-5.6-luna',eligible_since:'2026-01-01'}])).rows[0].value,null);
+  assert.equal((await finish(sj,{...result,shadow})).rows[0].result,'stale');
  });
  await t.test('existing account deletion erases listings with appeals and clears phone verification',async()=>{
   await db.query("update public.listing_images set storage_key='listings/'||$1::text||'/'||listing_id||'/'||id||'.jpg' where listing_id in (select id from public.listings where owner_id=$1::uuid)",[owner]);

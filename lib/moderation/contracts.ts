@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ENGINE_VERSION = 'jevu-moderation-1';
+export const ENGINE_VERSION = 'jevu-moderation-2';
 export const decisionSchema = z.enum(['APPROVED','NEEDS_FIX','REJECTED','HUMAN_REVIEW']);
 export type Decision = z.infer<typeof decisionSchema>;
 export const observationSchema = z.object({
@@ -35,4 +35,4 @@ export const snapshotSchema = z.object({
 });
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type FraudSignals = { recent_submissions:number; prior_rejections:number; confirmed_reports:number; duplicate_content:number; reused_images:number };
-export type ModerationResult = { decision:Decision; risk_score:number; findings:Finding[]; stages:Stage[]; images:{image_index:number; sha256:string|null; perceptual_hash:null; status:'PASS'|'ERROR'}[]; provider:string; provider_version:string; ocr_provider:string; ocr_version:string; error_code:string|null };
+export type ModerationResult = { decision:Decision; risk_score:number; findings:Finding[]; stages:Stage[]; images:{image_index:number; sha256:string|null; perceptual_hash:string|null;algorithm?:string; status:'PASS'|'ERROR'}[]; provider:string; provider_version:string; ocr_provider:string; ocr_version:string; error_code:string|null };

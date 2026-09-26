@@ -27,7 +27,7 @@ const worker = {
       || /\.(?:js|css|png|svg|webp|ico|webmanifest)$/.test(path)) {
       const response = await handler.fetch(request, env, ctx);
       if (request.method === "POST" && /^\/api\/listings\/[^/]+\/submit$/.test(path) && response.ok) {
-        ctx.waitUntil(safelyProcessModerationQueue());
+        ctx.waitUntil(safelyProcessModerationQueue(true));
       }
       return response;
     }

@@ -81,7 +81,7 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
   const db = await createDatabase();
   try {
     const names = await applyMigrations(db);
-    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:40},(_,index)=>String(index+1).padStart(4,'0')));
+    assert.deepEqual(names.map(name => name.slice(0,4)), Array.from({length:41},(_,index)=>String(index+1).padStart(4,'0')));
     const rlsCoverage = await db.query(`
       select count(*)::int as total,
              count(*) filter (where relation.relrowsecurity)::int as rls
@@ -97,8 +97,8 @@ test("all Supabase migrations and the reference seed run on a clean PostgreSQL-c
       where procedure.prosecdef
         and namespace.nspname in ('public', 'private')
     `);
-    // Reviewed elevated inventory through 0040, including promotion and moderation RPCs.
-    assert.equal(elevatedFunctions.rows.length, 66);
+    // Reviewed elevated inventory through 0041, including promotion and moderation RPCs.
+    assert.equal(elevatedFunctions.rows.length, 69);
     assert.ok(elevatedFunctions.rows.every((row) => row.proconfig?.includes('search_path=""')));
     const profileRpcPrivileges = await db.query(`
       select

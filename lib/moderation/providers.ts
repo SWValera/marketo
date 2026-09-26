@@ -1,4 +1,4 @@
-/** No vendor is installed/configured. Future adapters must return schema-validated observations, not decisions. */
+import type {AIInput,AICallResult} from './ai-contract.ts';
 export interface ModerationAIProvider {
   readonly name:string; readonly version:string;
   readonly locality:'KZ'|'external'|'unavailable';
@@ -6,6 +6,10 @@ export interface ModerationAIProvider {
   analyzeText(data:{title:string;description:string;attributes:string;category:string},signal:AbortSignal):Promise<unknown>;
   analyzeImage(data:{bytes:Uint8Array;mimeType:string;category:string;title:string},signal:AbortSignal):Promise<unknown>;
   healthCheck(signal:AbortSignal):Promise<boolean>;
+}
+/** Optional unified text/vision/OCR capability. Business rules stay outside adapters. */
+export interface MultimodalModerationProvider extends Pick<ModerationAIProvider,'name'|'version'|'locality'|'supportsRUandKK'|'healthCheck'> {
+  analyzeListing(input:AIInput,signal:AbortSignal):Promise<AICallResult>;
 }
 export interface ModerationOCRProvider {
   readonly name:string; readonly version:string; readonly locality:'KZ'|'external'|'unavailable'; readonly supportsRUandKK:boolean;

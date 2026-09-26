@@ -116,3 +116,12 @@ publication/promotion triggers remain authoritative. No historical migration,
 public listing lifetime or approved brand asset is rewritten. Automatic approval
 and SMS enforcement default off. See `docs/AUTOMATED_MODERATION.md` for deployment
 order, provider dependencies and rollback without deleting history.
+
+## 0041 — moderation AI shadow analysis
+
+`0041_moderation_ai_shadow.sql` follows 0040 without editing it. Adds internal
+shadow results and a two-call durable ledger on existing runs, a daily call
+budget and hard approval-off constraint, dHash columns and four band indexes.
+Adds one service-only RPC for reservations, sanitized metadata and bounded image
+similarity. Wraps completion/admin metrics while retaining revision/lease checks,
+manual publication and promotion/lifecycle primitives. No backfill or new table.
