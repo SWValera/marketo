@@ -1,5 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile,readdir} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';import {pg_trgm} from '@electric-sql/pglite/contrib/pg_trgm';import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';
+import {lexicalReleaseSQL} from '../scripts/prepare-moderation-lexical-ruleset.mjs';
+import {moderate} from '../lib/moderation/engine.ts';
+import {UnavailableAIProvider,UnavailableOCRProvider} from '../lib/moderation/providers.ts';
 const owner='71000000-0000-4000-8000-000000000001',staff='72000000-0000-4000-8000-000000000002',buyer='73000000-0000-4000-8000-000000000003';
 test('moderation migration, RLS, revision race, jobs, manual review, appeals and lifecycle',async t=>{
  const db=new PGlite({extensions:{pg_trgm,pgcrypto}});
@@ -26,6 +29,23 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
  const finish=(job,result)=>service('select public.finish_moderation_job($1,$2,$3) result',[job.id,job.claim_token,result]);
  const result={decision:'APPROVED',risk_score:0,findings:[],stages:['rules','text','privacy','fraud','category','ai_text','image_technical_0','image_semantic_0','ocr_0'].map(code=>({code,status:'PASS'})),images:[{image_index:0,sha256:'a'.repeat(64),status:'PASS',perceptual_hash:null}],provider:'fixture',provider_version:'1',ocr_provider:'fixture',ocr_version:'1',error_code:null};
  let id,job;
+ await t.test('lexical config release is non-destructive, audited, private and uses unchanged publication gates',async()=>{
+  const original=(await db.query("select jsonb_agg(to_jsonb(r) order by code) value from private.moderation_rules r")).rows[0].value;
+  await db.exec(lexicalReleaseSQL('prepare','isolated-fixture'));
+  assert.deepEqual((await db.query("select jsonb_agg(to_jsonb(r) order by code) value from private.moderation_rules r where ruleset_version='kz-policy-2026-09-26.1'")).rows[0].value,original);
+  await assert.rejects(as(owner,"select public.moderation_admin('activate','{\"version\":\"kz-policy-2026-09-26.2\",\"reason\":\"forged\"}')"),/admin|required/);
+  await db.exec(lexicalReleaseSQL('prepare','isolated-fixture')); // idempotent
+  await db.exec(lexicalReleaseSQL('activate','isolated-fixture'));
+  const jpeg=await readFile('tests/moderation/benchmark/v1/images/phone.jpg');
+  for(const [title,expected] of [['Обычный телефон','HUMAN_REVIEW'],['Продам вейп','REJECTED']]){
+   const listing=await make();await as(owner,'update public.listings set title=$2 where id=$1',[listing,title]);await submit(listing);const localJob=await claim();assert.equal(localJob.ruleset_version,'kz-policy-2026-09-26.2');
+   const local=await moderate({snapshot:localJob.snapshot,rules:localJob.rules,fraud:localJob.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,loadImage:async()=>jpeg});
+   assert.equal((await finish(localJob,local)).rows[0].result,expected);const listingState=(await db.query('select published_at,expires_at from public.listings where id=$1',[listing])).rows[0];assert.equal(listingState.published_at,null);assert.equal(listingState.expires_at,null);
+   const stored=(await db.query('select stages from private.moderation_runs where id=$1',[localJob.id])).rows[0].stages;assert.ok(stored.find(s=>s.code==='text').version.startsWith('jevu-lexical-1:'));
+  }
+  assert.equal((await db.query("select count(*)::int n from public.admin_audit_log where entity_id='kz-policy-2026-09-26.2' and action like 'moderation.rules_%'")).rows[0].n,4);
+  await db.exec(lexicalReleaseSQL('rollback','isolated-fixture'));
+ });
  await t.test('submit creates immutable revision and no browser can forge decision/rules',async()=>{
   id=await make();await submit(id);job=await claim();assert.equal(job.snapshot.title,'Ordinary furniture');assert.equal(job.content_revision_hash.length,64);
   for(const sql of ["update public.listings set status='active' where id=$1","update public.listings set published_at=now() where id=$1","select public.finish_moderation_job($1,$1,'{}')","select public.moderation_admin('settings','{\"auto_approve\":true}')","update private.moderation_runs set decision='APPROVED' where id=$1","update private.moderation_rules set enabled=false where id=$1"]){await assert.rejects(as(owner,sql,sql.includes('$1')?[id]:[]),/permission|admin|required|authorized/i)}

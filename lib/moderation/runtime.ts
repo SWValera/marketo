@@ -11,6 +11,7 @@ import {OpenAIModerationProvider} from './openai-provider';
 import {moderationDerivatives} from './image-derivatives';
 import {executeShadow} from './ai-execution';
 import {emptyShadow,enforceShadowDecision} from './shadow';
+import {semanticCallRequired} from './lexical';
 import {bounded} from './providers';
 import type {AIInput} from './ai-contract';
 import type {Json} from '../supabase/database.types';
@@ -30,10 +31,10 @@ export async function processModerationQueue(){
     const config=moderationAIConfig(env,job.created_at),loaded=new Map<string,Uint8Array>();
     // Preserve the deterministic engine. New provider-derived data is strictly
     // separate and cannot enter its findings or publication path.
-    const result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,
+    const result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,lexicalAIAvailable:config.enabled&&config.eligible&&Boolean(config.key&&config.model),
       loadImage:async key=>{const object=await getListingMediaBucket().get(key);if(!object||object.size>4*1024*1024)throw new Error('image_unavailable');const bytes=new Uint8Array(await object.arrayBuffer());loaded.set(key,bytes);return bytes;}});
     let shadow=emptyShadow(!config.enabled?'disabled':!config.eligible?'not_eligible':!config.key||!config.model?'configuration_missing':'content_unavailable');
-    const vision=config.enabled&&config.eligible&&Boolean(config.key&&config.model),derivatives:AIInput['images']=[];
+    const vision=config.enabled&&config.eligible&&Boolean(config.key&&config.model)&&semanticCallRequired(result.lexical,job.snapshot.images.length>0),derivatives:AIInput['images']=[];
     const shadowRPC=async(operation:string,payload:Json={})=>{const reply=await client.rpc('moderation_shadow_job',{operation,job_id:job.id,token:job.claim_token,payload});if(reply.error)throw new Error('shadow_storage_failed');return reply.data;};
     const duplicates:{image_index:number;exact:number;perceptual:number}[]=[];
     try{

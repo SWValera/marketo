@@ -188,3 +188,7 @@ Only test expectations/fixtures changed; category data and lifecycle code did no
 The optional OpenAI multimodal shadow extension (0041), current safe defaults,
 call budget, perceptual hashes and evaluation workflow are documented in
 [MODERATION_AI_SHADOW.md](MODERATION_AI_SHADOW.md). It cannot auto-publish.
+
+The versioned deterministic RU/KK lexical layer, contextual exceptions, offline
+benchmark and controlled ruleset release are documented in
+[MODERATION_LEXICAL.md](MODERATION_LEXICAL.md). NO_TEXT_RISK cannot auto-publish.

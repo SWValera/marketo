@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {lexicalConfigSchema,type LexicalResult} from './lexical-contract.ts';
 
 export const ENGINE_VERSION = 'jevu-moderation-2';
 export const decisionSchema = z.enum(['APPROVED','NEEDS_FIX','REJECTED','HUMAN_REVIEW']);
@@ -18,13 +19,14 @@ export type Analysis = z.infer<typeof analysisSchema>;
 export type Observation = z.infer<typeof observationSchema>;
 export type Stage = { code:string; status:'PASS'|'ERROR'|'UNAVAILABLE'; provider?:string; version?:string };
 export type Finding = { rule_id?:string; finding_code:string; source_type:'text'|'image'|'ocr'|'category'|'fraud'|'system'; image_index?:number; severity:'low'|'medium'|'high'|'critical'; confidence?:number; recommended_action:Decision; evidence_summary:string; user_reason_ru:string; user_reason_kk:string };
+export const moderationRuleConfigSchema=z.object({terms:z.array(z.string()).max(80),observation:observationSchema.shape.code,explicit_offers:z.array(z.string()).max(40),lexical:lexicalConfigSchema.optional()}).strict();
 export const ruleSchema = z.object({
   id:z.string().uuid(),code:z.string(),jurisdiction:z.literal('KZ'),ruleset_version:z.string(),enabled:z.boolean(),
   title_ru:z.string(),title_kk:z.string(),description_ru:z.string(),description_kk:z.string(),
   rule_type:z.string(),scope:z.array(z.string()),applicable_categories:z.array(z.string()),severity:z.enum(['low','medium','high','critical']),
   action:decisionSchema,priority:z.number(),legal_status:z.enum(['LAW','REGULATION','JEVU_POLICY','LEGAL_REVIEW_REQUIRED']),
   legal_basis:z.string(),legal_source_title:z.string(),legal_source_reference:z.string(),effective_from:z.string(),effective_to:z.string().nullable(),
-  config:z.object({terms:z.array(z.string()).max(80),observation:observationSchema.shape.code,explicit_offers:z.array(z.string()).max(40)}).strict(),
+  config:moderationRuleConfigSchema,
 }).passthrough();
 export type Rule = z.infer<typeof ruleSchema>;
 export const snapshotSchema = z.object({
@@ -35,4 +37,4 @@ export const snapshotSchema = z.object({
 });
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type FraudSignals = { recent_submissions:number; prior_rejections:number; confirmed_reports:number; duplicate_content:number; reused_images:number };
-export type ModerationResult = { decision:Decision; risk_score:number; findings:Finding[]; stages:Stage[]; images:{image_index:number; sha256:string|null; perceptual_hash:string|null;algorithm?:string; status:'PASS'|'ERROR'}[]; provider:string; provider_version:string; ocr_provider:string; ocr_version:string; error_code:string|null };
+export type ModerationResult = { lexical?:LexicalResult; decision:Decision; risk_score:number; findings:Finding[]; stages:Stage[]; images:{image_index:number; sha256:string|null; perceptual_hash:string|null;algorithm?:string; status:'PASS'|'ERROR'}[]; provider:string; provider_version:string; ocr_provider:string; ocr_version:string; error_code:string|null };
