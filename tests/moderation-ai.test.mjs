@@ -21,6 +21,30 @@ test('Responses request uses strict schema, bounded multimodal input and isolate
  assert.equal(body.input[0].content[2].detail,'high');assert.match(body.input[0].content[2].image_url,/^data:image\/jpeg;base64,/);
  assert.deepEqual([result.metadata.input_tokens,result.metadata.output_tokens],[123,45]);assert.equal(result.metadata.request_id,'req_synthetic');assert.equal(result.observations.schema_version,AI_SCHEMA_VERSION);
 });
+test('generation schema enforces observation provenance and required image coverage without accepting incomplete OCR',async()=>{
+ for(const indexes of [[],[0],[0,2]]){
+  let schema;
+  await adapter(cleanObservation(indexes),(_url,init)=>{schema=JSON.parse(init.body).text.format.schema;}).analyzeListing({...data,images:indexes.map(image_index=>({image_index,bytes,mimeType:'image/jpeg'}))},signal);
+  const p=schema.properties;
+  assert.equal(p.text_observations.items.properties.source.const,'text');
+  assert.equal(p.text_observations.items.properties.image_index.type,'null');
+  assert.deepEqual(p.image_observations.items.properties.source.enum,['image','ocr']);
+  assert.equal(p.image_observations.maxItems,indexes.length?56:0);
+  for(const field of ['images_checked','image_subjects','visible_text']){
+   assert.equal(p[field].minItems,indexes.length);assert.equal(p[field].maxItems,indexes.length);
+   const indexSchema=field==='images_checked'?p[field].items:p[field].items.properties.image_index;
+   assert.deepEqual(indexSchema.anyOf?indexSchema.anyOf.map(s=>s.const):[indexSchema.const],indexes.length?indexes:[0]);
+  }
+  assert.equal(p.visible_text.items.properties.complete.type,'boolean');
+ }
+ assert.throws(()=>validateObservations({...cleanObservation(),text_observations:[observation('possible_payment_card','ocr',0)]},[0]));
+ assert.throws(()=>validateObservations({...cleanObservation(),image_observations:[observation('possible_payment_card','image',null)]},[0]));
+ assert.throws(()=>validateObservations({...cleanObservation(),visible_text:[]},[0]));
+ assert.throws(()=>validateObservations({...cleanObservation(),visible_text:[{image_index:0,text:'',complete:false}]},[0]));
+ let calls=0;
+ await assert.rejects(adapter(cleanObservation(),()=>{calls++;}).analyzeListing({...data,images:[{...data.images[0],image_index:7}]},signal),e=>e.code==='content_unavailable');
+ assert.equal(calls,0);
+});
 for(const [title,description,kind] of [['Телефон Samsung','Обычный телефон','phone'],['Toyota Camry','Көлік жақсы күйде','car'],['Диван','Жиһаз, хорошее состояние','furniture']])test('synthetic RU/KK normal '+kind,async()=>{const input={...data,title,description,images:[{...data.images[0],bytes:await syntheticImage(kind)}]};const observation=cleanObservation();observation.image_subjects[0].object_type=kind==='car'?'vehicle':kind;const analyzed=await adapter(observation).analyzeListing(input,signal);assert.equal(analyzed.observations.image_subjects[0].object_type,kind==='car'?'vehicle':kind);assert.equal(evaluateShadow(analyzed.observations,rules,base).recommendation,'SHADOW_APPROVE');assert.equal(enforceShadowDecision({...base,decision:'APPROVED'}).decision,'HUMAN_REVIEW');});
 test('unknown enums, invalid JSON/schema, missing image, repeated index, incomplete OCR fail closed',async()=>{
  for(const invalid of [{...cleanObservation(),decision:'APPROVED'},{...cleanObservation(),image_observations:[observation('unknown')]},{...cleanObservation(),image_observations:[{...observation('possible_vape'),confidence:1.01}]},{...cleanObservation(),image_subjects:[{image_index:0,object_type:'unknown_type',confidence:1}]},{...cleanObservation(),images_checked:[]},{...cleanObservation(),images_checked:[0,0]},{...cleanObservation(),visible_text:[{image_index:0,text:'truncated',complete:false}]},{...cleanObservation(),image_observations:[observation('possible_vape','image',6)]},{...cleanObservation(),text_observations:[observation('possible_vape')]}])await assert.rejects(adapter(invalid).analyzeListing(data,signal),e=>e.code==='invalid_schema');
