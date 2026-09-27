@@ -50,5 +50,7 @@ test('new web app and packaged resources have no install/registration entry poin
   assert.doesNotMatch(text,/serviceWorker\s*\.\s*register\s*\(|beforeinstallprompt|appinstalled|appleWebApp\s*:|manifest\s*:/,root+'/'+name);
  }
  const headers=await readFile('public/_headers','utf8');assert.match(headers,/\/sw\.js[\s\S]*Cache-Control: no-store, no-cache, must-revalidate/);
+ assert.match(headers,/^\/assets\/\*\n  Cache-Control: public, max-age=31536000, immutable$/m);
+ assert.deepEqual(headers.split('\n').filter(line=>line.startsWith('/')),['/assets/*','/sw.js'],'no shared caching of pages, APIs or user data');
  for(const path of ['public/manifest.webmanifest','public/offline.html','app/offline/page.tsx'])await assert.rejects(readFile(path),{code:'ENOENT'});
 });

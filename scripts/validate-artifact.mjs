@@ -90,6 +90,18 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   }
 
   const clientFiles = await listFiles(clientPath);
+  // This URL namespace is immutable only because Vite fingerprints every file.
+  // Never extend the header to HTML, API responses or user media.
+  for (const path of clientFiles.filter(path => path.slice(clientPath.length + 1).replaceAll("\\", "/").startsWith("assets/"))) {
+    if (!/^assets\/[^/]+-[\w-]{8}\.(?:js|css)$/.test(path.slice(clientPath.length + 1).replaceAll("\\", "/"))) {
+      throw artifactError("Immutable /assets cache requires fingerprinted JS/CSS filenames.");
+    }
+  }
+  const assetHeaders = await readFile(join(clientPath, "_headers"), "utf8");
+  if (!/^\/assets\/\*\n  Cache-Control: public, max-age=31536000, immutable$/m.test(assetHeaders)
+    || !/\/sw\.js\n[^]*Cache-Control: no-store, no-cache, must-revalidate/.test(assetHeaders)) {
+    throw artifactError("Fingerprint caching and non-cacheable PWA retirement headers are required.");
+  }
   if (!clientFiles.some((path) => /[\\/]assets[\\/].+\.js$/i.test(path))
     || !clientFiles.some((path) => /[\\/]assets[\\/].+\.css$/i.test(path))) {
     throw artifactError("Client artifact must contain JavaScript and CSS assets.");
