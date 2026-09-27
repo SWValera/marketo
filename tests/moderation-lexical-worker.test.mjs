@@ -13,15 +13,15 @@ test('workerd queue preserves lexical routes across disabled/missing/failed AI; 
  const jpeg=await readFile('tests/moderation/benchmark/v1/images/phone.jpg');
  const rules=withLexicalRules(await loadRules()).map(r=>ruleSchema.parse({...r,jurisdiction:'KZ',description_ru:r.title_ru,description_kk:r.title_kk,rule_type:'semantic_and_offer',scope:['text','image','ocr'],priority:100,legal_basis:'fixture',legal_source_title:'fixture',legal_source_reference:'fixture',effective_from:'2026-09-26',effective_to:null}));
  const entry=`import {env} from 'cloudflare:workers';
- import {processModerationQueue} from './lib/moderation/runtime.ts';
+ import {safelyProcessModerationQueue} from './lib/moderation/runtime.ts';
  export default {async fetch(request){
   const id='71000000-0000-4000-8000-000000000001';
   const titles={'/hard':'Продам в.е.й.п','/clean':'Обычный телефон','/suspicious':'Есть одноразка','/direct':'Макет, использовать как настоящий документ'};
   const c=globalThis.fixture={reservations:0,records:[],finished:null,failures:0,derivatives:0};
-  c.job={id,listing_id:id,claim_token:id,created_at:'2026-09-26T12:00:00Z',engine_version:'jevu-moderation-3',automatic_enabled:true,automatic_since:'2026-09-26T00:00:00Z',auto_approve:false,auto_reject:true,
+  c.job={id,listing_id:id,claim_token:id,created_at:'2026-09-26T12:00:00Z',engine_version:'jevu-moderation-4',automatic_enabled:true,automatic_since:'2026-09-26T00:00:00Z',auto_approve:false,auto_reject:true,
    rules:JSON.parse(env.RULES),fraud:{recent_submissions:0,prior_rejections:0,confirmed_reports:0,duplicate_content:0,reused_images:0},
    snapshot:{title:titles[new URL(request.url).pathname],description:'Синтетическая проверка / сынақ',category_id:id,settlement_id:id,price_minor:null,currency_code:'KZT',attributes:[],category_path:[{id,slug:'phones',ru:'Телефоны',kk:'Телефондар'}],images:[{id,storage_key:'phone.jpg',sort_order:0,width:600,height:380,byte_size:env.SIZE,mime_type:'image/jpeg'}]}};
-  await processModerationQueue();return Response.json(c);
+  await safelyProcessModerationQueue(25000);return Response.json(c);
  }};`;
  const admin=`export function createSupabaseAdminClient(){return {async rpc(name,args){
   const c=globalThis.fixture;let data=null;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {lexicalConfigSchema,type LexicalResult} from './lexical-contract.ts';
 
-export const ENGINE_VERSION = 'jevu-moderation-3';
+export const ENGINE_VERSION = 'jevu-moderation-4';
 export const decisionSchema = z.enum(['APPROVED','NEEDS_FIX','REJECTED','HUMAN_REVIEW']);
 export type Decision = z.infer<typeof decisionSchema>;
 export const observationSchema = z.object({

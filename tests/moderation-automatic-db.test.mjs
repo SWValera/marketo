@@ -3,7 +3,7 @@ import {automaticDatabase} from './helpers/automatic-db.mjs';
 import {moderate} from '../lib/moderation/engine.ts';import {UnavailableAIProvider,UnavailableOCRProvider} from '../lib/moderation/providers.ts';
 import {evaluateAutomatic} from '../lib/moderation/automatic.ts';import {evaluateShadow} from '../lib/moderation/shadow.ts';
 import {cleanObservation,observation} from './helpers/moderation-ai-fixtures.mjs';
-const metadata={provider:'openai',model:'gpt-5.6-luna',schema_version:'moderation-ai-observation-v1',request_id:'req_synthetic',status:'success',latency_ms:10,image_count:1,input_tokens:123,output_tokens:45,retry_count:0};
+const metadata={provider:'openai',model:'gpt-5.6-luna',schema_version:'moderation-ai-observation-v2',request_id:'req_synthetic',status:'success',latency_ms:10,image_count:1,input_tokens:123,output_tokens:45,retry_count:0};
 test('automatic migration: actual submit -> revision -> result -> publication -> owner trace/security/lifecycle',async t=>{
  const d=await automaticDatabase(),{db,as,make,submit,claim,finish,record,hash,users}=d;
  try{
@@ -11,7 +11,7 @@ test('automatic migration: actual submit -> revision -> result -> publication ->
  const evaluate=async(job,observations=cleanObservation())=>{const base=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),loadImage:async()=>jpeg,allowExternal:false,lexicalAIState:'READY'});const {result,trace}=await evaluateAutomatic({base,rules:job.rules,response:{observations,metadata},providerStatus:'success',switches:{enabled:true,approval:true,rejection:true}});return {...result,automatic:trace,shadow:evaluateShadow(observations,job.rules,base)};};
  let normal,normalRun,rejected;
  await t.test('full pipeline publishes once; ledger and required stages cannot be forged by users',async()=>{
-  normal=await make();await submit(normal);normalRun=await claim();assert.equal(normalRun.engine_version,'jevu-moderation-3');let result=await evaluate(normalRun);
+  normal=await make();await submit(normal);normalRun=await claim();assert.equal(normalRun.engine_version,'jevu-moderation-4');let result=await evaluate(normalRun);
   await assert.rejects(as(users.seller,'select public.finish_moderation_job($1,$2,$3)',[normalRun.id,normalRun.claim_token,result]),/permission/);
   for(const sql of ["update public.listings set status='active' where id=$1","update public.listings set status='rejected' where id=$1","update public.listings set published_at=now() where id=$1","insert into public.user_roles(user_id,role) values($1,'admin')","select public.assign_user_role($1,'admin',true)","select public.moderation_dashboard()","select public.moderation_admin('settings','{\"auto_approve\":true}')"])await assert.rejects(as(users.seller,sql,sql.includes('$1')?[normal]:[]),/permission|role|staff|admin/);
   await record(normalRun,metadata);assert.equal(await finish(normalRun,result),'APPROVED');assert.equal(await finish(normalRun,result),'ignored');

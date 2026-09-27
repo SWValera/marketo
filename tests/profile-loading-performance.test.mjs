@@ -3,13 +3,14 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import ts from 'typescript';
 import * as pagination from '../lib/data/pagination.ts';
+import * as formatters from '../lib/i18n/listing-formatters.ts';
 import * as filters from '../lib/listings/owner-filters.ts';
 
 const code = await readFile(new URL('../lib/data/supabase/my-listings.ts', import.meta.url), 'utf8');
 const modules = {
   '@/lib/data/supabase/authenticated-user': { resolveAuthenticatedUserId: async (_client, id) => { assert.equal(id, 'owner-a'); return id; } },
   '@/lib/data/supabase/listings': {},
-  '@/lib/i18n/config': { localeTag: () => 'ru-KZ' },
+  '@/lib/i18n/listing-formatters': formatters,
   '@/lib/media/public-url': { publicMediaUrl: () => null, protectedMediaUrl: () => null },
   '../pagination.ts': pagination,
   '@/lib/listings/owner-filters': filters,
@@ -17,7 +18,7 @@ const modules = {
 const exports = {};
 new Function('require', 'exports', ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText)(name => { assert.ok(name in modules, name); return modules[name]; }, exports);
 
-function fixture({ total = 1, status = 'active', error = null } = {}) {
+function fixture({ total = 1, status = 'active', error = null, moderationError = null } = {}) {
   const calls = [];
   const rows = total ? [{ id: 'listing-a', slug: 'item', title: 'Test', price_minor: 100, currency_code: 'KZT', status, created_at: '2026-01-01', updated_at: '2026-01-01', published_at: '2026-01-01', expires_at: '2099-01-01', deleted_at: null, categories: { name_ru: 'Категория' }, settlements: { name_ru: 'Город' } }] : [];
   return { calls, client: {
@@ -32,7 +33,7 @@ function fixture({ total = 1, status = 'active', error = null } = {}) {
       };
       return query;
     },
-    async rpc(name) { calls.push({ rpc: name }); return { data: [], error: null }; },
+    async rpc(name, args) { calls.push({ rpc: name, args }); return name === 'my_moderation_statuses' ? { data: {'listing-a': {status:'APPROVED',label_code:'published',effective_state:'published',reasons:[],can_appeal:false}}, error: moderationError } : { data: [], error: null }; },
   } };
 }
 
@@ -47,7 +48,8 @@ test('profile first page loads exact count and scoped rows in one request and sk
   assert.ok(queries[0].operations.some(op => op[0] === 'eq' && op[1] === 'owner_id' && op[2] === 'owner-a'));
   assert.ok(queries[0].operations.some(op => op[0] === 'or' && op[1].includes('status.eq.active')));
   assert.ok(queries[0].operations.some(op => op[0] === 'is' && op[1] === 'deleted_at'));
-  assert.equal(f.calls.some(q => q.rpc), false);
+  assert.deepEqual(f.calls.filter(q => q.rpc), [{rpc:'my_moderation_statuses',args:{listing_ids:['listing-a']}}]);
+  assert.equal(result.items[0].moderation.label_code, 'published');
 });
 
 test('empty profile needs no images or feedback and still returns a correct empty state', async () => {
@@ -77,4 +79,6 @@ test('rejected ads retain moderation feedback; database errors are never display
   assert.equal(f.calls.filter(q => q.rpc === 'get_my_listing_moderation_feedback').length, 1);
   const bad = fixture({ error: { code: '08006' } });
   await assert.rejects(exports.listMyListings(bad.client, { authenticatedUserId: 'owner-a' }), e => e.code === 'LIST_UNAVAILABLE');
+  const failedStatus = fixture({moderationError:{code:'08006'}});
+  await assert.rejects(exports.listMyListings(failedStatus.client, {authenticatedUserId:'owner-a'}), e => e.code === 'LIST_UNAVAILABLE');
 });

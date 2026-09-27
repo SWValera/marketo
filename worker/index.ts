@@ -1,5 +1,4 @@
 /** Cloudflare Worker entry point for the vinext application. */
-import { safelyProcessModerationQueue } from "../lib/moderation/runtime";
 import handler from "vinext/server/app-router-entry";
 import { withPageReadScope } from "../lib/http/read-scope";
 import { canonicalRedirect } from "../lib/site-origin";
@@ -15,6 +14,9 @@ interface ExecutionContext {
 
 const worker = {
   async scheduled(_controller: unknown, _env: Env, ctx: ExecutionContext) {
+    // Durable submissions are picked up by the minute cron. Loading/running
+    // image/AI moderation must never consume an HTTP invocation's CPU budget.
+    const { safelyProcessModerationQueue } = await import("../lib/moderation/runtime");
     ctx.waitUntil(safelyProcessModerationQueue());
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -25,11 +27,7 @@ const worker = {
     if (request.method !== "GET" || path === "/auth/callback" || path === "/auth/callback/"
       || /^\/(?:assets|api\/media|icons)\//.test(path)
       || /\.(?:js|css|png|svg|webp|ico|webmanifest)$/.test(path)) {
-      const response = await handler.fetch(request, env, ctx);
-      if (request.method === "POST" && /^\/api\/listings\/[^/]+\/submit$/.test(path) && response.ok) {
-        ctx.waitUntil(safelyProcessModerationQueue(true));
-      }
-      return response;
+      return handler.fetch(request, env, ctx);
     }
     return withPageReadScope(request, () => handler.fetch(request, env, ctx));
   },

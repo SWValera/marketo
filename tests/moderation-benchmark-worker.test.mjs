@@ -8,7 +8,7 @@ test('workerd preview: only pinned fixtures, auth, no forged results, one paid c
  export default {fetch(req,env){env.MARKETO_IMAGES={input(){return {transform(){return this;},async output(options){return {response:()=>new Response(Uint8Array.from(atob(options.format==='image/png'?env.PNG:env.JPEG),c=>c.charCodeAt(0)),{headers:{'content-type':options.format}})};}};}};return worker.fetch(req,env);}};`;
  const bundle=await build({stdin:{contents:entry,loader:'js',resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'browser',target:'es2022'});
  const network=createFetchMock();network.disableNetConnect();let calls=0;
- const observations=cleanObservation([0,1]);observations.visible_text[1].text='TEST CARD 4242 4242 4242 4242';
+ const observations=cleanObservation([0,1]);observations.visible_text[1].text='TEST CARD 4242 4242 4242 4242';observations.visible_text[1].ocr_status='TEXT_READ';
  network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(()=>{calls++;return {statusCode:200,data:JSON.stringify(responseBody(observations)),responseOptions:{headers:{'content-type':'application/json'}}};});
  const mf=new Miniflare({host:'127.0.0.1',modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-05-22',compatibilityFlags:['nodejs_compat'],fetchMock:network,bindings:{OPENAI_API_KEY:'synthetic-test-key',MODERATION_EXTERNAL_AI_ENABLED:'false',JPEG:jpeg.toString('base64'),PNG:png.toString('base64')}});
  const fixtures={};for(const ref of c.image_fixture_refs)fixtures[ref]=(await readFile(b.root+'/'+ref)).toString('base64');

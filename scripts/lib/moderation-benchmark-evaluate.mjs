@@ -33,7 +33,7 @@ export async function evaluateBenchmarkCase(c,{rules,provider,processor,loadFixt
   const analysis=result.observations;meta=result.metadata;
   shadow=evaluateShadow(analysis,rules,base);
   ai=codes([...analysis.text_observations,...analysis.image_observations].filter(o=>o.present).map(o=>o.code).concat(shadow.findings.filter(f=>f.source==='ocr').map(f=>f.code)));
-  ocr={text_present:analysis.visible_text.some(t=>t.text.trim().length>0),complete:analysis.visible_text.every(t=>t.complete),privacy_detected:shadow.findings.some(f=>f.source==='ocr'&&['payment_card','personal_id'].includes(f.code))};
+  ocr={text_present:analysis.visible_text.some(t=>t.text.trim().length>0),complete:analysis.visible_text.every(t=>t.ocr_status!=='TECHNICAL_FAILURE'),privacy_detected:shadow.findings.some(f=>f.source==='ocr'&&['payment_card','personal_id'].includes(f.code))};
   // Feed local measured reuse into the existing observation/decision evaluator.
   // No final-publication or bespoke scoring policy exists in the benchmark.
   if(duplicate&&(duplicate.exact||duplicate.similar))shadow=evaluateShadow({...analysis,image_observations:[...analysis.image_observations,{code:'duplicate_or_reused_image',present:true,confidence:1,source:'image',image_index:0,subject:'unknown',reason:'duplicate_or_reused_image'}]},rules,base);

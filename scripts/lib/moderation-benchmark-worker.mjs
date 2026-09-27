@@ -39,7 +39,7 @@ export function createBenchmarkWorker({cases,images,rules,nonce,expiresAt,model}
     try{const copy=response.clone();const data=JSON.parse(new TextDecoder().decode(await readPhotoBytes(copy.body,96*1024,init.signal)));const text=data.output?.flatMap(o=>o.content??[]).filter(c=>c.type==='output_text').map(c=>c.text).join('');const value=JSON.parse(text);
      const parsed=aiObservationSchema.safeParse(value);let indexes=false;
      try{validateObservations(value,c.image_fixture_refs.map((_,i)=>i));indexes=true;}catch{}
-     diagnostics={structure_valid:parsed.success,index_contract_valid:indexes,complete:value.visible_text?.every(t=>t.complete===true)===true};
+     diagnostics={structure_valid:parsed.success,index_contract_valid:indexes,complete:value.visible_text?.every(t=>t.ocr_status!=='TECHNICAL_FAILURE')===true};
     }catch{diagnostics={structure_valid:false,index_contract_valid:false,complete:false};}
    }
    return response;

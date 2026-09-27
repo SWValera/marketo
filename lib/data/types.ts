@@ -9,6 +9,7 @@ export type PageResult<T> = {
 export type NumberedPageResult<T> = PageResult<T> & {
   page: number;
   totalPages: number;
+  counts?: Record<string, number>;
   state: "ready" | "empty" | "out_of_range";
 };
 
@@ -56,7 +57,10 @@ export type ListingDetail = ListingSummary & {
 
 export type ListingStatus = "draft" | "pending" | "active" | "rejected" | "archived" | "sold" | "expired" | "deleted";
 
+export type OwnerModerationStatus = {effective_state:string;label_code:string;run_id:string|null;status:string;reasons:{ru:string;kk:string}[];can_appeal?:boolean};
+
 export type MyListingSummary = {
+  moderation?: OwnerModerationStatus;
   id: string;
   slug: string;
   title: string;
@@ -149,6 +153,8 @@ export type Notification = {
 };
 
 export type ModerationQueueItem = {
+  effectiveState: string;
+  labelCode: string;
   id: string;
   title: string;
   priceLabel: string;
@@ -173,7 +179,7 @@ export type ModerationAttribute = {
 };
 
 export type ModerationListingDetail = {
-  summary: {current_revision:string;owner_controls:boolean;run_id?:string;decision?:string;manual_decision?:string|null;status?:string;basis?:string;provider_status?:string;created_at?:string};
+  summary: {publication_state?:string;effective_state:string;label_code:string;published_revision?:string|null;current_revision:string;owner_controls:boolean;run_id?:string;decision?:string;manual_decision?:string|null;status?:string;basis?:string;provider_status?:string;created_at?:string};
   priceMinor: number | null;
   id: string;
   title: string;

@@ -237,6 +237,8 @@ export type Database = {
           updated_at: string;
         }>;
       };
+      my_moderation_statuses: { Args: { listing_ids: string[] }; Returns: Json };
+      moderation_staff_audit: { Args: { target_listing_id: string }; Returns: Json };
       submit_listing: {
         Args: { target_listing_id: string };
         Returns: undefined;

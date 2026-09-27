@@ -24,7 +24,7 @@ export function automaticSmokeWorker({cases,nonce,expiresAt,model}){
   }
   const {result,trace}=await evaluateAutomatic({base,rules:job.rules,response,providerStatus:shadow.status,switches:{enabled:true,approval:true,rejection:true}});
   // OCR was consumed above; return only booleans and sanitized findings/metadata.
-  const ocrReadable=Boolean(response?.observations.visible_text.some(t=>t.complete&&t.text.trim().length>0));
+  const ocrReadable=Boolean(response?.observations.visible_text.some(t=>t.ocr_status!=='TECHNICAL_FAILURE'&&t.text.trim().length>0));
   const value={...result,automatic:trace,...(shadow.schema_version?{shadow}:{})};response=undefined;
   return Response.json({value,metadata:metas,actual_calls:actualCalls,ocr_readable:ocrReadable},{headers:{'cache-control':'no-store'}});
  }};

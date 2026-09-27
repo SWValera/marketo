@@ -2,6 +2,7 @@ import type {Rule,ModerationResult} from './contracts.ts';
 import {checkRules} from './engine.ts';
 import {detectPersonalData} from './normalize.ts';
 import {AI_SCHEMA_VERSION,type AIObservations,type AIErrorCode} from './ai-contract.ts';
+import {unconfirmedImageIdentifier} from './privacy-evidence.ts';
 
 export type ShadowDecision='SHADOW_APPROVE'|'SHADOW_REJECT'|'SHADOW_NEEDS_FIX'|'SHADOW_HUMAN_REVIEW';
 export type ShadowFinding={code:string;source:'text'|'image'|'ocr'|'fraud'|'category';image_index:number|null;confidence:number|null;action:ShadowDecision;rule_code:string|null;reason:string};
@@ -18,9 +19,11 @@ export function evaluateShadow(analysis:AIObservations,rules:Rule[],base:Moderat
   let action:ShadowDecision='SHADOW_HUMAN_REVIEW';
   if(['document_visible','possible_identity_document','possible_payment_card','possible_personal_identifier','category_mismatch','image_text_mismatch'].includes(o.code)&&o.confidence>=.85)action='SHADOW_NEEDS_FIX';
   if(rule?.legal_status==='JEVU_POLICY'&&rule.action==='REJECTED'&&o.subject==='offered_item'&&o.confidence>=.95&&analysis.overall_uncertainty<=.15)action='SHADOW_REJECT';
+  if(unconfirmedImageIdentifier(o,analysis,base))action='SHADOW_APPROVE';
   add(o.code,o.source,o.image_index,o.confidence,action,rule?.code??null);
  }
  for(const text of analysis.visible_text){
+  if(text.ocr_status==='PARTIAL_TEXT'&&text.moderation_relevance==='possible_risk')add('ocr_partial_risk','ocr',text.image_index,null,'SHADOW_HUMAN_REVIEW');
   for(const code of detectPersonalData(text.text))add(code,'ocr',text.image_index,1,'SHADOW_NEEDS_FIX');
   for(const f of checkRules(text.text,rules,'ocr',text.image_index))add(f.finding_code,'ocr',text.image_index,f.confidence??null,f.recommended_action==='REJECTED'?'SHADOW_REJECT':'SHADOW_HUMAN_REVIEW',f.finding_code);
  }

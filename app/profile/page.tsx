@@ -1,3 +1,5 @@
+import {ModerationProfileRefresh} from '@/components/moderation-profile-refresh';
+import {moderationText} from '@/lib/moderation/labels';
 /* eslint-disable @next/next/no-img-element -- Owner media is served through the authenticated same-origin media route. */
 import { ModerationStatus, SellerVerificationStatus } from "@/components/moderation-status";
 import type { Metadata } from "next";
@@ -163,7 +165,7 @@ export default async function ProfilePage({
       <nav className="profile-listing-tabs" aria-label={t("profile.myListings")}>
         {ownerListingTabs.map((value) => <Link key={value} className="secondary-button" href={ownerProfileHref(value)} aria-current={tab === value ? "page" : undefined}>{t(`profile.tab.${value}`)}</Link>)}
       </nav>
-      <PublicationRefresh expiresAt={listings?.items.filter((item) => item.status === "active" && item.expiresAt).map((item) => item.expiresAt!).sort()[0] ?? null} />
+      <ModerationProfileRefresh states={Object.fromEntries((listings?.items??[]).flatMap(l=>l.moderation?[[l.id,l.moderation]]:[]))}/><PublicationRefresh expiresAt={listings?.items.filter((item) => item.status === "active" && item.expiresAt).map((item) => item.expiresAt!).sort()[0] ?? null} />
       {!listings ? <EmptyState
         icon={<AlertTriangle size={30} />}
         title={t("profile.listingsLoadErrorTitle")}
@@ -188,7 +190,7 @@ export default async function ProfilePage({
               {listing.imageUrl
                 ? <img src={listing.imageUrl} alt="" loading="lazy" />
                 : <span aria-label={t("profile.noListingImage")}><ImageOff size={28} /></span>}
-              <strong className={`owner-listing-status is-${listing.status}`}>{statusLabel(listing.status)}</strong>
+              <strong className={`owner-listing-status is-${listing.status}`}>{listing.moderation?moderationText(listing.moderation.label_code,locale):statusLabel(listing.status)}</strong>
             </div>
             <div className="owner-listing-copy">
               <h3>{listing.title}</h3>
@@ -200,7 +202,7 @@ export default async function ProfilePage({
                 <strong>{t("profile.rejectionReason")}</strong>
                 <span>{rejectionLabel(listing.rejectionReasonCode)}</span>
               </div> : null}
-              {listing.status === "pending" || listing.status === "rejected" ? <ModerationStatus listingId={listing.id} /> : null}
+              {listing.status === "pending" || listing.status === "rejected" ? <ModerationStatus key={`${listing.id}-${listing.moderation?.label_code}`} listingId={listing.id} initial={listing.moderation} /> : null}
               <OwnerListingActions listing={listing} />
             </div>
           </article>)}

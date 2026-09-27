@@ -1,8 +1,9 @@
 'use client';
+import type {ModerationListingDetail} from '@/lib/data/types';
 import {useRef,useState} from 'react';
 import {useI18n} from './i18n-provider';
 import {MODERATION_NOTE_MAX_LENGTH,MODERATION_REJECTION_REASONS,type ModerationRejectionReason} from '@/lib/moderation/policy';
-export type ModeratorOutcome={id:string;status:'active'|'rejected';decision:string;revision:string;override_id:string|null};
+export type ModeratorOutcome={id:string;status:'active'|'rejected';decision:string;revision:string;override_id:string|null;summary:ModerationListingDetail['summary']};
 type Action='approve'|'reject'|'needs_fix';
 export function ModerationDecision({listingId,revision,onSaved}:{listingId:string;revision:string;onSaved:(value:ModeratorOutcome)=>void}){
  const {locale,t}=useI18n(),kk=locale==='kk';const [action,setAction]=useState<Action|null>(null),[reason,setReason]=useState<ModerationRejectionReason|''>(''),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState('');
@@ -14,7 +15,7 @@ export function ModerationDecision({listingId,revision,onSaved}:{listingId:strin
   lock.current=true;setBusy(true);setFeedback(t('admin.submitting'));
   try{const response=await fetch(`/api/admin/listings/${listingId}/moderate`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({decision:action,reasonCode:action==='approve'?null:reason,note:note.trim()||null,revision,requestId:receipt.current}),signal:AbortSignal.timeout(15000)});
    const body=await response.json() as {listing?:ModeratorOutcome};if(!response.ok){setFeedback(t(response.status===409?'admin.stale':response.status===401||response.status===403?'admin.forbidden':'admin.failed'));return;}
-   const value=body.listing as ModeratorOutcome;if(value?.id!==listingId||!['active','rejected'].includes(value.status)||value.revision!==revision)throw Error('invalid_receipt');
+   const value=body.listing as ModeratorOutcome;if(value?.id!==listingId||!['active','rejected'].includes(value.status)||value.revision!==revision||!value.summary?.effective_state||!value.summary?.label_code)throw Error('invalid_receipt');
    onSaved(value);setAction(null);setFeedback(t('admin.success'));
   }catch{setFeedback(t('admin.failed'));}finally{lock.current=false;setBusy(false);}
  }

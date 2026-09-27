@@ -31,7 +31,7 @@ export async function automaticDatabase(){
  const submit=(id,seller=users.seller)=>as(seller,'select public.submit_listing_with_promotion_choice($1,null)',[id]);
  const claim=async()=>(await service('select public.claim_moderation_job() job')).rows[0].job;
  const finish=async(job,value)=>(await service('select public.finish_moderation_job($1,$2,$3) outcome',[job.id,job.claim_token,value])).rows[0].outcome;
- const record=async(job,meta)=>{const n=(await service("select public.moderation_shadow_job('reserve',$1,$2,$3) n",[job.id,job.claim_token,{model:meta.model,eligible_since:job.automatic_since}])).rows[0].n;if(n===null)throw Error('fixture_budget_exhausted');await service("select public.moderation_shadow_job('record',$1,$2,$3)",[job.id,job.claim_token,{attempt:n,...meta}]);};
+ const record=async(job,meta)=>{const n=(await service("select public.moderation_shadow_job('reserve',$1,$2,$3) n",[job.id,job.claim_token,{model:meta.model,eligible_since:job.automatic_since,schema_version:meta.schema_version}])).rows[0].n;if(n===null)throw Error('fixture_budget_exhausted');await service("select public.moderation_shadow_job('record',$1,$2,$3)",[job.id,job.claim_token,{attempt:n,...meta}]);};
  const hash=async id=>(await db.query('select private.moderation_hash(private.moderation_content($1)) hash',[id])).rows[0].hash;
  return {db,as,service,make,submit,claim,finish,record,hash,users};
  }catch(error){await db.close();throw error;}

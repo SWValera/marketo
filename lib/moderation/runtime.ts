@@ -14,13 +14,14 @@ import {emptyShadow} from './shadow';
 import {semanticCallRequired} from './lexical';
 import {recordLexicalExecution,lexicalAIStateAfterShadow} from './lexical-execution';
 import {bounded} from './providers';
-import type {AIInput,AICallResult} from './ai-contract';
+import {AI_SCHEMA_VERSION,type AIInput,type AICallResult} from './ai-contract';
 import {evaluateAutomatic} from './automatic';
 import type {Json} from '../supabase/database.types';
 
 const jobSchema=z.object({id:z.string().uuid(),listing_id:z.string().uuid(),claim_token:z.string().uuid(),created_at:z.string(),engine_version:z.string().optional(),automatic_enabled:z.boolean().default(false),auto_reject:z.boolean().default(false),automatic_since:z.string().nullable().optional(),snapshot:snapshotSchema,rules:z.array(ruleSchema).min(1),auto_approve:z.boolean(),fraud:z.object({recent_submissions:z.number(),prior_rejections:z.number(),confirmed_reports:z.number(),duplicate_content:z.number(),reused_images:z.number()})});
 /** Bounded durable jobs. Never called by a public unauthenticated mutation API. */
-export async function processModerationQueue(){
+export async function processModerationQueue(budgetMs=90_000){
+  const deadline=Date.now()+budgetMs,remaining=()=>Math.max(1,deadline-Date.now());
   if(env.MODERATION_FRAMEWORK_ENABLED!=='true')return;
   const client=createSupabaseAdminClient();
   const claimed=await client.rpc('claim_moderation_job');
@@ -52,11 +53,11 @@ export async function processModerationQueue(){
           const matches=await shadowRPC('similar',{sha256:item.sha256,perceptual_hash:item.perceptual_hash,algorithm:item.algorithm??null});
           const match=z.object({exact:z.number(),perceptual:z.number()}).parse(matches);if(match.exact||match.perceptual)duplicates.push({image_index:item.image_index,...match});
         }
-      },25_000);
+      },Math.min(25_000,remaining()));
       if(vision&&derivatives.length===job.snapshot.images.length){
         const rules=job.rules.filter(r=>r.applicable_categories.length===0||job.snapshot.category_path.some(c=>r.applicable_categories.includes(c.slug)));
-        shadow=await executeShadow({provider:new OpenAIModerationProvider({key:config.key,model:config.model}),data:{title:job.snapshot.title,description:job.snapshot.description,attributes:JSON.stringify(job.snapshot.attributes),category:job.snapshot.category_path.map(c=>`${c.slug} ${c.ru} ${c.kk}`).join(' / '),images:derivatives},rules,base:result,signal:new AbortController().signal,
-          reserve:async()=>{const value=await shadowRPC('reserve',{model:config.model!,eligible_since:config.since!});return value===null?null:z.number().int().min(1).max(2).parse(value);},
+        shadow=await executeShadow({provider:new OpenAIModerationProvider({key:config.key,model:config.model}),data:{title:job.snapshot.title,description:job.snapshot.description,attributes:JSON.stringify(job.snapshot.attributes),category:job.snapshot.category_path.map(c=>`${c.slug} ${c.ru} ${c.kk}`).join(' / '),images:derivatives},rules,base:result,signal:AbortSignal.timeout(Math.min(45_000,remaining())),
+          reserve:async()=>{const value=await shadowRPC('reserve',{model:config.model!,eligible_since:config.since!,schema_version:AI_SCHEMA_VERSION});return value===null?null:z.number().int().min(1).max(2).parse(value);},
           record:async(attempt,metadata)=>{await shadowRPC('record',{attempt,...metadata});},onValidated:value=>{response=value;}});
       }
     }catch{shadow=emptyShadow('content_unavailable');}
@@ -79,4 +80,4 @@ export async function processModerationQueue(){
     console.warn(JSON.stringify({event:'moderation.system_error',engine:ENGINE_VERSION,duration_ms:Date.now()-start}));
   }
 }
-export async function safelyProcessModerationQueue(fromRequest=false){if(fromRequest&&env.MODERATION_EXTERNAL_AI_ENABLED==='true')return;try{await processModerationQueue();}catch{console.warn(JSON.stringify({event:'moderation.queue_unavailable'}));}}
+export async function safelyProcessModerationQueue(budgetMs=90_000){try{await processModerationQueue(budgetMs);}catch{console.warn(JSON.stringify({event:'moderation.queue_unavailable'}));}}

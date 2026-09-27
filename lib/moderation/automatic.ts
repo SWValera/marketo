@@ -3,6 +3,7 @@ import {decide, finding} from './engine.ts';
 import {detectPersonalData} from './normalize.ts';
 import {compileLexicalRules, evaluateLexical} from './lexical.ts';
 import {findingFamilies} from './finding-taxonomy.ts';
+import {unconfirmedImageIdentifier} from './privacy-evidence.ts';
 import type {ModerationResult, Rule, Finding} from './contracts.ts';
 
 export type AutomaticSwitches={enabled:boolean;approval:boolean;rejection:boolean};
@@ -14,6 +15,7 @@ export type AutomaticTrace={
  lexical:ModerationResult['lexical']|null;schema_validated:boolean;provider_status:string;
  category:{status:'match'|'mismatch'|'uncertain';confidence:number}|null;
  uncertainty:number|null;ocr_images:number;vision_images:number;
+ ocr:{image_index:number;ocr_status:string;moderation_relevance:string}[];
  observations:{code:string;present:boolean;confidence:number;source:string;image_index:number|null;subject:string}[];
  resolved_local_rules:string[];canonical_families:string[];timeline:TimelineStep[];
 };
@@ -31,7 +33,7 @@ const policyFinding=(rule:Rule,source:Finding['source_type'],index:number|null,c
  * Missing/invalid analysis cannot fill a mandatory stage or authorize publication. */
 export async function evaluateAutomatic(input:{base:ModerationResult;rules:Rule[];response?:AICallResult;providerStatus:string;switches:AutomaticSwitches;localDurationMs?:number}):Promise<{result:ModerationResult;trace:AutomaticTrace}>{
  const result:ModerationResult=structuredClone(input.base), rules=input.rules.filter(r=>r.enabled);
- const trace:AutomaticTrace={version:'jevu-automatic-1',decision_source:'AUTOMATIC',mode:input.switches.enabled?'automatic':'manual_fallback',basis:'uncertain',lexical:result.lexical??null,schema_validated:false,provider_status:input.providerStatus,category:null,uncertainty:null,ocr_images:0,vision_images:0,observations:[],resolved_local_rules:[],canonical_families:[],timeline:[]};
+ const trace:AutomaticTrace={version:'jevu-automatic-1',decision_source:'AUTOMATIC',mode:input.switches.enabled?'automatic':'manual_fallback',basis:'uncertain',lexical:result.lexical??null,schema_validated:false,provider_status:input.providerStatus,category:null,uncertainty:null,ocr_images:0,vision_images:0,ocr:[],observations:[],resolved_local_rules:[],canonical_families:[],timeline:[]};
  let analysis:AIObservations|undefined;
  const hard=result.findings.some(f=>f.source_type==='text'&&f.confidence===1&&f.recommended_action==='REJECTED'&&rules.some(r=>r.id===f.rule_id&&r.code===f.finding_code&&r.legal_status==='JEVU_POLICY'&&r.action==='REJECTED'));
  if(input.response&&input.providerStatus==='success')try{
@@ -41,6 +43,7 @@ export async function evaluateAutomatic(input:{base:ModerationResult;rules:Rule[
  if(analysis){
   trace.schema_validated=true;trace.category={status:analysis.category_consistency.status,confidence:analysis.category_consistency.confidence};
   trace.uncertainty=analysis.overall_uncertainty;trace.ocr_images=analysis.visible_text.length;trace.vision_images=analysis.images_checked.length;
+  trace.ocr=analysis.visible_text.map(({image_index,ocr_status,moderation_relevance})=>({image_index,ocr_status,moderation_relevance}));
   trace.observations=[...analysis.text_observations,...analysis.image_observations].map(({code,present,confidence,source,image_index,subject})=>({code,present,confidence,source,image_index,subject}));
  }
  if(!input.switches.enabled){result.decision='HUMAN_REVIEW';trace.basis='switch_disabled';}
@@ -58,12 +61,15 @@ export async function evaluateAutomatic(input:{base:ModerationResult;rules:Rule[
   const conflict=uncertainty||contextConflict||lexicalConflict;
   for(const code of result.lexical?.review_rule_codes??[]){
    const family=findingFamilies[code as keyof typeof findingFamilies];
-   const evidence=observations.filter(o=>o.code===family&&o.confidence>=.98);
-   if(!conflict&&evidence.length&&evidence.every(o=>!o.present||harmlessSubjects.has(o.subject)||o.subject==='offered_item')){
+   const evidence=analysis.text_observations.filter(o=>o.code===family);
+   if(!conflict&&evidence.length===1&&evidence[0].confidence>=.98&&evidence.every(o=>!o.present||harmlessSubjects.has(o.subject)||o.subject==='offered_item')){
     result.findings=result.findings.filter(f=>!(f.source_type==='text'&&f.finding_code===code&&f.confidence===.6));trace.resolved_local_rules.push(code);
    }
   }
   for(const o of positive){
+   // Retain the hypothesis in trace.observations, but do not manufacture a
+   // privacy violation without OCR/local/document/payment corroboration.
+   if(unconfirmedImageIdentifier(o,analysis,result))continue;
    const ruleCode=familyToRule.get(o.code),rule=rules.find(r=>r.code===ruleCode&&r.scope.includes(o.source));
    // An explicitly educational/accessory/toy use is not the prohibited offered item.
    if(rule&&harmlessSubjects.has(o.subject)&&o.confidence>=.98&&!conflict)continue;
@@ -75,6 +81,7 @@ export async function evaluateAutomatic(input:{base:ModerationResult;rules:Rule[
    result.findings.push({...finding(code,fixable?'NEEDS_FIX':'HUMAN_REVIEW',o.source as Finding['source_type'],o.image_index??undefined),confidence:o.confidence,...(rule?{rule_id:rule.id}:{})});
   }
   for(const image of analysis.visible_text){
+   if(image.ocr_status==='PARTIAL_TEXT'&&image.moderation_relevance==='possible_risk')result.findings.push(finding('ocr_partial_risk','HUMAN_REVIEW','ocr',image.image_index));
    for(const code of detectPersonalData(image.text))result.findings.push({...finding(code,'NEEDS_FIX','ocr',image.image_index),confidence:1});
    const lexicalRules=rules.filter(r=>r.config.lexical&&r.scope.includes('ocr'));
    if(lexicalRules.length){

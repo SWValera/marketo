@@ -14,7 +14,7 @@ import type {
 } from "@/lib/data/types";
 import { requestCache as cache } from "@/lib/http/read-scope";
 import { publicListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
-import { localeTag } from "@/lib/i18n/config";
+import { listingNumber, listingDate } from "@/lib/i18n/listing-formatters";
 import type { Locale } from "@/lib/i18n/messages";
 import type { CategoryAttributeDataType } from "@/lib/reference-data/types";
 import { beginVerifiedAccountRead } from "@/lib/data/account-page-read";
@@ -67,12 +67,12 @@ function priceParts(priceMinor: number | null, currencyCode: string | null, loca
   const exponent = currencyCode === "KZT" ? 0 : 2;
   const amount = priceMinor / (10 ** exponent);
   const symbol = currencyCode === "KZT" ? "₸" : currencyCode ?? "";
-  return { amount, label: `${amount.toLocaleString(localeTag(locale), { maximumFractionDigits: exponent })} ${symbol}`.trim() };
+  return { amount, label: `${listingNumber(amount, locale, exponent)} ${symbol}`.trim() };
 }
 
 function dateLabel(value: string | null, locale: Locale) {
   if (!value) return "";
-  return new Intl.DateTimeFormat(localeTag(locale), { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+  return listingDate(value, locale, "published");
 }
 
 function hydrateAttributes(result: ReturnType<typeof publicListingAttributeRecords>, locale: Locale) {

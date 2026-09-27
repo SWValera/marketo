@@ -3,10 +3,11 @@ import { resolveAuthenticatedUserId } from "@/lib/data/supabase/authenticated-us
 import { getListingAttributeRecords } from "@/lib/data/supabase/listings";
 import type {
   MyListingSummary,
+  OwnerModerationStatus,
   NumberedPageResult,
   OwnerDraftBundle,
 } from "@/lib/data/types";
-import { localeTag } from "@/lib/i18n/config";
+import { listingNumber, listingDate } from "@/lib/i18n/listing-formatters";
 import type { Locale } from "@/lib/i18n/messages";
 import { protectedMediaUrl, publicMediaUrl } from "@/lib/media/public-url";
 import type { Json } from "@/lib/supabase/database.types";
@@ -49,20 +50,12 @@ function priceParts(value: unknown, currencyCode: string, locale: Locale) {
   const symbol = currencyCode === "KZT" ? "₸" : currencyCode;
   return {
     amount,
-    label: `${amount.toLocaleString(localeTag(locale), { maximumFractionDigits: exponent })} ${symbol}`,
+    label: `${listingNumber(amount, locale, exponent)} ${symbol}`,
   };
 }
 
 function dateLabel(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(localeTag(locale), {
-    timeZone: "Asia/Almaty",
-    timeZoneName: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return listingDate(value, locale, "owner");
 }
 
 async function currentUserId(client: JevuSupabaseClient, authenticatedUserId?: string) {
@@ -150,7 +143,7 @@ export async function listMyListings(
   if (rows.length === 0) throw new OwnerListingDataError("LIST_UNAVAILABLE");
 
   const listingIds = rows.map((row) => row.id);
-  const [imagesResult, feedback] = await Promise.all([
+  const [imagesResult, feedback, moderationResult] = await Promise.all([
     client
       .from("listing_images")
       .select("id, listing_id, storage_key, sort_order")
@@ -158,8 +151,11 @@ export async function listMyListings(
       .order("sort_order", { ascending: true })
       .order("id", { ascending: true }),
     rows.some((row) => row.status === "rejected") ? rejectionFeedback(client) : Promise.resolve([]),
+    client.rpc("my_moderation_statuses", {listing_ids:listingIds}),
   ]);
   if (imagesResult.error) throw new OwnerListingDataError("LIST_UNAVAILABLE", { cause: imagesResult.error });
+  if (moderationResult.error) throw new OwnerListingDataError("LIST_UNAVAILABLE", {cause:moderationResult.error});
+  const moderation = moderationResult.data as unknown as Record<string,OwnerModerationStatus>;
   const firstImage = new Map<string, string>();
   for (const image of imagesResult.data ?? []) {
     if (!firstImage.has(image.listing_id)) firstImage.set(image.listing_id, image.storage_key);
@@ -177,6 +173,7 @@ export async function listMyListings(
       const safeStatus = (termEnded ? "archived" : row.status) as MyListingSummary["status"];
       const safeFeedback = safeStatus === "rejected" ? feedbackByListing.get(row.id) : undefined;
       return {
+        moderation: moderation[row.id],
         id: row.id,
         slug: row.slug,
         title: row.title,
