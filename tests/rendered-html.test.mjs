@@ -176,6 +176,19 @@ globalThis.fetch = async (input, init) => {
     }), { status: 503, headers: { "content-type": "application/json" } });
   }
   let rows = structuredClone(referenceTables[table] ?? []);
+  // Model PostgREST embeds for the public detail read, with null for a relation
+  // unavailable to the current fixture. Other listing projections stay intact.
+  if (table === "listings" && requestUrl.searchParams.get("select")?.includes("listing_attribute_values(")) {
+    rows = rows.map(row => ({ ...row,
+      listing_attribute_values: referenceTables.listing_attribute_values.filter(value => value.listing_id === row.id).map(value => ({ ...value,
+        category_attributes: referenceTables.category_attributes.find(attribute => attribute.id === value.attribute_id) ?? null,
+      })),
+      listing_attribute_option_values: referenceTables.listing_attribute_option_values.filter(value => value.listing_id === row.id).map(value => ({ ...value,
+        category_attributes: referenceTables.category_attributes.find(attribute => attribute.id === value.attribute_id) ?? null,
+        category_attribute_options: referenceTables.category_attribute_options.find(option => option.id === value.option_id) ?? null,
+      })),
+    }));
+  }
   for (const column of ["id", "owner_id", "status", "slug"]) {
     const filter = requestUrl.searchParams.get(column);
     if (filter?.startsWith("eq.")) rows = rows.filter((row) => row[column] === filter.slice(3));

@@ -17,8 +17,9 @@ test('an abandoned server reference request cannot hold later visitors hostage',
 
 test('all server reference caches avoid cross-request I/O promises', async () => {
   const source=await readFile(new URL('../lib/reference-data/server.ts',import.meta.url),'utf8');
-  assert.equal((source.match(/shareInFlight: false/g)||[]).length,5);
-  assert.equal((source.match(/= cache\(async/g)||[]).length,5);
+  // Full publishing and compact browsing catalogs have distinct bounded caches.
+  assert.equal((source.match(/shareInFlight: false/g)||[]).length,6);
+  assert.equal((source.match(/= cache\(async/g)||[]).length,6);
 });
 
 test('fetch deadline covers slow bodies and preserves caller cancellation', async () => {

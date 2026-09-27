@@ -13,7 +13,7 @@ import type {
   Profile,
 } from "@/lib/data/types";
 import { requestCache as cache } from "@/lib/http/read-scope";
-import { getListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
+import { publicListingAttributeRecords, getListingDetailByRouteKey, listPublishedListingCards, listPublishedListingCardsBySeller, listPublishedListingPreview, type ListingQuery } from "@/lib/data/supabase/listings";
 import { localeTag } from "@/lib/i18n/config";
 import type { Locale } from "@/lib/i18n/messages";
 import type { CategoryAttributeDataType } from "@/lib/reference-data/types";
@@ -75,8 +75,7 @@ function dateLabel(value: string | null, locale: Locale) {
   return new Intl.DateTimeFormat(localeTag(locale), { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
 }
 
-async function hydrateAttributes(listingIds: string[], locale: Locale) {
-  const result = await getListingAttributeRecords(createSupabasePublicServerClient(), listingIds);
+function hydrateAttributes(result: ReturnType<typeof publicListingAttributeRecords>, locale: Locale) {
   const publicAttributes = result.attributes
     .filter((row) => row.is_active && row.is_visible)
     .sort((left, right) => left.sort_order - right.sort_order || left.id.localeCompare(right.id));
@@ -184,10 +183,8 @@ const findListingBySlug = cache(async (slug: string, locale: Locale): Promise<Li
     || !settlement?.id || !row.owner_id) {
     throw new PublicListingDataError("INVALID_ROW");
   }
-  const [hydrated, seller] = await Promise.all([
-    hydrateAttributes([row.id], locale),
-    getPublicSellerProfile(client, row.owner_id),
-  ]);
+  const hydrated = hydrateAttributes(publicListingAttributeRecords(row), locale);
+  const seller = await getPublicSellerProfile(client, row.owner_id);
   if (!seller?.display_name) throw new PublicListingDataError("INVALID_RELATION");
   if (!Array.isArray(row.listing_images)) throw new PublicListingDataError("INVALID_RELATION");
   const price = priceParts(row.price_minor, row.currency_code, locale);

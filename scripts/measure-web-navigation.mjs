@@ -6,7 +6,7 @@ const output='artifacts/pwa-removal';await mkdir(output,{recursive:true});
 const listing=base.startsWith('http://127.0.0.1:') ? (await (await fetch(base+'/__fixture/info')).json()).listing : JSON.parse(await readFile(output+'/http-before.json','utf8')).listing;
 const routes=[['home','/',"document.querySelector('.category-grid .category-tile') && document.querySelector('.showcase-card')"],['catalog','/search',"document.querySelector('.catalog-client, .catalog-layout, .catalog-toolbar, .listing-grid, .empty-state')"],...(listing?[['listing',listing,"document.querySelector('.listing-gallery, .listing-detail, .listing-main')"]]:[]),['profile','/profile',"document.querySelector('main')?.innerText.includes('Войдите')"],['chat','/messages',"document.querySelector('main')?.innerText.includes('Войдите')"]];
 const results=[];const count=Number(process.env.JEVU_PERF_REPEATS||3);
-for(const [scenario,path,ready] of routes)for(let repeat=0;repeat<count;repeat++){
+for(const [scenario,path,ready] of routes.filter(([scenario])=>!process.env.JEVU_PERF_SCENARIO||scenario===process.env.JEVU_PERF_SCENARIO))for(let repeat=0;repeat<count;repeat++){
  const browser=await testBrowser({output});let requests=[],errors=[];let started=0;
  browser.on('Network.requestWillBeSent',x=>requests.push({id:x.requestId,path:new URL(x.request.url).pathname,type:x.type,start:x.timestamp,fromSW:false,bytes:0}));
  browser.on('Network.responseReceived',x=>{const r=requests.findLast(r=>r.id===x.requestId);if(r)Object.assign(r,{status:x.response.status,fromSW:x.response.fromServiceWorker,headers:x.timestamp,mime:x.response.mimeType,cache:x.response.fromDiskCache});});

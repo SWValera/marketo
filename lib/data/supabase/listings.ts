@@ -324,16 +324,48 @@ export async function getListingDetail(client: JevuSupabaseClient, listingId: st
   return data;
 }
 
+// Anonymous PostgREST embeds keep each relation's existing RLS. Resolve values
+// and their dictionaries in the listing read instead of two extra HTTP waves.
+export const PUBLIC_LISTING_DETAIL_SELECT = "id, owner_id, slug, title, description, category_id, price_minor, currency_code, published_at, expires_at, vip_until, x2_until, promoted_until, categories(id, slug, name_ru, name_kk, search_placeholder_ru, search_placeholder_kk), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order), listing_attribute_values(listing_id, attribute_id, text_value, number_value, boolean_value, date_value, number_min_value, number_max_value, category_attributes(id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, is_active, is_visible, sort_order)), listing_attribute_option_values(listing_id, attribute_id, option_id, category_attributes(id, key, label_ru, label_kk, data_type, unit_ru, unit_kk, is_active, is_visible, sort_order), category_attribute_options(id, value, label_ru, label_kk))";
+
 export async function getListingDetailByRouteKey(client: JevuSupabaseClient, routeKey: string) {
   const uuidPrefix = routeKey.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:-|$)/i)?.[0].slice(0, 36);
   let request = client
     .from("listings")
-    .select("*, categories(id, slug, name_ru, name_kk, search_placeholder_ru, search_placeholder_kk), settlements(id, name_ru, name_kk), listing_images(storage_key, sort_order)")
+    .select(PUBLIC_LISTING_DETAIL_SELECT)
     .order("sort_order", { referencedTable: "listing_images" });
   request = uuidPrefix ? request.eq("id", uuidPrefix) : request.eq("slug", routeKey);
   const { data, error } = await request.maybeSingle();
   if (error) throw error;
   return data;
+}
+
+type AttributeRecords = Awaited<ReturnType<typeof getListingAttributeRecords>>;
+type EmbeddedScalar = AttributeRecords["scalarValues"][number] & { category_attributes: AttributeRecords["attributes"][number] | null };
+type EmbeddedOption = AttributeRecords["optionValues"][number] & {
+  category_attributes: AttributeRecords["attributes"][number] | null;
+  category_attribute_options: AttributeRecords["options"][number] | null;
+};
+
+/** Same hydration contract as private/staff reads; no shared listing cache. */
+export function publicListingAttributeRecords(row: { listing_attribute_values: unknown; listing_attribute_option_values: unknown }): AttributeRecords {
+  if (!Array.isArray(row.listing_attribute_values) || !Array.isArray(row.listing_attribute_option_values)) {
+    throw new Error("public_listing_attributes_invalid");
+  }
+  const scalarValues = row.listing_attribute_values as EmbeddedScalar[];
+  const optionValues = row.listing_attribute_option_values as EmbeddedOption[];
+  const attributes = new Map<string, AttributeRecords["attributes"][number]>();
+  const options = new Map<string, AttributeRecords["options"][number]>();
+  for (const value of [...scalarValues, ...optionValues]) {
+    const definition = value.category_attributes;
+    // A null embed can be hidden by RLS; never manufacture its definition.
+    if (definition && definition.id === value.attribute_id) attributes.set(definition.id, definition);
+  }
+  for (const value of optionValues) {
+    const option = value.category_attribute_options;
+    if (option && option.id === value.option_id) options.set(option.id, option);
+  }
+  return { scalarValues, optionValues, attributes: [...attributes.values()], options: [...options.values()] };
 }
 
 export async function getListingAttributeRecords(client: JevuSupabaseClient, listingIds: string[]) {

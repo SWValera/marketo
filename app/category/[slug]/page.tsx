@@ -23,7 +23,7 @@ import {
   isCategoryWithin,
 } from "@/lib/reference-data/catalog";
 import { sanitizeAttributeFilters } from "@/lib/reference-data/attributes";
-import { getCategoryAttributeReferences, getCategoryReferences } from "@/lib/reference-data/server";
+import { getCategoryAttributeReferences, getBrowseCategoryReferences } from "@/lib/reference-data/server";
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
@@ -33,7 +33,7 @@ type CategoryPageProps = {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const [{ slug }, catalog, { locale }] = await Promise.all([
     params,
-    getCategoryReferences(),
+    getBrowseCategoryReferences(),
     getServerI18n(),
   ]);
   const category = getCategoryBySlug(createCategoryCatalogView(catalog.data), slug);
@@ -54,7 +54,7 @@ async function CategoryPageContent({ params, searchParams }: CategoryPageProps) 
   const [{ slug }, parsed, catalog, { locale, t }] = await Promise.all([
     params,
     searchParams.then(parseCatalogSearchParams),
-    getCategoryReferences(),
+    getBrowseCategoryReferences(),
     getServerI18n(),
   ]);
   const view = createCategoryCatalogView(catalog.data);

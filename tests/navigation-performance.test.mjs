@@ -3,6 +3,7 @@ import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 const rootPath = fileURLToPath(root);
@@ -259,6 +260,7 @@ test("async pages avoid duplicate vinext probes without losing dynamic HTTP erro
   for (const page of [
     "app/admin/page.tsx",
     "app/admin/[id]/page.tsx",
+    "app/admin/moderation/page.tsx",
     "app/auth/result/page.tsx",
     "app/auth/update-password/page.tsx",
     "app/category/[slug]/page.tsx",
@@ -283,6 +285,28 @@ test("request-driven mutations do not schedule a duplicate replace plus refresh 
     for (const file of await walk(join(rootPath, directory))) {
       const text = await readFile(file, "utf8");
       if (/\brouter\.replace\s*\(/.test(text) && /\brouter\.refresh\s*\(/.test(text)) {
+        if (relative(rootPath, file).split(sep).join("/") === "components/moderation-owner-controls.tsx") {
+          // Both names in a file are not evidence of two navigations. Execute
+          // the actual action: delete replaces, edit/archive refresh, failures
+          // do neither. Keep the conservative scan for other components.
+          const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+          let action;
+          const visit = node => { if (ts.isFunctionDeclaration(node) && node.name?.text === "act") action = node; ts.forEachChild(node, visit); };
+          visit(ast);
+          assert.ok(action, "the owner navigation contract must remain executable");
+          const compiled = ts.transpileModule(action.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+          for (const operation of ["edit", "archive", "delete"]) for (const status of [200, 409, 500]) {
+            const calls = [];
+            const act = new Function("fetch", "router", "busy", "reason", "setBusy", "setFeedback", "listingId", "revision", "name", "text", "amount", "kk", compiled + ";return act;")(
+              async () => new Response(null, { status }),
+              { replace: path => calls.push(["replace", path]), refresh: () => calls.push(["refresh"]) },
+              false, "fixture reason", () => {}, () => {}, "fixture", "revision", "title", "description", "100", false,
+            );
+            await act(operation);
+            assert.deepEqual(calls, status !== 200 ? [] : operation === "delete" ? [["replace", "/admin"]] : [["refresh"]], `${operation}/${status}`);
+          }
+          continue;
+        }
         offenders.push(relative(rootPath, file).split(sep).join("/"));
       }
     }

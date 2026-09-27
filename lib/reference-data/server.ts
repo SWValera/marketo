@@ -4,6 +4,7 @@ import { requestCache as cache } from "@/lib/http/read-scope";
 import {
   getCategoryAttributes,
   listActiveCategories,
+  listBrowseCategories,
   listHomeCategories,
   listActiveCountries,
   listActiveRegions,
@@ -59,6 +60,11 @@ const categoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<C
   maxEntries: 1,
   ttlMilliseconds: envelopeTtl,
 });
+const browseCategoryCache = createSingleFlightTtlCache<string, ReferenceDataEnvelope<CategoryReferenceData>>({
+  shareInFlight: false,
+  maxEntries: 1,
+  ttlMilliseconds: envelopeTtl,
+});
 type HomeCategoryReferenceData = {
   categories: Array<ReferenceCategory & { childCount: number }>;
 };
@@ -102,6 +108,19 @@ export const getCategoryReferences = cache(async (): Promise<ReferenceDataEnvelo
     try {
       const rows = await listActiveCategories(createSupabasePublicServerClient());
       return ready(mapCategoryReferenceRows(rows));
+    } catch {
+      return failed(EMPTY_CATEGORIES);
+    }
+  });
+});
+
+// Separate from the full publishing catalog; never populate that cache with
+// incomplete form metadata. Both keep the same bounded public-only TTL.
+export const getBrowseCategoryReferences = cache(async (): Promise<ReferenceDataEnvelope<CategoryReferenceData>> => {
+  return browseCategoryCache.getOrLoad("browse-categories", async () => {
+    if (!tryGetServerSupabasePublicConfig()) return unavailable(EMPTY_CATEGORIES);
+    try {
+      return ready(mapCategoryReferenceRows(await listBrowseCategories(createSupabasePublicServerClient())));
     } catch {
       return failed(EMPTY_CATEGORIES);
     }

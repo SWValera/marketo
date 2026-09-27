@@ -76,6 +76,7 @@ test('listing metadata and content share their successful detail hydration',asyn
   assert.match(html,/SEO Seller/);
   assert.equal(calls.filter(p=>p==='/rest/v1/listings').length,1);
   assert.equal(calls.filter(p=>p==='/rest/v1/seller_profiles').length,1);
+  assert.equal(calls.length,2,'public detail and metadata use two reads, no separate attribute/auth/profile waves');
 });
 
 test('failed filter definitions never silently turn a filtered page into a broad successful list',async()=>{

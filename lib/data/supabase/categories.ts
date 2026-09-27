@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { CategoryPriceMode, CategoryReferenceData } from "@/lib/reference-data/types";
 
 const CATEGORY_COLUMNS = "id, parent_id, slug, name_ru, name_kk, icon_key, tone_key, search_placeholder_ru, search_placeholder_kk, title_placeholder_ru, title_placeholder_kk, description_hint_ru, description_hint_kk, price_mode, sort_order" as const;
+const CATEGORY_BROWSE_COLUMNS = "id, parent_id, slug, name_ru, name_kk, icon_key, tone_key, search_placeholder_ru, search_placeholder_kk, price_mode, sort_order" as const;
 const CATEGORY_REFERENCE_PAGE_SIZE = 1000;
 const CATEGORY_REFERENCE_PAGE_CONCURRENCY = 2;
 
@@ -108,6 +109,19 @@ export async function listActiveCategories(client: JevuSupabaseClient) {
       throw error;
     }
     return data;
+  });
+}
+
+/** Browsing needs the hierarchy and search labels, not publishing-form hints. */
+export async function listBrowseCategories(client: JevuSupabaseClient): Promise<CategoryReferenceRow[]> {
+  return collectCategoryReferencePages(async (from, to) => {
+    const { data, error } = await client.from("categories").select(CATEGORY_BROWSE_COLUMNS)
+      .eq("is_active", true).order("sort_order").order("name_ru").order("id").range(from, to);
+    if (error) {
+      if (isUnsatisfiedPositiveRange(error, from)) return [];
+      throw error;
+    }
+    return data.map(row => ({ ...row, title_placeholder_ru: null, title_placeholder_kk: null, description_hint_ru: null, description_hint_kk: null }));
   });
 }
 

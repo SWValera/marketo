@@ -35,7 +35,12 @@ test("all 1,358 Master Catalog contracts are localized, composable and filter-sa
         assert.ok(parent, `missing dependency parent: ${category.slug}.${attribute.key}`);
         const parentValues = new Set(parent.options?.map((option) => option.value));
         for (const option of attribute.options ?? []) {
-          if (option.value === "other-model") continue;
+          if (option.value === attribute.validation?.fallbackOption) {
+            const manual = resolved.attributes.find(field => field.key === `${attribute.key}_other`);
+            assert.ok(manual?.validation?.visibleWhen?.values?.includes(option.value), `fallback needs visible manual entry: ${category.slug}.${attribute.key}`);
+            assert.ok(manual?.validation?.requiredWhen?.values?.includes(option.value), `fallback must require manual entry: ${category.slug}.${attribute.key}`);
+            continue;
+          }
           assert.ok(option.parentValue && parentValues.has(option.parentValue), `orphan dependent option: ${category.slug}.${attribute.key}.${option.value}`);
         }
       }
@@ -101,10 +106,10 @@ test("every root vertical has a representative leaf with domain-specific seller 
     ["construction-repair", "building-brick", ["material", "size_spec", "quantity", "sale_unit", "condition"], ["employment", "mileage"]],
     ["goods-rental", "rental-power-tools", ["billing_period", "minimum_term", "deposit", "documents_required", "condition"], ["rooms", "salary_from"]],
     ["electronics", "smartphones", ["brand", "model", "storage", "ram", "condition"], ["salary_from", "total_area"]],
-    ["home-garden", "home-sofas", ["furniture_type", "material", "dimensions", "delivery"], ["employment", "mileage"]],
+    ["home-garden", "home-sofas", ["furniture_type", "material", "width", "height", "depth", "delivery"], ["employment", "mileage"]],
     ["personal", "women-dresses", ["brand", "size", "season", "material"], ["rooms", "salary_from"]],
     ["kids", "baby-clothing", ["age_group", "size", "gender", "season"], ["engine_volume", "employment"]],
-    ["hobby", "sports-fitness-equipment", ["sport", "product_type", "brand", "condition"], ["rooms", "salary_from"]],
+    ["hobby", "sports-fitness-equipment", ["product_type", "brand", "condition", "max_user_weight", "equipment_weight", "foldable"], ["rooms", "salary_from"]],
     ["animals", "cats", ["breed", "age_months", "vaccinated", "pedigree"], ["mileage", "floor"]],
     ["business", "business-showcases-counters", ["brand", "model", "power", "capacity"], ["rooms", "employment"]],
     ["free", "free-furniture", ["condition", "furniture_type", "material", "delivery"], ["salary_from", "engine_volume"]],
