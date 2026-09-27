@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import {createServer,get} from 'node:http';
 import {build} from 'esbuild';
 
-// Actual React forms + SW in a browser. Auth responses are fixtures, never real accounts/emails.
+// Actual React forms in a browser without PWA. Auth responses are fixtures, never real accounts/emails.
 const root=resolve('.'),out=resolve(process.env.JEVU_AUTH_CHECK_OUTPUT||'artifacts/jevu-auth-flow-20260911/browser');
 await mkdir(out,{recursive:true});
 const candidates=[process.env.JEVU_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','/usr/bin/chromium'].filter(Boolean);
@@ -29,14 +29,12 @@ const plugins=[{name:'auth-fixtures',setup(b){
  b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:fixtures[args.path],loader:'tsx',resolveDir:root}));
 }}];
 const js=await build({stdin:{contents:entry,resolveDir:root,sourcefile:'auth-browser.tsx',loader:'tsx'},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins});
-const css=await readFile('app/globals.css'),sw=await readFile('public/sw.js'),serverCalls=[];
+const css=await readFile('app/globals.css'),serverCalls=[];
 const server=createServer((req,res)=>{
  const path=new URL(req.url,'http://fixture').pathname;serverCalls.push({path,method:req.method});
  if(path==='/ordinary-offline-fixture'){req.socket.destroy();}
- else if(path==='/sw.js'){res.setHeader('Content-Type','text/javascript');res.end(sw);}
  else if(path==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(js.outputFiles[0].contents);}
  else if(path==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}
- else if(path==='/offline.html'){res.setHeader('Content-Type','text/html');res.end('<h1>OFFLINE FIXTURE</h1>');}
  else if(path==='/api/auth/registration/start'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({callback:'https://jevu.kz/api/auth/callback?flow=signup&bridge=fixture'}));}
  else if(path==='/api/auth/registration/complete'){res.setHeader('Content-Type','application/json');res.end('{"state":"waiting"}');}
  else if(path==='/api/auth/registration/cancel'){res.setHeader('Content-Type','application/json');res.end('{}');}
@@ -110,15 +108,14 @@ try{
   await show('register','new');const shot=await send('Page.captureScreenshot',{format:'png'});await writeFile(join(out,mobile?'auth-mobile.png':'auth-desktop.png'),Buffer.from(shot.data,'base64'));
   assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
  }
- // This exact SW controls assets, but every document redirect remains native.
- await evaluate(`navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready)`);await until(`!!navigator.serviceWorker.controller`);
+ // Auth callbacks remain native document navigation without a service worker.
  for(const [path,target,native] of [['/api/auth/callback?flow=recovery&code=fixture','/auth/update-password',true],['/auth/callback?flow=recovery&code=fixture','/auth/update-password',true],['/login?mode=recover','/login',true],['/guarded-fixture','/login',true]]){
-  responses.length=0;await send('Page.navigate',{url:url+path});await until(`location.pathname===${JSON.stringify(target)}&&!!document.querySelector('form')`);assert.ok(responses.length);assert.equal(Boolean(responses.at(-1).fromServiceWorker),!native);report.push({scenario:'controlled-SW '+path.split('?')[0],status:'PASS'});
+  responses.length=0;await send('Page.navigate',{url:url+path});await until(`location.pathname===${JSON.stringify(target)}&&!!document.querySelector('form')`);assert.ok(responses.length);assert.equal(Boolean(responses.at(-1).fromServiceWorker),!native);report.push({scenario:'native document '+path.split('?')[0],status:'PASS'});
  }
  for(const [code,expected] of [['otp_expired','Срок действия ссылки истёк'],['over_request_rate_limit','Слишком много попыток']]){
   await evaluate(`history.replaceState(null,'','/login?mode=recover&auth_error=invalid#error=access_denied&error_code=${code}&error_description=RAW_PROVIDER_ERROR')`);await show('recover','new',{callbackError:'invalid'});await until(`location.hash===''`);assert.ok((await text()).includes(expected));assert.doesNotMatch(await text(),/RAW_PROVIDER_ERROR/);report.push({scenario:'provider fragment '+code,status:'PASS'});
  }
- assert.ok(await evaluate(`!!navigator.serviceWorker.controller`));report.push({scenario:'SW remains active while documents are native; optional cache tested separately',status:'PASS'});
+ assert.equal(await evaluate(`navigator.serviceWorker.controller`),null);assert.equal(await evaluate(`navigator.serviceWorker.getRegistrations().then(r=>r.length)`),0);report.push({scenario:'auth and callbacks work without a service worker',status:'PASS'});
  assert.deepEqual(errors,[]);assert.ok(serverCalls.every(x=>!x.path.includes('rest/v1')));
- await writeFile(join(out,'results.json'),JSON.stringify({status:'PASS',environment:'local Chromium real React and Service Worker; Auth fixtures; Safari engine not available',cases:report},null,2));console.log(JSON.stringify({status:'PASS',cases:report.length,output:out}));await send('Browser.close').catch(()=>{});
+ await writeFile(join(out,'results.json'),JSON.stringify({status:'PASS',environment:'local Chromium real React without PWA; Auth fixtures; Safari engine not available',cases:report},null,2));console.log(JSON.stringify({status:'PASS',cases:report.length,output:out}));await send('Browser.close').catch(()=>{});
 }finally{socket?.close();child.kill();server.close();}

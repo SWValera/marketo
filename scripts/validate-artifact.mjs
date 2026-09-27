@@ -50,8 +50,7 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   for (const [path, label] of [
     [workerConfigPath, "generated Worker configuration"],
     [clientManifestPath, "client Vite manifest"],
-    [webManifestPath, "web app manifest"],
-    [serviceWorkerPath, "service worker"],
+    [serviceWorkerPath, "retirement script"],
   ]) {
     if (!(await isFile(path))) throw artifactError(`Missing ${label}: ${path.slice(root.length + 1)}`);
   }
@@ -66,7 +65,13 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   if (!clientManifest || typeof clientManifest !== "object" || Object.keys(clientManifest).length === 0) {
     throw artifactError("Client Vite manifest is empty.");
   }
-  JSON.parse(await readFile(webManifestPath, "utf8"));
+  if (await isFile(webManifestPath) || await isFile(join(clientPath, "offline.html"))) {
+    throw artifactError("Retired PWA web app manifest or offline shell is still packaged.");
+  }
+  const retirement = await readFile(serviceWorkerPath, "utf8");
+  if (!retirement.includes("registration.unregister") || /addEventListener\(["'](?:fetch|push|sync)["']|respondWith|caches\.open/.test(retirement)) {
+    throw artifactError("Old service worker endpoint must contain only the retirement script.");
+  }
 
   const workerConfig = JSON.parse(await readFile(workerConfigPath, "utf8"));
   if (workerConfig.main !== "index.js" || workerConfig.assets?.binding !== "ASSETS" || workerConfig.assets?.directory !== "../client") {
@@ -91,7 +96,11 @@ export async function validateArtifact(environment = createSitesEnvironment().en
   }
   const serverOnlyMarkers = /SUPABASE_(?:SECRET|SERVICE_ROLE)_KEY|sb_secret_[A-Za-z0-9_-]{12,}/;
   for (const path of clientFiles.filter((item) => /\.(?:js|css|html|json|webmanifest)$/i.test(item))) {
-    if (serverOnlyMarkers.test(await readFile(path, "utf8"))) {
+    const source = await readFile(path, "utf8");
+    if (/serviceWorker\.register\s*\(|beforeinstallprompt|appinstalled/.test(source)) {
+      throw artifactError(`PWA registration/install code is packaged: ${path.slice(clientPath.length + 1)}`);
+    }
+    if (serverOnlyMarkers.test(source)) {
       throw artifactError(`Server-only credential marker found in client artifact: ${path.slice(clientPath.length + 1)}`);
     }
   }

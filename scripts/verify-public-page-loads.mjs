@@ -1,7 +1,8 @@
 // Read-only smoke: drain full responses. A 200 shell alone is not success.
 import assert from 'node:assert/strict';
+import {CATEGORY_REFERENCE_VERSION,CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT} from '../lib/reference-data/release.ts';
 const base=new URL(process.argv[2]??'http://127.0.0.1:5186');
-assert.ok(['127.0.0.1','localhost','marketo-staging.arshavin-ivan-mail-ru.workers.dev'].includes(base.hostname));
+assert.ok(['127.0.0.1','localhost','jevu.kz','marketo-staging.arshavin-ivan-mail-ru.workers.dev'].includes(base.hostname));
 const results=[];
 async function read(path,headers={}) {
   const start=Date.now();
@@ -12,18 +13,15 @@ async function read(path,headers={}) {
   return body;
 }
 try {
-  const home=await read('/?source=pwa&mode=standalone');
+  const home=await read('/');
   assert.match(home,/category-tile/);assert.match(home,/Транспорт/);
   assert.doesNotMatch(home,/data-dgst="[^"]+"/);
-  const manifestLink=home.match(/<link[^>]*rel="manifest"[^>]*href="([^"]+)"/);
-  assert.ok(manifestLink,'manifest link');
-  assert.equal(new URL(manifestLink[1],base).origin,base.origin,'PWA manifest must be same-origin');
-  const manifest=JSON.parse(await read('/manifest.webmanifest'));
-  assert.equal(new URL(manifest.start_url,base).origin,base.origin);
-  assert.equal(new URL(manifest.start_url,base).pathname,'/');
-  assert.match(await read('/sw.js'),/marketo-static-v10/);
-  const catalog=JSON.parse(await read('/api/reference/categories?v=2026-09-05.1'));
-  assert.equal(catalog.categories.length,1358);
+  assert.doesNotMatch(home,/rel="manifest"|apple-mobile-web-app-capable/);
+  const retired = await read('/sw.js');
+  assert.match(retired,/registration\.unregister/);
+  assert.doesNotMatch(retired,/respondWith|addEventListener\("fetch"/);
+  const catalog=JSON.parse(await read('/api/reference/categories?v='+CATEGORY_REFERENCE_VERSION));
+  assert.equal(catalog.categories.length,CATEGORY_REFERENCE_EXPECTED_CATEGORY_COUNT);
   for(const [path,text] of [['/categories','Транспорт'],['/category/transport','Легковые автомобили'],
     ['/category/electronics','Электроника'],['/search','Каталог'],['/profile','Войдите'],
     ['/messages','Войдите'],['/favorites','Войдите'],['/login','Добро пожаловать'],['/help','Помощь']]) {
@@ -34,9 +32,9 @@ try {
     const rsc=await read(path,{rsc:'1',accept:'text/x-component'});
     assert.match(rsc,/Транспорт/);
   }
-  // Simulate leaving the initial page early, then reopening the installed app.
+  // Simulate leaving the initial page early, then reopening the web page.
   for(let i=0;i<3;i++) {
-    const response=await fetch(new URL('/?source=pwa&mode=standalone',base),{signal:AbortSignal.timeout(15000)});
+    const response=await fetch(new URL('/',base),{signal:AbortSignal.timeout(15000)});
     await response.body.cancel();
   }
   assert.match(await read('/'),/category-tile/);

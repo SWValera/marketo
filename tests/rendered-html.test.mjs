@@ -329,7 +329,7 @@ test("core routes render through the production worker", async () => {
     ["/favorites", "Войдите, чтобы открыть избранное"], ["/messages", "Войдите, чтобы написать продавцу"],
     ["/messages/new?listing=listing-id", "Войдите, чтобы написать продавцу"],
     ["/notifications", "Войдите, чтобы открыть уведомления"], ["/login", "Добро пожаловать"],
-    ["/settings", "Настройки"], ["/help", "Помощь"], ["/offline", "Нет подключения"],
+    ["/settings", "Настройки"], ["/help", "Помощь"],
   ];
   for (const [pathname, expected] of routes) {
     const { response, html } = await render(pathname);
@@ -666,7 +666,7 @@ test("category attributes route returns Supabase-backed filters without an eleva
 });
 
 test("50 sequential direct warm Worker RSC requests keep aggregate payload bounded and avoid hidden Home listing work", async () => {
-  const routes = ["/", "/categories", "/search", "/category/jobs", "/category/services", "/help", "/offline"];
+  const routes = ["/", "/categories", "/search", "/category/jobs", "/category/services", "/help"];
   const listingRoutes = new Set(["/search", "/category/jobs", "/category/services"]);
   const rpcPath = "/rest/v1/rpc/search_catalog_listing_cards";
   const rpcBefore = supabaseRequestCounts.get(rpcPath) ?? 0;
@@ -694,8 +694,8 @@ test("50 sequential direct warm Worker RSC requests keep aggregate payload bound
   }
 
   const rpcAfter = supabaseRequestCounts.get(rpcPath) ?? 0;
-  assert.equal(expectedListingRequests, 21, "the fixed 50-request route sequence must contain 21 listing-bearing requests");
-  assert.equal(rpcAfter - rpcBefore, 21, "one catalog RPC per listing-bearing direct RSC request");
+  assert.equal(expectedListingRequests, 24, "the fixed 50-request route sequence must contain 24 listing-bearing requests");
+  assert.equal(rpcAfter - rpcBefore, expectedListingRequests, "one catalog RPC per listing-bearing direct RSC request");
   assert.ok(totalBytes < 2_500_000, `50 RSC payloads unexpectedly retained full catalog data: ${totalBytes} bytes`);
   for (const table of ["countries", "regions", "settlements"]) {
     assert.equal(

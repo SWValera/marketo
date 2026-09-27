@@ -33,27 +33,16 @@ test("paginated reference queries end with a unique id tie-breaker", async () =>
   }
 });
 
-test("PWA cache operations are namespace-scoped and offline fallback is self-contained", async () => {
-  const worker = await source("public/sw.js");
-  const offline = await source("public/offline.html");
-  assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
-  assert.doesNotMatch(worker, /await\s+caches\.match\(/);
-  assert.match(worker, /cache\.match\(OFFLINE_URL\)/);
-  assert.match(offline, /lang="und"/);
-  assert.doesNotMatch(offline, /<(?:script|link)\b/i);
-  assert.match(offline, /Нет подключения[\s\S]*Интернет байланысы жоқ/);
-});
-
-test("install prompt failures are contained and clear stale prompt state", async () => {
-  const install = await source("components/pwa-install.tsx");
-  assert.match(install, /try\s*\{[\s\S]*installPrompt\.prompt\(\)[\s\S]*installPrompt\.userChoice/);
-  assert.match(install, /catch\s*\{[\s\S]*setInstallError\(true\)/);
-  assert.match(install, /finally\s*\{[\s\S]*setInstallPrompt\(null\)[\s\S]*setInstalling\(false\)/);
+test("PWA retirement cannot intercept documents or show install prompts", async () => {
+ const worker=await source("public/sw.js");
+ assert.doesNotMatch(worker,/addEventListener\(["'](?:fetch|push|sync)["']|respondWith|caches\.open/);
+ assert.match(worker,/registration\.unregister/);
+ const layout=await source("app/layout.tsx");assert.match(layout,/LegacyPwaCleanup/);
 });
 
 test("artifact validator covers client assets, bindings and server-only credential markers", async () => {
   const validator = await source("scripts/validate-artifact.mjs");
-  for (const marker of ["client Vite manifest", "web app manifest", "service worker", "r2_buckets", "serverOnlyMarkers"]) {
+  for (const marker of ["client Vite manifest", "web app manifest", "retirement script", "r2_buckets", "serverOnlyMarkers"]) {
     assert.match(validator, new RegExp(marker));
   }
   assert.match(validator, /workerConfig\.images !== undefined/);

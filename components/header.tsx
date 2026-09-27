@@ -5,7 +5,6 @@ import { AppLink as Link } from "@/components/app-link";
 import { Bell, Heart, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LocationPicker, useStoredLocation } from "@/components/location-picker";
-import { PwaInstall } from "@/components/pwa-install";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/i18n-provider";
 import { activateModalFocus } from "@/lib/browser/modal";
@@ -53,7 +52,6 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
         </nav>
 
         <LanguageSwitcher compact />
-        <PwaInstall />
         <button
           type="button"
           className="menu-toggle"
@@ -74,7 +72,6 @@ export function Header({ categorySlug, searchPlaceholder }: { categorySlug?: str
           <Link href="/favorites" onClick={() => setMenuOpen(false)}>{t("nav.favorites")}</Link>
           <Link href="/messages" onClick={() => setMenuOpen(false)}>{t("nav.chats")}</Link>
           <Link href="/profile" onClick={() => setMenuOpen(false)}>{t("nav.profile")}</Link>
-          <PwaInstall />
           <Link prefetch={false} href="/publish" onClick={() => setMenuOpen(false)}>{t("header.publish")}</Link>
         </nav></>
       )}

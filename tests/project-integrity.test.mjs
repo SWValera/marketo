@@ -4,61 +4,14 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("PWA manifest, icons and offline update flow are complete", async () => {
-  const manifest = JSON.parse(await readFile(new URL("public/manifest.webmanifest", root), "utf8"));
-  assert.equal(manifest.display, "standalone");
-  assert.equal(manifest.display_override[0], "standalone");
-  assert.equal(manifest.scope, "/");
-  assert.notEqual(manifest.id, "/");
-  assert.equal(manifest.start_url, "/");
-  assert.equal(manifest.name, "JEVU");
-  assert.equal(manifest.short_name, "JEVU");
-  assert.equal(manifest.prefer_related_applications, false);
-  for (const [icon, width] of [["jevu-192-v1.png", 192], ["jevu-512-v1.png", 512], ["jevu-maskable-192-v1.png", 192], ["jevu-maskable-512-v1.png", 512]]) {
-    const data = await readFile(new URL(`public/icons/${icon}`, root));
-    assert.ok(data.length > 100);
-    assert.equal(data.readUInt32BE(16), width);
-    assert.equal(data.readUInt32BE(20), width);
-  }
-  assert.ok(manifest.icons.some((icon) => icon.sizes === "192x192" && icon.purpose === "any"));
-  assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "any"));
-  assert.ok(manifest.icons.some((icon) => icon.sizes === "192x192" && icon.purpose === "maskable"));
-  assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
-  const layout = await readFile(new URL("app/layout.tsx", root), "utf8");
-  const favicon = await readFile(new URL("public/favicon.ico", root));
-  assert.match(layout, /favicon\.ico/);
-  assert.equal(favicon.readUInt16LE(2), 1);
-  assert.equal(favicon.readUInt16LE(4), 3);
-  const worker = await readFile(new URL("public/sw.js", root), "utf8");
-  const runtime = await readFile(new URL("components/pwa-runtime.tsx", root), "utf8");
-  assert.match(worker, /jevu-static-v1/);
-  assert.match(worker, /"\/offline\.html"/);
-  assert.doesNotMatch(worker.match(/const APP_SHELL[^;]+;/)?.[0] ?? "", /manifest\.webmanifest|favicon/);
-  assert.match(worker, /if \(request\.mode === "navigate" \|\| request\.destination === "document"\) return;/);
-  assert.doesNotMatch(worker, /redirect: "manual"|opaqueredirect/);
-  assert.match(worker, /fetch\(request, \{ signal: controller.signal[, }]/);
-  assert.match(worker, /event\.waitUntil\(self\.skipWaiting/);
-  assert.match(worker, /postMessage\(\{ activated: true \}\)/);
-  assert.match(runtime, /updateViaCache: "none"/);
-  assert.match(runtime, /new MessageChannel\(\)/);
-  assert.match(runtime, /pwa\.updateTitle/);
-  assert.match(runtime, /4500/);
-});
-
-test("PWA install always opens on explicit iPhone or Android choice", async () => {
-  const source = await readFile(new URL("components/pwa-install.tsx", root), "utf8");
-  const { messages } = await import(new URL("lib/i18n/messages.ts", root));
-  assert.match(source, /const showInstall[\s\S]*setChoice\(null\)[\s\S]*setOpen\(true\)/);
-  assert.match(source, /setChoice\("ios"\)/);
-  assert.match(source, /setChoice\("android"\)/);
-  assert.match(source, /pwa\.androidStandaloneNote/);
-  for (const platform of ["iphone", "android"]) {
-    for (let step = 1; step <= 6; step += 1) assert.match(source, new RegExp(`pwa\\.${platform}Step${step}`));
-  }
-  assert.match(messages.ru["pwa.iphoneNote"], /WhatsApp.*Telegram.*Safari/);
-  assert.match(messages.kk["pwa.iphoneNote"], /WhatsApp.*Telegram.*Safari/);
-  assert.match(messages.ru["pwa.androidStep2"], /⋮.*правом верхнем углу/);
-  assert.match(messages.kk["pwa.androidStep2"], /жоғарғы оң жақ.*⋮/);
+test("ordinary web retains its favicon without PWA entry points", async () => {
+  const layout=await readFile(new URL("app/layout.tsx",root),"utf8");
+  const header=await readFile(new URL("components/header.tsx",root),"utf8");
+  assert.match(layout,/favicon\.ico/);
+  assert.doesNotMatch(layout,/manifest:|appleWebApp:|PwaRuntime/);
+  assert.doesNotMatch(header,/PwaInstall/);
+  for(const path of ["public/manifest.webmanifest","public/offline.html","components/pwa-install.tsx","components/pwa-runtime.tsx"])
+    await assert.rejects(access(new URL(path,root)),{code:"ENOENT"});
 });
 
 test("Kazakhstan geography provides a nationwide region and major-city bootstrap", async () => {
@@ -181,7 +134,7 @@ test("home search, City Premium Showcase and primary calls to action navigate to
   const showcase = await readFile(new URL("components/city-premium-showcase.tsx", root), "utf8");
   const header = await readFile(new URL("components/header.tsx", root), "utf8");
   assert.match(home, /<Link(?=[^>]*\bhref="\/publish")(?=[^>]*\bprefetch=\{false\})[^>]*\bclassName="primary-action"/);
-  assert.match(home, /<CityPremiumShowcase \/>/);
+  assert.match(home, /<CityPremiumShowcase initial=\{initialShowcase\} \/>/);
   assert.match(home, /<HomeMarketplaceTabs catalog=\{catalogPanel\} \/>/);
   assert.match(showcase, /href=\{`\/listing\/\$\{item\.listingId\}-\$\{item\.slug\}`\}/);
   assert.match(header, /<form(?=[^>]*\bclassName="header-search")(?=[^>]*\baction="\/search")(?=[^>]*\brole="search")[^>]*>/);

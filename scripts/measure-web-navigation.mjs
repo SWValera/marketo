@@ -1,0 +1,31 @@
+// Explicit read-only lab run against a production build; never writes listings/auth.
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {testBrowser,delay} from '../tests/helpers/browser.mjs';
+const phase=process.env.JEVU_PERF_PHASE||'before',base=process.env.JEVU_PERF_BASE||'https://jevu.kz';
+const output='artifacts/pwa-removal';await mkdir(output,{recursive:true});
+const listing=base.startsWith('http://127.0.0.1:') ? (await (await fetch(base+'/__fixture/info')).json()).listing : JSON.parse(await readFile(output+'/http-before.json','utf8')).listing;
+const routes=[['home','/',"document.querySelector('.category-grid .category-tile') && document.querySelector('.showcase-card')"],['catalog','/search',"document.querySelector('.catalog-client, .catalog-layout, .catalog-toolbar, .listing-grid, .empty-state')"],...(listing?[['listing',listing,"document.querySelector('.listing-gallery, .listing-detail, .listing-main')"]]:[]),['profile','/profile',"document.querySelector('main')?.innerText.includes('Войдите')"],['chat','/messages',"document.querySelector('main')?.innerText.includes('Войдите')"]];
+const results=[];const count=Number(process.env.JEVU_PERF_REPEATS||3);
+for(const [scenario,path,ready] of routes)for(let repeat=0;repeat<count;repeat++){
+ const browser=await testBrowser({output});let requests=[],errors=[];let started=0;
+ browser.on('Network.requestWillBeSent',x=>requests.push({id:x.requestId,path:new URL(x.request.url).pathname,type:x.type,start:x.timestamp,fromSW:false,bytes:0}));
+ browser.on('Network.responseReceived',x=>{const r=requests.findLast(r=>r.id===x.requestId);if(r)Object.assign(r,{status:x.response.status,fromSW:x.response.fromServiceWorker,headers:x.timestamp,mime:x.response.mimeType,cache:x.response.fromDiskCache});});
+ browser.on('Network.loadingFinished',x=>{const r=requests.findLast(r=>r.id===x.requestId);if(r)Object.assign(r,{end:x.timestamp,bytes:x.encodedDataLength});});
+ browser.on('Runtime.exceptionThrown',x=>errors.push(x.exceptionDetails.exception?.description??x.exceptionDetails.text));
+ try{
+  if(base.startsWith('http://127.0.0.1:')) {
+   await browser.send('Fetch.enable',{patterns:[{urlPattern:'https://*.supabase.co/*'}]});
+   browser.on('Fetch.requestPaused',async x=>{try{const r=await fetch(base+'/__fixture/upstream?url='+encodeURIComponent(x.request.url));await browser.send('Fetch.fulfillRequest',{requestId:x.requestId,responseCode:r.status,responseHeaders:[{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'}],body:Buffer.from(await r.arrayBuffer()).toString('base64')});}catch{await browser.send('Fetch.failRequest',{requestId:x.requestId,errorReason:'Failed'});}});
+  }
+  await browser.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  await browser.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.__lab={longtasks:[],lcp:[],images:[],readyAt:null,firstVisiblePhoto:null};const photoFrame=()=>{if(window.__lab.firstVisiblePhoto===null){const photo=[...document.querySelectorAll(".listing-gallery img,.showcase-media img,.listing-card img")].find(i=>{const r=i.getBoundingClientRect();return i.complete&&i.naturalWidth>0&&r.width>0&&r.height>0&&r.top<innerHeight&&r.bottom>0&&getComputedStyle(i).visibility==='visible'&&!i.closest('[hidden]')});if(photo)window.__lab.firstVisiblePhoto=performance.now();else requestAnimationFrame(photoFrame)}};requestAnimationFrame(photoFrame);new PerformanceObserver(l=>window.__lab.longtasks.push(...l.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:'longtask',buffered:true});new PerformanceObserver(l=>window.__lab.lcp.push(...l.getEntries().map(e=>({start:e.startTime,size:e.size})))).observe({type:'largest-contentful-paint',buffered:true});document.addEventListener('load',e=>{const i=e.target;if(i instanceof HTMLImageElement&&i.matches('.listing-image,.listing-gallery img,.showcase-media img,.listing-card img')&&i.getBoundingClientRect().top<innerHeight)window.__lab.images.push({time:performance.now(),path:new URL(i.currentSrc).pathname,width:i.naturalWidth,height:i.naturalHeight})},true);const observer=new MutationObserver(()=>{if(!window.__lab.readyAt&&(${ready})){window.__lab.readyAt=performance.now();observer.disconnect()}});observer.observe(document,{subtree:true,childList:true,attributes:true});`});
+  for(const mode of ['cold','warm']){
+   requests=[];errors=[];started=performance.now();await browser.send('Page.navigate',{url:base+path});
+   let failure=null;try{await browser.until(`location.pathname===${JSON.stringify(path.split('?')[0])} && !!window.__lab?.readyAt`);}catch(error){failure=error.message;}
+   const observedUseful=Math.round(performance.now()-started);await delay(1200);
+   const metrics=await browser.evaluate(`({lab:window.__lab,nav:performance.getEntriesByType('navigation')[0]?.toJSON(),resources:performance.getEntriesByType('resource').map(e=>({path:new URL(e.name).pathname,duration:e.duration,bytes:e.transferSize,initiator:e.initiatorType})),sw:navigator.serviceWorker.controller?.scriptURL??null,manifest:!!document.querySelector('link[rel=manifest]'),images:[...document.querySelectorAll('.listing-gallery img,.showcase-media img,.listing-card img')].slice(0,5).map(i=>({complete:i.complete,width:i.naturalWidth,visible:getComputedStyle(i.closest('.showcase-grid')??i).opacity,top:i.getBoundingClientRect().top}))})`);
+   const row={scenario,mode,repeat,failure,observedUseful,...metrics,requests,errors};results.push(row);await writeFile(output+'/'+phase+'-browser.json',JSON.stringify({environment:{base,phase,browser:'installed Chromium headless',device:'1440x1000 DPR1 desktop emulation',network:base.startsWith('http://127.0.0.1:')?'loopback fixture; no network/CPU throttling; uncompressed local static assets':'native Mac network, no CPU throttling',auth:'guest',cache:'cold=fresh isolated profile per scenario/repeat; warm=same URL/profile second document',repeats:count},results},null,2));
+   console.log(JSON.stringify({phase,scenario,repeat,mode,useful_ms:Math.round(metrics.lab?.readyAt??observedUseful),ttfb_ms:Math.round(metrics.nav?.responseStart??0),requests:requests.length,bytes:requests.reduce((n,r)=>n+r.bytes,0),errors:errors.length,failure}));
+  }
+ }finally{await browser.close();}
+}

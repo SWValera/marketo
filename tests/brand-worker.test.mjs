@@ -29,10 +29,7 @@ test('compiled Cloudflare application renders JEVU metadata, logo, SEO and WWW r
    const html=await response.text();
    assert.match(html,/<title>[^<]*JEVU[^<]*<\/title>/,path);
    assert.match(html,/<meta name="application-name" content="JEVU"/);
-   assert.match(html,/<meta name="apple-mobile-web-app-title" content="JEVU"/);
-   // Miniflare dispatch preserves the request URL but rewrites Host to its
-   // loopback listener. Install assets must stay local; SEO must still be JEVU.
-   assert.equal(html.match(/rel="manifest" href="([^"]+)"/)?.[1],new URL('/manifest.webmanifest',await mf.ready).href);
+   assert.doesNotMatch(html,/apple-mobile-web-app-(?:capable|title|status-bar-style)|rel="manifest"|beforeinstallprompt/);
    assert.match(html,/https:\/\/jevu.kz\/icons\/jevu-512-v1.png/);
    const jsons=[...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map(m=>JSON.parse(m[1]));
    const graph=jsons.flatMap(x=>x['@graph']??[]);

@@ -25,6 +25,7 @@ import { useReferenceGeography } from "@/components/reference-geography-provider
 import { localize, localeTag } from "@/lib/i18n/config";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { createSingleFlightTtlCache } from "@/lib/reference-data/cache";
+import { fetchWithDeadline } from "@/lib/http/fetch-deadline";
 import { getSettlement } from "@/lib/reference-data/geography";
 import { useServerDeadlines } from "@/components/use-publication-deadline";
 import { useShowcaseTimeline } from "@/components/use-showcase-timeline";
@@ -59,7 +60,7 @@ const createPaidPlacementCache = () => createSingleFlightTtlCache<string, PaidRe
 });
 
 async function requestPaidPlacements(cityId: string) {
-  const response = await fetch(`/api/showcase?city=${encodeURIComponent(cityId)}`, {
+  const response = await fetchWithDeadline(`/api/showcase?city=${encodeURIComponent(cityId)}`, {
     headers: { accept: "application/json" },
   });
   if (!response.ok) throw new Error("showcase_unavailable");
@@ -190,9 +191,10 @@ export function CityPremiumShowcase({ initial }: { initial?: ShowcaseSnapshot })
     ? premiumCarouselPage(carouselItems, lastFrame.page, cardsPerPage) : targetPage;
   const currentItems = new Set(page.items);
   const targetItems = new Set(targetPage.items);
-  const pageReady = isPageReady(page);
   const prepared = premiumPreparedIndexes(carouselItems.length, targetPage.pageIndex, cardsPerPage);
-  const initialLoading = !hydrated || !layoutReady || !pageReady;
+  // Data/layout determine readiness. One slow photo must not hide other cards
+  // or their text; each image retains its own decode/error placeholder.
+  const initialLoading = !hydrated || !layoutReady || !dataReady;
   const moveToPage = carousel.selectPage;
   const paidLoading = paidState.city !== selectedLocation || paidState.status === "idle";
   const cityLabel = selectedCity ? localize(selectedCity.name, locale) : t("common.allKazakhstan");
@@ -223,7 +225,7 @@ export function CityPremiumShowcase({ initial }: { initial?: ShowcaseSnapshot })
     {viewAll && paidLoading ? <p className="showcase-status" role="status">{t("common.loading")}…</p> : null}
     <div className="showcase-carousel-area">
     <div
-      className={["showcase-grid", viewAll ? "showcase-grid-all" : !pageReady ? "showcase-grid-pending" : ""].filter(Boolean).join(" ")}
+      className={["showcase-grid", viewAll ? "showcase-grid-all" : ""].filter(Boolean).join(" ")}
       role="group"
       aria-label={viewAll ? t("showcase.viewAll") : t("showcase.page", { page: page.pageIndex + 1, total: page.pageCount })}
       tabIndex={viewAll ? -1 : 0}

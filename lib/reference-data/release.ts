@@ -1,7 +1,7 @@
 /**
  * Public reference payload versions. Bump the relevant value whenever its
  * canonical source changes. The version is part of the request URL, so the
- * browser and PWA may cache these public payloads without serving an older
+ * browser may cache these public payloads without serving an older
  * catalog after a release.
  */
 export const CATEGORY_REFERENCE_VERSION = "2026-09-13.1";

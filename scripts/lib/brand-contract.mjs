@@ -26,8 +26,8 @@ export const brandCompatibility = {
  'lib/phone/protection.ts':[`__Host-${old}-phone`,`${old}-phone-cookie:`,`${old}-phone-quota:`],
  'lib/publish/recovery.ts':[`${old}-listing-draft:`],
  'lib/site-origin.ts':[`https://${old}-staging.arshavin-ivan-mail-ru.workers.dev`],
- 'public/manifest.webmanifest':[`/${old}-pwa-v1`],
- 'public/sw.js':[`${old}-static-`,`x-${old}-reference-version`],
+ 'public/sw.js':[`${old}-static-`,`${old}-shell-`],
+ 'lib/browser/retire-pwa.ts':[`${old}-static-`,`${old}-shell-`],
 };
 
 export function unapprovedLegacyBrand(path, text){

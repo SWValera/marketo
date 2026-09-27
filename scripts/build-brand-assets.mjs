@@ -13,11 +13,6 @@ for(const size of [16,32,180,192,512]){
  const name=size===180?'apple-touch-icon':`jevu-${size}-v1`;
  await sharp(source).rotate().resize(size,size,{fit:'contain',background,withoutEnlargement:true}).png().toFile(`public/icons/${name}.png`);
 }
-for(const size of [192,512]){
- const inset=Math.round(size*0.68);
- const logo=await sharp(source).rotate().resize(inset,inset,{fit:'contain',background,withoutEnlargement:true}).png().toBuffer();
- await sharp({create:{width:size,height:size,channels:3,background}}).composite([{input:logo,gravity:'centre'}]).png().toFile(`public/icons/jevu-maskable-${size}-v1.png`);
-}
 // ICO uses exact PNG entries: 16, 32 and 48 px, preserving alpha/colour.
 const entries=[];
 for(const size of [16,32,48])entries.push({size,bytes:await sharp(source).resize(size,size,{fit:'contain',background}).png().toBuffer()});

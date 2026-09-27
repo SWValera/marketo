@@ -14,7 +14,7 @@ const image='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.
 const category={id:categoryId,parentId:null,slug:'free-other',name:{ru:'Тестовая категория',kk:'Сынақ санаты'},icon:'gift',tone:'green',searchPlaceholder:null,titlePlaceholder:null,descriptionHint:null,priceMode:'free',sortOrder:1};
 const draft={id:listingId,slug:'fixture',status:'draft',categoryId,categorySlug:'free-other',settlementId:cityId,title:'Тестовое объявление',description:'Достаточно подробное тестовое описание',price:null,currencyCode:'KZT',contactName:'Тест',contactPhone:'+77001234567',allowMessages:true,attributes:{},images:[{id:'photo',url:image,sortOrder:0}],rejectionReasonCode:null,rejectedAt:null,updatedAt:'2026-09-20T00:00:00Z'};
 const mocks={
- 'next/navigation':'export const useRouter=()=>({push:()=>{},refresh:()=>{}});',
+ 'next/navigation':'const router={push:()=>{},refresh:()=>{}};export const useRouter=()=>router;',
  '@/components/app-link':'export const AppLink=({prefetch,children,...props})=><a {...props}>{children}</a>;',
  '@/components/i18n-provider':`import {translate} from './lib/i18n/messages';const lang=new URLSearchParams(location.search).get('lang')||'ru';const t=(k,v)=>translate(lang,k,v);export const useI18n=()=>({locale:lang,t});`,
  '@/components/location-picker':`export const useStoredLocation=()=>${JSON.stringify(cityId)};export const LocationPicker=()=> <button type='button'>Город</button>;`,
@@ -26,7 +26,7 @@ const mocks={
  '@/lib/media/client-image-normalization':`export const normalizeListingPhotoForUpload=async file=>file;export const preparePhotoSelection=async files=>({successes:files,failures:[]});`,
  '@/lib/media/photo-preview':`export const createPhotoPreview=async file=>URL.createObjectURL(file);`,
 };
-const fixturePlugin=mocks=>({name:'fixture-boundaries',setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:'fixture'}:null);b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'tsx',resolveDir:root}));}});
+const fixturePlugin=mocks=>({name:'fixture-boundaries',setup(b){b.onResolve({filter:/.*/},a=>Object.hasOwn(mocks,a.path)?{path:a.path,namespace:'fixture'}:a.path==='./i18n-provider'&&mocks['@/components/i18n-provider']?{path:'@/components/i18n-provider',namespace:'fixture'}:null);b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'tsx',resolveDir:root}));}});
 const entry=`import React from 'react';import{createRoot}from'react-dom/client';import{PublishForm}from'./components/publish-form';import{OwnerListingActions}from'./components/owner-listing-actions';localStorage.clear();const p=new URLSearchParams(location.search);const draft=${JSON.stringify(draft)};if(p.has('rejected'))draft.status='rejected';createRoot(document.getElementById('app')).render(p.has('profile')?<OwnerListingActions listing={{id:draft.id,slug:'fixture',status:'active'}}/>:<><main className='page-shell publish-page'><PublishForm userId='fixture-user' catalog={{status:'ready',data:{categories:[${JSON.stringify(category)}]}}} profileDefaults={{displayName:'Тест',contactPhone:'+77001234567',cityId:${JSON.stringify(cityId)}}} initialDraft={p.has('edit')||p.has('rejected')?draft:null}/></main><nav className='mobile-bottom-nav'><a>Главная</a><a>Подать</a><a>Профиль</a></nav></>);`;
 const app=await build({stdin:{contents:entry,loader:'tsx',resolveDir:root},bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},plugins:[fixturePlugin(mocks)]});
 const routePath=join(out,'submit-route.mjs');
@@ -48,6 +48,7 @@ globalThis.__publishClient={auth:{getUser:async()=>({data:{user:{id:'fixture-use
 const css=(await readFile('app/globals.css','utf8')).replace('@import "tailwindcss";','');
 const server=createServer(async(req,res)=>{try{
  const path=new URL(req.url,'http://fixture').pathname;
+ if(path.endsWith('/moderation')&&req.method==='GET'){res.setHeader('content-type','application/json');res.end(JSON.stringify({run_id:null,status:'HUMAN_REVIEW',reasons:[]}));return;}
  if(path.startsWith('/api/')){
   let body='';for await(const chunk of req)body+=chunk;requests.push({path,method:req.method,body:path.endsWith('/images')?'photo':body?JSON.parse(body):null});
   if(path.endsWith('/promotion-choice')){const url='http://'+req.headers.host+path;const response=await profileRoute[req.method](new Request(url,{method:req.method,headers:req.headers,...(body?{body}:{})}),{params:Promise.resolve({id:listingId})});res.writeHead(response.status,{'content-type':'application/json'});res.end(await response.text());return;}

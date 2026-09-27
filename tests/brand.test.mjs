@@ -8,7 +8,6 @@ import {unapprovedLegacyBrand} from '../scripts/lib/brand-contract.mjs';
 
 const read=(path)=>readFile(path,'utf8');
 const legacy=new RegExp('mar'+'keto','i');
-const manifest=JSON.parse(await read('public/manifest.webmanifest'));
 const logo=await readFile('assets/brand/jevu-logo-source.jpg');
 const sha256=(bytes)=>createHash('sha256').update(bytes).digest('hex');
 // Approved assets from 9121172, not output regenerated on the current machine.
@@ -20,8 +19,6 @@ const approvedIcons=[
   ['jevu-32-v1.png',32,'5d824c8e84a4139c54a5f43664e2723095b1ba8113c03bccde4d9f8ef6115636'],
   ['jevu-192-v1.png',192,'9b307f384910d148a907b82a96c0625c0951d34c4d77894a3247d71eb19177d5'],
   ['jevu-512-v1.png',512,'f1f47fad1a15942965766891224ed3eef12966c3072121bf66bf0408a37f54d4'],
-  ['jevu-maskable-192-v1.png',192,'29152e9e75ce7c2b81d4c1468e38842c1d0ca84f4b2a8f59fda70c3020f2fa92'],
-  ['jevu-maskable-512-v1.png',512,'25e3000c4d8e3c641912b412c2d62c4ba47b153adcf483f01ef759e5509c2dd6'],
 ];
 
 async function assertImageSize(bytes,format,width,height,label){
@@ -65,42 +62,24 @@ test('official logo and approved app icons retain their exact hashes and dimensi
   }
 });
 
-test('manifest advertises JEVU while preserving existing same-origin app identity',async()=>{
-  for(const key of ['name','short_name'])assert.equal(manifest[key],'JEVU');
-  for(const key of ['start_url','scope'])assert.equal(manifest[key],'/');
-  assert.equal(manifest.display,'standalone');
-  // Identity is intentionally non-visible and immutable for installed app updates.
-  assert.equal(manifest.id,'/'+['mar','keto-pwa-v1'].join(''));
-  assert.equal(manifest.theme_color,'#16a34a');assert.equal(manifest.background_color,'#ffffff');
-  for(const icon of [...manifest.icons,...manifest.shortcuts.flatMap(s=>s.icons)]){
-    assert.doesNotMatch(icon.src,legacy);await readFile('public'+icon.src);
-  }
-  assert.deepEqual(manifest.icons,[
-    {src:'/icons/jevu-192-v1.png',sizes:'192x192',type:'image/png',purpose:'any'},
-    {src:'/icons/jevu-512-v1.png',sizes:'512x512',type:'image/png',purpose:'any'},
-    {src:'/icons/jevu-maskable-192-v1.png',sizes:'192x192',type:'image/png',purpose:'maskable'},
-    {src:'/icons/jevu-maskable-512-v1.png',sizes:'512x512',type:'image/png',purpose:'maskable'},
-  ]);
-  assert.deepEqual(manifest.shortcuts.map(({url,icons})=>({url,icons})),['/search','/publish'].map(url=>({
-    url,icons:[{src:'/icons/jevu-192-v1.png',sizes:'192x192',type:'image/png'}],
-  })));
+test('ordinary web metadata preserves icons and does not install an app',async()=>{
+  const layout=await read('app/layout.tsx');
+  assert.doesNotMatch(layout,/manifest:|appleWebApp:|PwaRuntime/);
+  for(const asset of ['/favicon.ico','/icons/jevu-16-v1.png','/icons/jevu-32-v1.png','/icons/apple-touch-icon.png','/icons/jevu-512-v1.png'])assert.ok(layout.includes(asset),asset);
+  await assert.rejects(read('public/manifest.webmanifest'),{code:'ENOENT'});
+  await assert.rejects(read('public/offline.html'),{code:'ENOENT'});
 });
 
 test('no old brand artwork is served or referenced by public brand surfaces',async()=>{
   const files=await readdir('public',{recursive:true});
   assert.ok(files.every(file=>!legacy.test(file)));
-  for(const path of ['components/brand.tsx','components/header.tsx','components/city-premium-showcase.tsx','lib/i18n/messages.ts','public/offline.html','supabase/templates/confirmation.html','app/layout.tsx']){
+  for(const path of ['components/brand.tsx','components/header.tsx','components/city-premium-showcase.tsx','lib/i18n/messages.ts','supabase/templates/confirmation.html','app/layout.tsx']){
     assert.doesNotMatch(await read(path),legacy,path);
   }
-  const offline=await read('public/offline.html');
-  assert.match(offline,/data:image\/png;base64,/);assert.match(offline,/JEVU/);
-  const images=[...offline.matchAll(/data:image\/png;base64,([A-Za-z0-9+/=]+)/g)];
-  assert.equal(images.length,1,'offline page has exactly one embedded brand icon');
-  assert.ok(Buffer.from(images[0][1],'base64').equals(await readFile('public/icons/jevu-192-v1.png')),'offline icon exactly matches approved PNG');
   assert.match(await read('components/brand.tsx'),/jevu-192-v1\.png/);
   assert.match(await read('app/page.tsx'),/<Brand \/>/);
   assert.match(await read('components/header.tsx'),/<Brand \/>/);
-  for(const path of ['components/pwa-install.tsx','components/login-content.tsx','components/hero-slider.tsx']){
+  for(const path of ['components/login-content.tsx','components/hero-slider.tsx']){
     const source=await read(path);
     assert.match(source,/<BrandIcon /,path);
     assert.doesNotMatch(source,/>M<\//,path);

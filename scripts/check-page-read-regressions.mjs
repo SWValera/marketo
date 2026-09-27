@@ -9,7 +9,7 @@ export async function checkPageReadRegressions(environment){
   delete isolated.MARKETO_AUDIT_WORKER_ROOT;
   delete isolated.MARKETO_TEST_UNPATCHED;
   const names=['read-scope','loading-causality','page-navigation','attribute-loading',
-    'error-page-retry','category-directory-retry','favorite-read','service-worker-deadline','service-worker','test-plan'];
+    'error-page-retry','category-directory-retry','favorite-read','pwa-retirement','showcase-loading','test-plan'];
   await runProcess(process.execPath,['--test','--test-concurrency=1',...names.map(name=>`tests/${name}.test.mjs`)],{
     environment:isolated,cwd:projectRoot,timeoutMilliseconds:60000,killAfterMilliseconds:3000,
     label:'page-read regression build gate',

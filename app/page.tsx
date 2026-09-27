@@ -36,8 +36,8 @@ function HomeCatalogFallback({ locale }: { locale: Locale }) {
   </section>;
 }
 
-async function HomeCatalogPanel({ locale }: { locale: Locale }) {
-  const catalog = await getHomeCategoryReferences();
+async function HomeCatalogPanel({ locale, catalogRead }: { locale: Locale; catalogRead: ReturnType<typeof getHomeCategoryReferences> }) {
+  const catalog = await catalogRead;
   const rootCategories = sortCategoryReferences(catalog.data.categories);
   return <section className="home-tab-panel" aria-labelledby="home-catalog-title" data-marketo-error={catalog.status !== "ready" || undefined}>
     <HomeCatalogHeading locale={locale} />
@@ -46,6 +46,8 @@ async function HomeCatalogPanel({ locale }: { locale: Locale }) {
 }
 
 export default async function Home() {
+  // Independent public reads overlap; category data need not wait for showcase RPCs.
+  const catalogRead = getHomeCategoryReferences();
   const initialRead = (async (): Promise<ShowcaseSnapshot> => {
     const storedCity = (await cookies()).get("jevu-showcase-city")?.value;
     const city = storedCity && (storedCity === "all" || /^[0-9a-f-]{36}$/i.test(storedCity)) ? storedCity : "all";
@@ -60,7 +62,7 @@ export default async function Home() {
   })();
   const [i18n, initialShowcase] = await Promise.all([getServerI18n(), initialRead]);
   const { locale, t } = i18n;
-  const catalogPanel = <Suspense fallback={<HomeCatalogFallback locale={locale} />}><HomeCatalogPanel locale={locale} /></Suspense>;
+  const catalogPanel = <Suspense fallback={<HomeCatalogFallback locale={locale} />}><HomeCatalogPanel locale={locale} catalogRead={catalogRead} /></Suspense>;
 
   return <>
     <Header />

@@ -105,7 +105,6 @@ test("known public assets and framework asset namespaces remain available", () =
     "/favicon.ico",
     "/file.svg",
     "/globe.svg",
-    "/manifest.webmanifest",
     "/robots.txt",
     "/sitemap.xml",
     "/sitemap-1.xml",

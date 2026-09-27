@@ -25,7 +25,6 @@ const PUBLIC_ROOT_ASSETS = new Set([
   "/favicon.ico",
   "/file.svg",
   "/globe.svg",
-  "/manifest.webmanifest",
   "/robots.txt",
   "/sitemap.xml",
   "/sw.js",

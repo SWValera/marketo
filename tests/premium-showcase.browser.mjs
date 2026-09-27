@@ -15,7 +15,6 @@ const mocks={
  "@/components/category-link":"export const CategoryLink=({children,cityId,...props})=><a {...props}>{children}</a>;",
  "@/components/i18n-provider":"import {translate} from './lib/i18n/messages';export const useI18n=()=>({locale:window.lang,t:(key,values)=>translate(window.lang,key,values)});",
  "@/components/location-picker":"import {useSyncExternalStore} from 'react';let city='fixture-city';const listeners=new Set();window.changeLocation=(value,count,delay=0)=>{window.fixtureCounts[value]=count;window.scopeDelay=delay;city=value;listeners.forEach(f=>f())};export const useStoredLocation=()=>useSyncExternalStore(f=>{listeners.add(f);return()=>listeners.delete(f)},()=>city,()=>city);export const LocationPicker=({className})=><button className={className}>Петропавловск</button>;",
- "@/components/pwa-install":"export const PwaInstall=()=> <button className='install-header-button'><span className='install-header-label'>Установить</span><span className='install-header-icon'>↓</span></button>;",
  "@/components/language-switcher":"export const LanguageSwitcher=()=> <div className='language-switcher compact'><button>RU</button><button>КАЗ</button></div>;",
  "@/components/reference-geography-provider":"const value={data:{regions:[],settlements:[{id:'fixture-city',name:{ru:'Петропавловск',kk:'Петропавл'}}]},ensureLoaded:()=>{}};export const useReferenceGeography=()=>value;",
 };
@@ -23,7 +22,7 @@ const entry=`
 import React from 'react';import{createRoot,hydrateRoot}from'react-dom/client';import{renderToString}from'react-dom/server';import{CityPremiumShowcase}from'./components/city-premium-showcase';import{Header}from'./components/header';
 const params=new URLSearchParams(location.search),count=Number(params.get('count')||0);window.lang=params.get('lang')||'ru';window.ready=false;window.fixtureCounts={'fixture-city':count};window.scopeDelay=0;window.requestScopes=[];
 const shapes=params.has('healthy')?['landscape','portrait','square']:['landscape','portrait','square','missing','broken'];
-const placementsFor=count=>Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:'listing-'+i,slug:'fixture',title:i===0?'Длинное название объявления для проверки переноса текста':'Объявление '+(i+1),priceMinor:i===0?100000000:1000000,currencyCode:'KZT',locationRu:'Петропавловск',locationKk:'Петропавл',imageUrl:shapes[i%shapes.length]==='missing'?null:'/api/media/listings/fixture/'+i+'/'+shapes[i%shapes.length]+'.svg?delay='+Number(params.get('delay')||180),expiresAt:new Date(Date.now()+86400000).toISOString()}));
+const placementsFor=count=>Array.from({length:count},(_,i)=>({id:'placement-'+i,listingId:'listing-'+i,slug:'fixture',title:i===0?'Длинное название объявления для проверки переноса текста':'Объявление '+(i+1),priceMinor:i===0?100000000:1000000,currencyCode:'KZT',locationRu:'Петропавловск',locationKk:'Петропавл',imageUrl:shapes[i%shapes.length]==='missing'?null:'/api/media/listings/fixture/'+i+'/'+shapes[i%shapes.length]+'.svg?delay='+(params.has('slow-peer')?(i===0?80:4000):Number(params.get('delay')||180)),expiresAt:new Date(Date.now()+86400000).toISOString()}));
 window.fetch=async url=>{if(url==='/api/lifecycle/time')return new Response(JSON.stringify({now:Math.max(1,window.__fakeNow)}),{headers:{'content-type':'application/json'}});const city=new URL(url,location.origin).searchParams.get('city');window.requestScopes.push(city);const count=window.fixtureCounts[city]??0;const ms=window.scopeDelay;await new Promise(r=>setTimeout(r,ms));window.ready=true;return new Response(JSON.stringify({capacity:city==='all'?null:15,placements:placementsFor(count)}),{headers:{'content-type':'application/json'}})};
 const initial=params.has("ssr")?{city:"fixture-city",items:placementsFor(count),capacity:15,status:"ready"}:undefined;const tree=<><Header/><main className="page-shell home-showcase-shell"><CityPremiumShowcase initial={initial}/></main><section className="page-shell home-marketplace"><div className="home-marketplace-tabs"><button>Каталог</button><button>Объявления</button></div><div className="section-heading"><div><span className="section-kicker">Полный каталог</span><h2>Популярные категории</h2></div></div><div style={{height:180}}/></section><nav className="mobile-bottom-nav"><a href="#app">JEVU</a></nav></>;
 if(initial){window.ready=true;document.getElementById('app').innerHTML=renderToString(tree);window.ssrHtml=document.getElementById('app').innerHTML;hydrateRoot(document.getElementById('app'),tree)}else createRoot(document.getElementById('app')).render(tree);
@@ -57,16 +56,34 @@ try{
  let visit=0;
  const navigate=async url=>{const target=url+"&visit="+(++visit);await send("Page.navigate",{url:target});await until("location.href==="+JSON.stringify(target)+" && window.ready && !!document.querySelector('.showcase-status')");};
  await send("Page.enable");await send("Runtime.enable");
- await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__decoded=new WeakSet();window.__partialFrames=0;const originalDecode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(){return originalDecode.call(this).then(()=>{window.__decoded.add(this)})};const inspect=()=>{for(const c of document.querySelectorAll('.showcase-paid-card:not([hidden])')){const img=c.querySelector('img'),text=c.querySelector('.showcase-card-copy strong');if(img&&text&&getComputedStyle(text).visibility==='visible'&&getComputedStyle(img).display!=='none'&&(!img.complete||!img.naturalWidth||!window.__decoded.has(img)))window.__partialFrames++}requestAnimationFrame(inspect)};requestAnimationFrame(inspect);"});
+ await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__decoded=new WeakSet();window.__partialFrames=0;const originalDecode=HTMLImageElement.prototype.decode;HTMLImageElement.prototype.decode=function(){return originalDecode.call(this).then(()=>{window.__decoded.add(this)})};const inspect=()=>{for(const c of document.querySelectorAll('.showcase-paid-card:not([hidden])')){const img=c.querySelector('img'),text=c.querySelector('.showcase-card-copy strong');if(img&&text&&getComputedStyle(text).visibility==='visible'&&getComputedStyle(img).display!=='none'&&getComputedStyle(img).visibility==='visible'&&(!img.complete||!img.naturalWidth||!window.__decoded.has(img)))window.__partialFrames++}requestAnimationFrame(inspect)};requestAnimationFrame(inspect);"});
  await send("Page.addScriptToEvaluateOnNewDocument",{source:"window.__fakeNow=Number(new URLSearchParams(location.search).get('now')||0);\nDate.now=()=>window.__fakeNow;\nwindow.__hidden=false;\nObject.defineProperty(document,'hidden',{configurable:true,get:()=>window.__hidden});\nwindow.__clockTimers=new Map();window.__clockID=0;window.__clockMax=0;\nwindow.__setBoundary=(fn,delay)=>{const id=++window.__clockID;window.__clockTimers.set(id,{fn,at:Date.now()+delay});window.__clockMax=Math.max(window.__clockMax,window.__clockTimers.size);return id;};\nwindow.__clearBoundary=id=>window.__clockTimers.delete(id);\nwindow.__advance=to=>{while(true){const entry=[...window.__clockTimers].sort((a,b)=>a[1].at-b[1].at)[0];if(!entry||entry[1].at>to)break;window.__fakeNow=entry[1].at;window.__clockTimers.delete(entry[0]);entry[1].fn();}window.__fakeNow=to;};\n"});
  await send("Page.addScriptToEvaluateOnNewDocument",{source:`window.imageFrames=[];const loop=()=>{if(window.ready && document.querySelector('.showcase-status')){const cards=[...document.querySelectorAll('.showcase-card:not([hidden])')];if(cards.length)window.imageFrames.push(cards.map(c=>[c.getBoundingClientRect().width,c.getBoundingClientRect().height]));}requestAnimationFrame(loop)};requestAnimationFrame(loop);`});
  const geometry=`(()=>{const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,bottom:r.bottom}};const cards=[...document.querySelectorAll('.showcase-card:not([hidden])')];return {viewportHeight:innerHeight,scrollWidth:document.documentElement.scrollWidth,columns:getComputedStyle(document.querySelector('.showcase-grid')).gridTemplateColumns.split(' ').length,real:cards.filter(c=>c.classList.contains('showcase-paid-card')).length,demo:cards.filter(c=>c.classList.contains('showcase-brand-card')).length,links:cards.filter(c=>c.classList.contains('showcase-paid-card')).map(c=>c.getAttribute('href')),counter:document.querySelector('.showcase-status')?.textContent,cards:cards.map(c=>({box:rect(c),media:c.querySelector('.showcase-media')?rect(c.querySelector('.showcase-media')):null,image:c.querySelector('img')&&getComputedStyle(c.querySelector('img')).display!=='none'?{...rect(c.querySelector('img')),fit:getComputedStyle(c.querySelector('img')).objectFit}:null,copy:rect(c.querySelector('.showcase-card-copy')),overflow:c.scrollWidth>c.clientWidth}))}})()`;
  const assertGeometry=(g,width,columns)=>{assert.ok(g.scrollWidth<=width, "No horizontal overflow");assert.equal(g.columns,columns);for(const c of g.cards){assert.ok(!c.overflow);assert.ok(c.copy.bottom<=c.box.bottom+1);if(c.media){assert.ok(Math.abs(c.media.h-(columns===3?Math.max(64,Math.min(g.viewportHeight-311,112)):Math.min(c.media.w*.75,columns===4?180:240)))<1);if(c.image){assert.equal(c.image.fit,"cover");assert.ok(Math.abs(c.image.w-c.media.w)<1);assert.ok(Math.abs(c.image.h-c.media.h)<1);assert.ok(Math.abs(c.image.y-c.media.y)<1);}}}};
 
 
+ if(process.env.JEVU_SHOWCASE_MEASURE){
+  const samples=[];
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  for(let repeat=0;repeat<3;repeat++){
+   await send('Network.setCacheDisabled',{cacheDisabled:true});
+   await navigate(origin+'/?count=2&healthy=1&ssr=1&slow-peer=1&now=0');
+   const started=performance.now();
+   let photo=null,text=null,fastLoaded=null;
+   while(performance.now()-started<6000&&(!photo||!text)){
+    const state=await evaluate("(()=>{const c=document.querySelector('.showcase-paid-card:not([hidden])'),i=c?.querySelector('img'),t=c?.querySelector('strong');return {time:performance.now(),loaded:i?.complete&&i.naturalWidth>0,photo:i?.complete&&i.naturalWidth>0&&getComputedStyle(i).visibility==='visible',text:t&&getComputedStyle(t).visibility==='visible'}})()");
+    if(state.loaded&&!fastLoaded)fastLoaded=state.time;if(state.photo&&!photo)photo=state.time;if(state.text&&!text)text=state.time;
+    await delay(20);
+   }
+   samples.push({photo_ms:Math.round(photo),text_ms:Math.round(text),firstImageLoaded_ms:Math.round(fastLoaded)});
+  }
+  await writeFile('artifacts/pwa-removal/showcase-'+process.env.JEVU_SHOWCASE_MEASURE+'.json',JSON.stringify({conditions:'Actual production React component/CSS; 1440x1000; image 1 = 80ms, image 2 = 4000ms; three cold runs',samples},null,2));
+  console.log(JSON.stringify(samples));await send('Browser.close');process.exit(0);
+ }
  const counts=[0,1,2,3,4,5,6,7,8,9,14,15];
  const currentPage="(()=>{const b=[...document.querySelectorAll('.showcase-dots button')];return b.length?b.findIndex(x=>x.getAttribute('aria-current')==='true'):0})()";
- const imageReady="!document.querySelector('.showcase-grid-pending')";
+ const imageReady="!document.querySelector('.showcase-card:not([hidden])[aria-busy=true]')";
  const sizeAt=(w,h)=>w>=568&&w<=1000&&h<=500&&w>h?3:w>=1440||(w>=1024&&w>h)?4:2;
  const checkPage=async page=>until(currentPage+"==="+page);
  const settle=async()=>{await until("window.ready && !!document.querySelector('.showcase-status')");await until(imageReady);await until("document.readyState==='complete'");await evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");};
@@ -195,6 +212,14 @@ try{
  await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});await checkPage(1);assert.equal(await evaluate("[...window.__clockTimers.values()][0].at"),3000);
  await evaluate("window.__advance(6000)");await checkPage(0);assert.ok((await evaluate("location.href")).startsWith(origin));
  results.push({swipe:"PASS"});
+
+ // Ready text and the fast image must not wait for an unrelated 4-second image.
+ await navigate(origin+'/?count=2&healthy=1&ssr=1&slow-peer=1&now=0');
+ await until("(()=>{const c=document.querySelector('.showcase-paid-card'),i=c?.querySelector('img');return i?.complete&&i.naturalWidth>0&&getComputedStyle(i).visibility==='visible'})()");
+ assert.ok(await evaluate('performance.now()<2000'));
+ assert.equal(await evaluate("getComputedStyle(document.querySelectorAll('.showcase-paid-card strong')[1]).visibility"),'visible');
+ assert.equal(await evaluate("document.querySelectorAll('.showcase-paid-card img')[1].complete"),false);
+ results.push({independentPhotoReadiness:'PASS'});
 
  // SSR has URLs before hydration and no duplicate API. Slow scopes never manufacture demos.
  await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});

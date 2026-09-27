@@ -290,21 +290,10 @@ test("request-driven mutations do not schedule a duplicate replace plus refresh 
   assert.deepEqual(offenders, []);
 });
 
-test("PWA runtime detects releases promptly without discarding an in-progress draft", async () => {
-  const runtime = await source("components/pwa-runtime.tsx");
-  assert.match(runtime, /controlledAtRegistration\s*=\s*Boolean\(navigator\.serviceWorker\.controller\)/);
-  assert.match(runtime, /if\s*\(\s*!controlledAtRegistration\s*\)\s*\{[\s\S]*?controlledAtRegistration\s*=\s*true;[\s\S]*?return;/);
-  assert.match(runtime, /reloadRequested\.current/);
-  assert.match(runtime, /setInterval\([\s\S]*?visibilityState\s*===\s*["']visible["'][\s\S]*?checkForUpdate\(\)/);
-  assert.match(runtime, /addEventListener\("visibilitychange", onVisibilityChange\)/);
-  assert.match(runtime, /removeEventListener\("visibilitychange", onVisibilityChange\)/);
-  assert.match(runtime, /addEventListener\("pageshow", onPageShow\)/);
-  assert.match(runtime, /removeEventListener\("pageshow", onPageShow\)/);
-  assert.match(runtime, /addEventListener\("online", checkForUpdate\)/);
-  assert.match(runtime, /removeEventListener\("online", checkForUpdate\)/);
-  assert.match(runtime, /updateCheckInFlight/);
-  assert.match(runtime, /if \(activationRequested\.current\)[\s\S]*reloadOnce\(\)[\s\S]*setReloadAvailable\(true\)/);
-  assert.match(runtime, /activationRequested\.current = true/);
-  assert.match(runtime, /addEventListener\("statechange", onInstallingStateChange\);[\s\S]*onInstallingStateChange\(\)/);
-  assert.match(runtime, /if \(!registration\.waiting && controlledAtRegistration\) checkForUpdate\(\)/);
+test("PWA retirement never reloads forms or waits for worker readiness", async () => {
+ const cleanup=await source("lib/browser/retire-pwa.ts");
+ assert.doesNotMatch(cleanup,/\.register\(|serviceWorker\.ready|location\.reload|localStorage|sessionStorage|indexedDB/);
+ assert.match(cleanup,/getRegistrations\(\)/);
+ assert.match(cleanup,/registration\.update\(\)/);
+ assert.match(cleanup,/registration\.unregister\(\)/);
 });
