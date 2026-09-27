@@ -162,6 +162,7 @@ export type ModerationQueueItem = {
   imageUrl: string | null;
   status: string;
   automaticDecision?: string | null;
+  manualDecision?: string | null;
   overridden?: boolean;
 };
 
@@ -172,6 +173,7 @@ export type ModerationAttribute = {
 };
 
 export type ModerationListingDetail = {
+  summary: {current_revision:string;owner_controls:boolean;run_id?:string;decision?:string;manual_decision?:string|null;status?:string;basis?:string;provider_status?:string;created_at?:string};
   priceMinor: number | null;
   id: string;
   title: string;

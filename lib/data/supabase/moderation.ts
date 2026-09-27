@@ -1,8 +1,5 @@
 import type { JevuSupabaseClient } from "@/lib/data/supabase/client";
-import { getListingAttributeRecords, getListingDetail } from "@/lib/data/supabase/listings";
-import { getProfileForStaff } from "@/lib/data/supabase/profiles";
 import type {
-  ModerationAttribute,
   ModerationDecision,
   ModerationListingDetail,
   ModerationQueueItem,
@@ -15,39 +12,11 @@ import { normalizePageSize, normalizePositivePage, pageWindow } from "../paginat
 import {
   ModerationDataError,
   moderationMediaUrl,
-  normalizeModerationQueueQueryResult,
 } from "./moderation-core.ts";
 
 export { ModerationDataError, moderationMediaUrl, normalizeModerationQueueQueryResult } from "./moderation-core.ts";
 
 const MAX_QUEUE_PAGE_SIZE = 50;
-
-type QueryFailure = { code?: string; message?: string } | null;
-type QueueQueryRow = {
-  id: string;
-  title: string;
-  price_minor: number | null;
-  currency_code: string;
-  status: string;
-  owner_id: string | null;
-  category_id: string;
-  settlement_id: string;
-  created_at: string;
-  categories: unknown;
-  settlements: unknown;
-};
-
-type QueueQueryResult = { data: QueueQueryRow[] | null; error: QueryFailure; count: number | null };
-
-function singleRelation<T>(value: unknown): T | null {
-  if (Array.isArray(value)) return (value[0] as T | undefined) ?? null;
-  return value && typeof value === "object" ? value as T : null;
-}
-
-function localizedName(value: { name_ru?: string | null; name_kk?: string | null } | null, locale: Locale) {
-  if (!value) return "";
-  return locale === "kk" ? value.name_kk ?? value.name_ru ?? "" : value.name_ru ?? value.name_kk ?? "";
-}
 
 function priceLabel(priceMinor: number | null, currencyCode: string, locale: Locale) {
   if (priceMinor === null) return locale === "kk" ? "Келісімді" : "Договорная";
@@ -67,197 +36,19 @@ function dateLabel(value: string, locale: Locale) {
   }).format(new Date(value));
 }
 
-function safeNumber(value: unknown) {
-  if (typeof value === "number") return value;
-  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
-  return null;
+type QueueRow={id:string;title:string;price_minor:number|null;currency_code:string;status:string;owner_id:string|null;created_at:string;category_ru:string;category_kk:string;city_ru:string;city_kk:string;seller_name:string|null;image_key:string|null;decision:string|null;manual_decision:string|null;overridden:boolean};
+export async function listModerationQueue(client:JevuSupabaseClient,options:{page?:number;pageSize?:number;locale?:Locale;filter?:string}={}):Promise<NumberedPageResult<ModerationQueueItem>>{
+ const page=normalizePositivePage(options.page),pageSize=normalizePageSize(options.pageSize,24,MAX_QUEUE_PAGE_SIZE),locale=options.locale??'ru';
+ const {data,error}=await client.rpc('moderation_dashboard',{selected_filter:options.filter??'all',requested_page:page,page_size:pageSize});
+ if(error||!data)throw new ModerationDataError('QUEUE_UNAVAILABLE',error);
+ const result=data as unknown as {items:QueueRow[];total:number};const pagination=pageWindow(result.total,page,pageSize);
+ return {items:result.items.map(row=>({id:row.id,title:row.title,priceLabel:priceLabel(row.price_minor,row.currency_code,locale),currencyCode:row.currency_code,cityLabel:locale==='kk'?row.city_kk:row.city_ru,categoryLabel:locale==='kk'?row.category_kk:row.category_ru,createdAt:row.created_at,createdLabel:dateLabel(row.created_at,locale),sellerId:row.owner_id,sellerName:row.seller_name??(locale==='kk'?'Сатушы':'Продавец'),imageUrl:moderationMediaUrl(row.image_key),status:row.status,automaticDecision:row.decision,manualDecision:row.manual_decision,overridden:row.overridden})),total:result.total,page,totalPages:pagination.totalPages,nextCursor:page<pagination.totalPages?String(page+1):null,state:pagination.outOfRange?'out_of_range':result.total?'ready':'empty'};
 }
-
-export async function listModerationQueue(
-  client: JevuSupabaseClient,
-  options: { page?: number; pageSize?: number; locale?: Locale; filter?: string } = {},
-): Promise<NumberedPageResult<ModerationQueueItem>> {
-  const page = normalizePositivePage(options.page);
-  const pageSize = normalizePageSize(options.pageSize, 24, MAX_QUEUE_PAGE_SIZE);
-  const locale = options.locale ?? "ru";
-  const dashboard=await client.rpc('moderation_dashboard',{selected_filter:options.filter??'all',requested_page:page,page_size:pageSize});
-  if(dashboard.error||!dashboard.data)throw new ModerationDataError('QUEUE_UNAVAILABLE',dashboard.error);
-  const summary=dashboard.data as unknown as {total:number;items:{id:string;decision:string|null;overridden:boolean}[]};
-  const pagination=pageWindow(summary.total,page,pageSize);
-  if(pagination.offset===null||pagination.rangeEnd===null)return {items:[],total:summary.total,nextCursor:null,page,totalPages:pagination.totalPages,state:pagination.outOfRange?'out_of_range':'empty'};
-  const offset=pagination.offset;
-  const countResponse={count:summary.total};
-  const response=await client.from('listings').select('id, title, price_minor, currency_code, status, owner_id, category_id, settlement_id, created_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)').in('id',summary.items.map(i=>i.id)).order('created_at',{ascending:false}).order('id',{ascending:false});
-  const { rows } = normalizeModerationQueueQueryResult({ ...response, count: countResponse.count } as unknown as QueueQueryResult);
-  const total = countResponse.count;
-  if (rows.length === 0) throw new ModerationDataError("QUEUE_UNAVAILABLE");
-
-  const listingIds = rows.map((row) => row.id);
-  const ownerIds = [...new Set(rows.map((row) => row.owner_id).filter((id): id is string => Boolean(id)))];
-  const [imageResult, sellerResult] = await Promise.all([
-    client
-      .from("listing_images")
-      .select("id, listing_id, storage_key, sort_order")
-      .in("listing_id", listingIds)
-      .order("sort_order", { ascending: true })
-      .order("id", { ascending: true }),
-    ownerIds.length
-      ? client.from("profiles").select("id, display_name").in("id", ownerIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (imageResult.error || sellerResult.error) {
-    throw new ModerationDataError("QUEUE_UNAVAILABLE", imageResult.error ?? sellerResult.error);
-  }
-
-  const firstImageByListing = new Map<string, string>();
-  for (const image of imageResult.data ?? []) {
-    if (!firstImageByListing.has(image.listing_id)) firstImageByListing.set(image.listing_id, image.storage_key);
-  }
-  const sellerById = new Map((sellerResult.data ?? []).map((seller) => [seller.id, seller.display_name]));
-
-  return {
-    items: rows.map((row) => {
-      const category = singleRelation<{ name_ru: string; name_kk: string }>(row.categories);
-      const settlement = singleRelation<{ name_ru: string; name_kk: string }>(row.settlements);
-      return {
-        id: row.id,
-        title: row.title,
-        priceLabel: priceLabel(safeNumber(row.price_minor), row.currency_code, locale),
-        currencyCode: row.currency_code,
-        cityLabel: localizedName(settlement, locale),
-        categoryLabel: localizedName(category, locale),
-        createdAt: row.created_at,
-        createdLabel: dateLabel(row.created_at, locale),
-        sellerId: row.owner_id,
-        sellerName: row.owner_id
-          ? sellerById.get(row.owner_id) ?? (locale === "kk" ? "Сатушы" : "Продавец")
-          : (locale === "kk" ? "Профиль жойылған" : "Профиль удалён"),
-        imageUrl: moderationMediaUrl(firstImageByListing.get(row.id) ?? null),
-        status: row.status,
-        automaticDecision: summary.items.find(i=>i.id===row.id)?.decision,
-        overridden: summary.items.find(i=>i.id===row.id)?.overridden,
-      };
-    }),
-    total,
-    nextCursor: offset + rows.length < total ? String(page + 1) : null,
-    page,
-    totalPages: pagination.totalPages,
-    state: "ready",
-  };
-}
-
-async function categoryPath(
-  client: JevuSupabaseClient,
-  category: { id: string; parent_id: string | null; name_ru: string; name_kk: string },
-  locale: Locale,
-) {
-  const path: string[] = [];
-  let current: typeof category | null = category;
-  const visited = new Set<string>();
-  while (current && !visited.has(current.id) && path.length < 12) {
-    visited.add(current.id);
-    path.unshift(localizedName(current, locale));
-    if (!current.parent_id) break;
-    const result = await client
-      .from("categories")
-      .select("id, parent_id, name_ru, name_kk")
-      .eq("id", current.parent_id)
-      .maybeSingle() as unknown as { data: typeof category | null; error: QueryFailure };
-    if (result.error) throw new ModerationDataError("DETAIL_UNAVAILABLE", result.error);
-    current = result.data;
-  }
-  return path;
-}
-
-function scalarValue(row: Record<string, unknown>, locale: Locale) {
-  if (row.text_value !== null && row.text_value !== undefined) return String(row.text_value);
-  if (row.number_value !== null && row.number_value !== undefined) return String(row.number_value);
-  if (row.boolean_value !== null && row.boolean_value !== undefined) {
-    return row.boolean_value ? (locale === "kk" ? "Иә" : "Да") : (locale === "kk" ? "Жоқ" : "Нет");
-  }
-  if (row.date_value !== null && row.date_value !== undefined) return String(row.date_value);
-  if (row.number_min_value !== null && row.number_max_value !== null) {
-    return `${String(row.number_min_value)}–${String(row.number_max_value)}`;
-  }
-  return "";
-}
-
-function mapModerationAttributes(
-  records: Awaited<ReturnType<typeof getListingAttributeRecords>>,
-  locale: Locale,
-): ModerationAttribute[] {
-  const definitions = new Map(records.attributes.map((attribute) => [attribute.id, attribute]));
-  const options = new Map(records.options.map((option) => [option.id, option]));
-  const values = new Map<string, string[]>();
-  for (const row of records.scalarValues) {
-    const value = scalarValue(row as unknown as Record<string, unknown>, locale);
-    if (value) values.set(row.attribute_id, [value]);
-  }
-  for (const row of records.optionValues) {
-    const option = options.get(row.option_id);
-    if (!option) continue;
-    const label = locale === "kk" ? option.label_kk : option.label_ru;
-    values.set(row.attribute_id, [...(values.get(row.attribute_id) ?? []), label]);
-  }
-  return [...values.entries()]
-    .map(([attributeId, selected]) => {
-      const definition = definitions.get(attributeId);
-      if (!definition) return null;
-      const label = locale === "kk" ? definition.label_kk : definition.label_ru;
-      const unit = locale === "kk" ? definition.unit_kk : definition.unit_ru;
-      return {
-        key: definition.key,
-        label,
-        value: `${selected.join(", ")}${unit ? ` ${unit}` : ""}`,
-        sortOrder: definition.sort_order,
-      };
-    })
-    .filter((attribute): attribute is ModerationAttribute & { sortOrder: number } => Boolean(attribute))
-    .sort((left, right) => left.sortOrder - right.sortOrder)
-    .map((attribute) => ({ key: attribute.key, label: attribute.label, value: attribute.value }));
-}
-
-export async function getModerationListingDetail(
-  client: JevuSupabaseClient,
-  listingId: string,
-  locale: Locale = "ru",
-): Promise<ModerationListingDetail | null> {
-  try {
-    const row = await getListingDetail(client, listingId);
-    if (!row || !["pending","rejected","active","archived"].includes(row.status)) return null;
-    const category = singleRelation<{ id: string; parent_id: string | null; name_ru: string; name_kk: string }>(row.categories);
-    const settlement = singleRelation<{ name_ru: string; name_kk: string }>(row.settlements);
-    if (!category || !settlement) throw new ModerationDataError("DETAIL_UNAVAILABLE");
-    const [attributes, seller, resolvedCategoryPath] = await Promise.all([
-      getListingAttributeRecords(client, [row.id]),
-      row.owner_id ? getProfileForStaff(client, row.owner_id) : Promise.resolve(null),
-      categoryPath(client, category, locale),
-    ]);
-    const images = (row.listing_images as unknown as Array<{ id: string; storage_key: string; sort_order: number }>)
-      .slice()
-      .sort((left, right) => left.sort_order - right.sort_order || left.id.localeCompare(right.id))
-      .map((image) => ({ id: image.id, url: moderationMediaUrl(image.storage_key) ?? "", sortOrder: image.sort_order }));
-    return {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      priceLabel: priceLabel(safeNumber(row.price_minor), row.currency_code, locale),
-      currencyCode: row.currency_code,
-      categoryPath: resolvedCategoryPath,
-      cityLabel: localizedName(settlement, locale),
-      createdAt: row.created_at,
-      createdLabel: dateLabel(row.created_at, locale),
-      sellerId: row.owner_id,
-      sellerName: seller?.display_name ?? (locale === "kk" ? "Сатушы" : "Продавец"),
-      status: row.status as ModerationListingDetail["status"],
-      priceMinor: safeNumber(row.price_minor),
-      attributes: mapModerationAttributes(attributes, locale),
-      images,
-    };
-  } catch (error) {
-    if (error instanceof ModerationDataError) throw error;
-    throw new ModerationDataError("DETAIL_UNAVAILABLE", error);
-  }
+type CaseRow={id:string;title:string;description:string;price_minor:number|null;currency_code:string;status:ModerationListingDetail['status'];created_at:string;owner_id:string|null;seller_name:string|null;city_ru:string;city_kk:string;category_path:{ru:string;kk:string}[];images:{id:string;storage_key:string;sort_order:number}[];summary:ModerationListingDetail['summary'];attributes:{key:string;ru:string;kk:string;unit_ru:string|null;unit_kk:string|null;values:{ru?:string;kk?:string;text?:string;number?:number;boolean?:boolean;date?:string;min?:number;max?:number}[]}[]};
+export async function getModerationListingDetail(client:JevuSupabaseClient,listingId:string,locale:Locale='ru'):Promise<ModerationListingDetail|null>{
+ const {data,error}=await client.rpc('moderation_case',{target_listing_id:listingId});if(error)throw new ModerationDataError('DETAIL_UNAVAILABLE',error);if(!data)return null;
+ const r=data as unknown as CaseRow,kk=locale==='kk';
+ return {id:r.id,title:r.title,description:r.description,priceMinor:r.price_minor,priceLabel:priceLabel(r.price_minor,r.currency_code,locale),currencyCode:r.currency_code,status:r.status,createdAt:r.created_at,createdLabel:dateLabel(r.created_at,locale),sellerId:r.owner_id,sellerName:r.seller_name??(kk?'Сатушы':'Продавец'),cityLabel:kk?r.city_kk:r.city_ru,categoryPath:r.category_path.map(c=>kk?c.kk:c.ru),images:r.images.map(i=>({id:i.id,url:moderationMediaUrl(i.storage_key)??'',sortOrder:i.sort_order})),summary:r.summary,attributes:r.attributes.map(a=>({key:a.key,label:kk?a.kk:a.ru,value:a.values.map(v=>v.ru?(kk?v.kk:v.ru):v.text??v.number??(typeof v.boolean==='boolean'?(v.boolean?(kk?'Иә':'Да'):(kk?'Жоқ':'Нет')):v.date??(v.min!=null&&v.max!=null?`${v.min}–${v.max}`:''))).join(', ')+((kk?a.unit_kk:a.unit_ru)?` ${kk?a.unit_kk:a.unit_ru}`:'')}))};
 }
 
 export async function moderateListing(
@@ -266,14 +57,18 @@ export async function moderateListing(
   decision: ModerationDecision,
   reasonCode?: ModerationRejectionReason,
   note?: string,
+  receipt?: {revision:string;requestId:string},
 ) {
-  const { error } = await client.rpc("moderate_listing", {
+  const args = {
     target_listing_id: listingId,
     decision,
     reason_code: decision !== "approve" ? reasonCode ?? null : null,
     note: note?.trim() || null,
-  });
+  };
+  if(!receipt)throw new Error("revision_required");
+  const {data,error}=await client.rpc("moderate_listing_checked",{...args,expected_revision:receipt.revision,request_id:receipt.requestId});
   if (error) throw error;
+  return data;
 }
 
 export async function createReport(

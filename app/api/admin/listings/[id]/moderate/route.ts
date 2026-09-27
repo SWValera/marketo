@@ -11,6 +11,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const bodySchema = z.object({
+  revision:z.string().regex(/^[a-f0-9]{64}$/),
+  requestId:z.string().uuid(),
   decision: z.enum(["approve", "reject", "needs_fix"]),
   reasonCode: z.string().trim().max(64).nullable().optional(),
   note: z.string().trim().max(MODERATION_NOTE_MAX_LENGTH).nullable().optional(),
@@ -30,7 +32,7 @@ function rpcFailure(error: unknown) {
   if (code === "P0002" || /listing is unavailable/i.test(message)) {
     return NextResponse.json({ error: "listing_unavailable" }, { status: 404 });
   }
-  if (/transition/i.test(message)) {
+  if (code === "40001" || /transition/i.test(message)) {
     return NextResponse.json({ error: "listing_already_moderated" }, { status: 409 });
   }
   if (code === "22023" || /reason_code|note is too long|invalid moderation/i.test(message)) {
@@ -66,7 +68,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "invalid_moderation_input" }, { status: 400 });
-  if (parsed.data.decision !== "approve" && !isModerationRejectionReason(parsed.data.reasonCode)) {
+  if (parsed.data.decision !== "approve" && (!isModerationRejectionReason(parsed.data.reasonCode)||!parsed.data.note?.trim())) {
     return NextResponse.json({ error: "rejection_reason_required" }, { status: 422 });
   }
   const reasonCode = parsed.data.decision !== "approve" && isModerationRejectionReason(parsed.data.reasonCode)
@@ -74,15 +76,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     : undefined;
 
   try {
-    await moderationRepository.decide(
+    const listing=await moderationRepository.decide(
       await createSupabaseServerClient(),
       id,
       parsed.data.decision,
       reasonCode,
       parsed.data.note ?? undefined,
+      {revision:parsed.data.revision,requestId:parsed.data.requestId},
     );
     return NextResponse.json({
-      listing: { id, status: parsed.data.decision === "approve" ? "active" : "rejected" },
+      listing,
     });
   } catch (error) {
     return rpcFailure(error);

@@ -18,7 +18,7 @@ test('workerd queue preserves lexical routes across disabled/missing/failed AI; 
   const id='71000000-0000-4000-8000-000000000001';
   const titles={'/hard':'Продам в.е.й.п','/clean':'Обычный телефон','/suspicious':'Есть одноразка','/direct':'Макет, использовать как настоящий документ'};
   const c=globalThis.fixture={reservations:0,records:[],finished:null,failures:0,derivatives:0};
-  c.job={id,listing_id:id,claim_token:id,created_at:'2026-09-26T12:00:00Z',auto_approve:false,
+  c.job={id,listing_id:id,claim_token:id,created_at:'2026-09-26T12:00:00Z',engine_version:'jevu-moderation-3',automatic_enabled:true,automatic_since:'2026-09-26T00:00:00Z',auto_approve:false,auto_reject:true,
    rules:JSON.parse(env.RULES),fraud:{recent_submissions:0,prior_rejections:0,confirmed_reports:0,duplicate_content:0,reused_images:0},
    snapshot:{title:titles[new URL(request.url).pathname],description:'Синтетическая проверка / сынақ',category_id:id,settlement_id:id,price_minor:null,currency_code:'KZT',attributes:[],category_path:[{id,slug:'phones',ru:'Телефоны',kk:'Телефондар'}],images:[{id,storage_key:'phone.jpg',sort_order:0,width:600,height:380,byte_size:env.SIZE,mime_type:'image/jpeg'}]}};
   await processModerationQueue();return Response.json(c);
@@ -46,7 +46,7 @@ test('workerd queue preserves lexical routes across disabled/missing/failed AI; 
  network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(()=>{mockCalls++;return {statusCode:200,data:JSON.stringify(responseBody(cleanObservation())),responseOptions:{headers:{'content-type':'application/json'}}};});
  const options={host:'127.0.0.1',modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-05-22',compatibilityFlags:['nodejs_compat'],fetchMock:network,r2Buckets:['MEDIA'],bindings:{
   RULES:JSON.stringify(rules),JPEG:jpeg.toString('base64'),SIZE:jpeg.length,
-  MODERATION_FRAMEWORK_ENABLED:'true',MODERATION_EXTERNAL_AI_ENABLED:'true',MODERATION_AI_SHADOW_MODE:'true',MODERATION_AI_PROVIDER:'openai',MODERATION_OCR_PROVIDER:'openai_vision_ocr',MODERATION_AI_MODEL:'gpt-5.6-luna',MODERATION_EXTERNAL_PROCESSING_BASIS:'isolated mocked test',MODERATION_AI_ENABLED_SINCE:'2026-09-26T00:00:00Z',OPENAI_API_KEY:'synthetic-mock-only',MODERATION_PERCEPTUAL_HASH_ENABLED:'false',
+  MODERATION_FRAMEWORK_ENABLED:'true',MODERATION_EXTERNAL_AI_ENABLED:'true',MODERATION_AI_SHADOW_MODE:'false',MODERATION_AUTOMATIC_ENABLED:'true',MODERATION_AUTOMATIC_REJECTION_ENABLED:'true',MODERATION_AI_PROVIDER:'openai',MODERATION_OCR_PROVIDER:'openai_vision_ocr',MODERATION_AI_MODEL:'gpt-5.6-luna',MODERATION_EXTERNAL_PROCESSING_BASIS:'isolated mocked test',MODERATION_AI_ENABLED_SINCE:'2026-09-26T00:00:00Z',OPENAI_API_KEY:'synthetic-mock-only',MODERATION_PERCEPTUAL_HASH_ENABLED:'false',
  }};
  const mf=new Miniflare(options),others=[];
  try{

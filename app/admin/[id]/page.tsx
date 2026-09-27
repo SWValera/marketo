@@ -1,12 +1,9 @@
-/* eslint-disable @next/next/no-img-element -- Pending media must keep the moderator session and private cache policy. */
-import {hasRole} from "@/lib/auth/context";
-import { ModerationAudit } from "@/components/moderation-audit";
+import {ModerationWorkspace} from "@/components/moderation-workspace";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ImageOff } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/empty-state";
-import { ModerationDecision } from "@/components/moderation-decision";
 import { ModerationAccessError, requireModerationPageAccess } from "@/lib/auth/moderation-access";
 import { moderationRepository } from "@/lib/data/repositories";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -67,44 +64,5 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
   }
   if (!item) notFound();
 
-  return <DashboardShell
-    title={item.title}
-    description={t("admin.statusCreated", { status: item.status === "pending" ? t("admin.pending") : item.status, date: item.createdLabel })}
-    active="/admin"
-    authContext={authContext}
-    fallback="/admin"
-  >
-    <div className="admin-detail-grid">
-      <section className="dashboard-card moderation-case">
-        <h2>{t("admin.review")}</h2>
-        <section className="moderation-detail-section" aria-labelledby="moderation-photos-title">
-          <h3 id="moderation-photos-title">{t("admin.photos")}</h3>
-          {item.images.length ? <div className="moderation-photo-grid">
-            {item.images.map((image, index) => <img src={image.url} alt={`${item.title} — ${index + 1}`} loading={index === 0 ? "eager" : "lazy"} key={image.id} />)}
-          </div> : <p className="moderation-empty-inline"><ImageOff size={18} />{t("admin.noPhotos")}</p>}
-        </section>
-        <section className="moderation-detail-section" aria-labelledby="moderation-description-title">
-          <h3 id="moderation-description-title">{t("admin.descriptionLabel")}</h3>
-          <p className="moderation-description">{item.description}</p>
-        </section>
-        <dl>
-          <div><dt>{t("admin.listingId")}</dt><dd>{item.id}</dd></div>
-          <div><dt>{t("admin.status")}</dt><dd>{item.status === "pending" ? t("admin.pending") : item.status}</dd></div>
-          <div><dt>{t("admin.price")}</dt><dd>{item.priceLabel}</dd></div>
-          <div><dt>{t("admin.category")}</dt><dd>{item.categoryPath.join(" → ")}</dd></div>
-          <div><dt>{t("admin.city")}</dt><dd>{item.cityLabel}</dd></div>
-          <div><dt>{t("admin.createdAt")}</dt><dd>{item.createdLabel}</dd></div>
-          <div><dt>{t("admin.seller")}</dt><dd>{item.sellerName}</dd></div>
-          <div><dt>{t("admin.sellerId")}</dt><dd>{item.sellerId ?? "—"}</dd></div>
-        </dl>
-        <section className="moderation-detail-section moderation-attributes" aria-labelledby="moderation-attributes-title">
-          <h3 id="moderation-attributes-title">{t("admin.attributes")}</h3>
-          {item.attributes.length ? <dl>
-            {item.attributes.map((attribute) => <div key={attribute.key}><dt>{attribute.label}</dt><dd>{attribute.value}</dd></div>)}
-          </dl> : <p className="moderation-empty-inline">{t("admin.noAttributes")}</p>}
-        </section>
-      </section>
-      <div>{(item.status === "pending" || hasRole(authContext,"admin")&&["active","rejected","archived"].includes(item.status)) ? <ModerationDecision listingId={item.id} /> : null}<ModerationAudit listingId={item.id} locale={locale} item={item} /></div>
-    </div>
-  </DashboardShell>;
+  return <DashboardShell title={t("admin.title")} description={t("admin.description")} active="/admin" authContext={authContext} fallback="/admin"><ModerationWorkspace initial={{kind:'case',item}} locale={locale}/></DashboardShell>;
 }

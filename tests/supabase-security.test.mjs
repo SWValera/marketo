@@ -763,10 +763,10 @@ test("Supabase v2 security and reference-data audit", async (t) => {
       assert.equal(rejectionAudit.rows[0].metadata.reason_code, "wrong_category");
       assert.equal(rejectionAudit.rows[0].metadata.note, "move to another category");
       await asAuthenticated(db, users.admin, async () => {
-        await assert.rejects(
-          db.query("select public.moderate_listing($1, 'approve')", [listings.pendingApprove]),
-          /transition .* not allowed/i,
-        );
+        // Since 0042 the active owner-admin may override an existing outcome.
+        const before = (await db.query("select published_at,expires_at from public.listings where id=$1", [listings.pendingApprove])).rows[0];
+        await db.query("select public.moderate_listing($1, 'approve')", [listings.pendingApprove]);
+        assert.deepEqual((await db.query("select published_at,expires_at from public.listings where id=$1", [listings.pendingApprove])).rows[0], before);
       });
     });
 
@@ -780,7 +780,7 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           [listings.deletedOwner, "approve", null],
         ]) {
           await assert.rejects(
-            db.query("select public.moderate_listing($1, $2, $3)", [listingId, decision, reason]),
+            db.query("select public.moderate_listing($1, $2, $3, 'Isolated transition check')", [listingId, decision, reason]),
             /not allowed|unavailable/i,
           );
         }
@@ -1382,11 +1382,11 @@ test("Supabase v2 security and reference-data audit", async (t) => {
           and namespace.nspname in ('public', 'private')
         order by namespace.nspname, procedure.proname
       `);
-      assert.equal(functions.rows.length, 69); // Reviewed through 0041, including private job primitives.
+      assert.equal(functions.rows.length, 76); // Reviewed through 0043: preserved private primitives + scoped staff RPCs.
       assert.ok(functions.rows.every((row) => row.proconfig?.includes('search_path=""')));
       assert.deepEqual(functions.rows.filter(row => row.anon_execute).map(row => row.proname), ["get_city_premium_availability", "get_listing_contact_options"]);
       const notClientCallable = functions.rows.filter((row) => !row.authenticated_execute).map((row) => row.proname);
-      assert.deepEqual(notClientCallable, ["activate_city_premium_for_owner", "apply_listing_moderation", "archive_expired_listings_before_moderation", "cancel_unavailable_listing_promotions", "capture_moderation_submission", "clear_moderation_identity", "enforce_listing_publication_period", "enqueue_moderation", "finish_moderation_job_before_shadow", "handle_new_auth_user", "listing_has_live_promotion", "lock_moderation_content", "moderation_admin_before_shadow", "moderation_content", "moderation_watchdog", "process_city_premium_queue", "process_listing_promotion_bumps", "recheck_confirmed_report", "require_writable_account_owner", "resolve_city_premium_approval", "start_listing_promotion", "touch_conversation_after_message", "activate_city_premium", "advance_account_deletion", "archive_expired_listings", "begin_account_deletion", "claim_moderation_job", "connect_city_premium", "count_moderation_image_reuse", "expire_listing_promotions", "fail_moderation_job", "finish_account_deletion", "finish_moderation_job", "moderation_shadow_job", "registration_handoff", "reveal_listing_phone", "seller_phone_challenge"]);
+      assert.deepEqual(notClientCallable, ["activate_city_premium_for_owner", "apply_listing_moderation", "archive_expired_listings_before_moderation", "cancel_unavailable_listing_promotions", "capture_moderation_submission", "clear_moderation_identity", "enforce_listing_publication_period", "enqueue_moderation", "finish_moderation_job_before_shadow", "get_listing_moderation_before_automatic", "handle_new_auth_user", "is_moderation_owner", "listing_has_live_promotion", "lock_moderation_content", "moderation_admin_before_automatic", "moderation_admin_before_shadow", "moderation_content", "moderation_watchdog", "process_city_premium_queue", "process_listing_promotion_bumps", "recheck_confirmed_report", "require_writable_account_owner", "resolve_city_premium_approval", "start_listing_promotion", "touch_conversation_after_message", "activate_city_premium", "advance_account_deletion", "archive_expired_listings", "begin_account_deletion", "claim_moderation_job", "connect_city_premium", "count_moderation_image_reuse", "expire_listing_promotions", "fail_moderation_job", "finish_account_deletion", "finish_moderation_job", "moderation_shadow_job", "registration_handoff", "reveal_listing_phone", "seller_phone_challenge"]);
     });
 
     await t.test("0038/0040 owner lifecycle, original 720-hour term, public cutoff and retained photos", () => auditProfileLifecycle(db, users, listings.activeOwner));

@@ -17,18 +17,19 @@ export const aiObservationSchema=z.object({
 }).strict();
 export type AIObservations=z.infer<typeof aiObservationSchema>;
 export type AIInput={title:string;description:string;category:string;attributes:string;images:{image_index:number;bytes:Uint8Array;mimeType:'image/jpeg'}[]};
-export const errorCodes=['timeout','network_error','provider_5xx','provider_rate_limit','invalid_schema','content_unavailable','configuration_missing','provider_4xx','budget_exhausted','disabled','not_eligible'] as const;
+export const errorCodes=['timeout','network_error','provider_5xx','provider_rate_limit','invalid_schema','ocr_incomplete','content_unavailable','configuration_missing','provider_4xx','budget_exhausted','disabled','not_eligible'] as const;
 export type AIErrorCode=typeof errorCodes[number];
-export type AICallMetadata={provider:'openai';model:string;schema_version:typeof AI_SCHEMA_VERSION;request_id:string|null;latency_ms:number;input_tokens:number|null;output_tokens:number|null;image_count:number;status:'success'|AIErrorCode;retry_count:number};
+export type AICallMetadata={provider:'openai';model:string;schema_version:typeof AI_SCHEMA_VERSION;request_id:string|null;latency_ms:number;input_tokens:number|null;output_tokens:number|null;image_count:number;status:'success'|AIErrorCode;retry_count:number;validation_issue?:'json'|'envelope'|'shape'|'coverage'|'provenance'|'ocr_incomplete'};
 export type AICallResult={observations:AIObservations;metadata:AICallMetadata};
 export class AIProviderError extends Error {
-  readonly code:AIErrorCode;readonly metadata?:AICallMetadata;
-  constructor(code:AIErrorCode,metadata?:AICallMetadata){super(code);this.code=code;this.metadata=metadata;}
+  readonly code:AIErrorCode;readonly metadata?:AICallMetadata;readonly validationIssue?:AICallMetadata['validation_issue'];
+  constructor(code:AIErrorCode,metadata?:AICallMetadata,validationIssue?:AICallMetadata['validation_issue']){super(code);this.code=code;this.metadata=metadata;this.validationIssue=validationIssue;}
 }
 export function validateObservations(raw:unknown,indexes:number[]):AIObservations{
-  const result=aiObservationSchema.parse(raw);
+  const parsed=aiObservationSchema.safeParse(raw);if(!parsed.success)throw new AIProviderError('invalid_schema',undefined,'shape');const result=parsed.data;
   const same=(values:number[])=>values.length===indexes.length&&new Set(values).size===indexes.length&&values.every(i=>indexes.includes(i));
-  if(!same(result.images_checked)||!same(result.image_subjects.map(i=>i.image_index))||!same(result.visible_text.map(t=>t.image_index))||result.visible_text.some(t=>!t.complete))throw new AIProviderError('invalid_schema');
-  if(result.text_observations.some(o=>o.source!=='text'||o.image_index!==null)||result.image_observations.some(o=>o.source==='text'||o.image_index===null||!indexes.includes(o.image_index)))throw new AIProviderError('invalid_schema');
+  if(!same(result.images_checked)||!same(result.image_subjects.map(i=>i.image_index))||!same(result.visible_text.map(t=>t.image_index)))throw new AIProviderError('invalid_schema',undefined,'coverage');
+  if(result.text_observations.some(o=>o.source!=='text'||o.image_index!==null)||result.image_observations.some(o=>o.source==='text'||o.image_index===null||!indexes.includes(o.image_index)))throw new AIProviderError('invalid_schema',undefined,'provenance');
+  if(result.visible_text.some(t=>!t.complete))throw new AIProviderError('ocr_incomplete',undefined,'ocr_incomplete');
   return result;
 }

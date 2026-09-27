@@ -1,0 +1,50 @@
+'use client';
+/* eslint-disable @next/next/no-img-element -- Scoped moderator media retains its session. */
+import {useEffect,useRef,useState,type MouseEvent} from 'react';
+import {Eye,ImageOff} from 'lucide-react';
+import {AppLink} from './app-link';
+import type {Locale} from '@/lib/i18n/messages';
+import type {ModerationListingDetail,ModerationQueueItem,NumberedPageResult} from '@/lib/data/types';
+import {moderationFilter,moderationFilters} from '@/lib/moderation/dashboard';
+import {moderationText} from '@/lib/moderation/labels';
+import {ModerationDecision,type ModeratorOutcome} from './moderation-decision';
+import {ModerationAudit} from './moderation-audit';
+import {ModerationMetrics} from './moderation-metrics';
+import {ModerationOwnerControls} from './moderation-owner-controls';
+export type ModerationView={kind:'queue';queue:NumberedPageResult<ModerationQueueItem>;filter:string}|{kind:'case';item:ModerationListingDetail};
+function query(path:string,locale:Locale){const u=new URL(path,'https://jevu.invalid');const id=u.pathname.split('/')[2];return id?`view=case&id=${encodeURIComponent(id)}&locale=${locale}`:`view=queue&filter=${moderationFilter(u.searchParams.get('filter'))}&page=${u.searchParams.get('page')??1}&locale=${locale}`;}
+export function ModerationWorkspace({initial,locale}:{initial:ModerationView;locale:Locale}){
+ const kk=locale==='kk',txt=(s:string|null|undefined)=>moderationText(s,locale);const [view,setView]=useState(initial),[busy,setBusy]=useState(false),[error,setError]=useState(''),[auditVersion,setAuditVersion]=useState(0);
+ const [backPath,setBackPath]=useState(initial.kind==='queue'?`/admin?filter=${initial.filter}&page=${initial.queue.page}`:'/admin');
+ const cache=useRef(new Map<string,{value:ModerationView;at:number}>()),pending=useRef(new Map<string,Promise<ModerationView>>()),sequence=useRef(0),epoch=useRef(0),mounted=useRef(true);
+ async function read(path:string){const key=query(path,locale),hit=cache.current.get(key);if(hit&&Date.now()-hit.at<45000)return hit.value;
+  const existing=pending.current.get(key);if(existing)return existing;
+  const generation=epoch.current;
+  const task=(async()=>{const r=await fetch('/api/admin/moderation?'+key,{cache:'no-store',signal:AbortSignal.timeout(12000)});if(r.status===401||r.status===403){cache.current.clear();throw Error(kk?'Кіру сеансы аяқталды немесе рұқсат жоқ. Бетті жаңартыңыз.':'Сессия завершена или доступ закрыт. Обновите страницу.');}if(!r.ok)throw Error(kk?'Жүктеу мүмкін болмады. Қайта көріңіз.':'Не удалось загрузить данные. Повторите переход.');const data=await r.json();const value:ModerationView=key.startsWith('view=case')?{kind:'case',item:data as ModerationListingDetail}:{kind:'queue',queue:data as NumberedPageResult<ModerationQueueItem>,filter:new URL(path,'https://jevu.invalid').searchParams.get('filter')??'all'};if(generation===epoch.current)cache.current.set(key,{value,at:Date.now()});while(cache.current.size>8)cache.current.delete(cache.current.keys().next().value!);return value;})();
+  pending.current.set(key,task);try{return await task;}finally{if(pending.current.get(key)===task)pending.current.delete(key);}
+ }
+ async function navigate(path:string,push=true){const ticket=++sequence.current;setError('');const hit=cache.current.get(query(path,locale));if(!hit||Date.now()-hit.at>=45000)setBusy(true);
+  try{const value=await read(path);if(!mounted.current||ticket!==sequence.current)return;if(push)window.history.pushState(null,'',path);if(value.kind==='queue')setBackPath(path);setView(value);}catch(e){if(mounted.current&&ticket===sequence.current)setError(e instanceof Error?e.message:'');}finally{if(mounted.current&&ticket===sequence.current)setBusy(false);}
+ }
+ function click(e:MouseEvent<HTMLAnchorElement>,path:string){if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();void navigate(path);}
+ function prefetch(path:string){if(pending.current.size===0)void read(path).catch(()=>{});}
+ useEffect(()=>{mounted.current=true;const path=window.location.pathname+window.location.search;cache.current.set(query(path,locale),{value:initial,at:Date.now()});
+ const pop=()=>{void navigate(window.location.pathname+window.location.search,false);};const focus=()=>{epoch.current++;cache.current.clear();pending.current.clear();void navigate(window.location.pathname+window.location.search,false);};window.addEventListener('popstate',pop);window.addEventListener('focus',focus);return()=>{mounted.current=false;window.removeEventListener('popstate',pop);window.removeEventListener('focus',focus);};
+ // Navigation functions use refs; the initial snapshot belongs to this mount only.
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
+ function saved(outcome:ModeratorOutcome){epoch.current++;sequence.current++;cache.current.clear();pending.current.clear();setBusy(false);setView(current=>current.kind==='case'&&current.item.id===outcome.id?{kind:'case',item:{...current.item,status:outcome.status,summary:{...current.item.summary,manual_decision:outcome.decision}}}:current);setAuditVersion(n=>n+1);}
+
+ const item=view.kind==='case'?view.item:null;
+ return <div className="moderation-workspace" aria-busy={busy}>
+ <div className="moderation-load-status" role="status" aria-live="polite">{busy?(kk?'Жүктелуде…':'Загружаем…'):''}</div>{error?<p role="alert">{error}</p>:null}
+ {view.kind==='queue'?<><AppLink href="/admin/moderation">{kk?'Шағымдар және ережелер':'Жалобы и правила'}</AppLink><nav className="dashboard-card" aria-label={kk?'Модерация сүзгілері':'Фильтры модерации'}>{Object.entries(moderationFilters).map(([key,label])=><a key={key} href={`/admin?filter=${key}`} onClick={e=>click(e,`/admin?filter=${key}`)} aria-current={key===view.filter?'page':undefined}>{label[locale]}</a>)}</nav>
+ <section className="dashboard-card moderation-table"><header><h2>{moderationFilters[moderationFilter(view.filter)][locale]}</h2><span>{kk?'Хабарландырулар':'Объявлений'}: {view.queue.total}</span></header><div className="moderation-list">{view.queue.items.map(row=><article className="moderation-row" key={row.id}>{row.imageUrl?<img src={row.imageUrl} alt="" loading="lazy"/>:<span className="moderation-preview"><ImageOff size={22}/></span>}<div className="moderation-info"><strong>{row.title}</strong><span>{row.priceLabel} · {row.categoryLabel} · {row.cityLabel}</span><small>{row.sellerName}</small></div><span className="moderation-status">{row.manualDecision?txt(row.manualDecision):txt(row.status==='archived'&&!row.automaticDecision?'archived_pending':row.automaticDecision)}<small>{txt(row.status)} · {row.createdLabel}</small></span><div className="moderation-actions"><a href={`/admin/${row.id}`} onMouseEnter={()=>prefetch(`/admin/${row.id}`)} onFocus={()=>prefetch(`/admin/${row.id}`)} onTouchStart={()=>prefetch(`/admin/${row.id}`)} onClick={e=>click(e,`/admin/${row.id}`)} aria-label={`${kk?'Ашу':'Открыть'}: ${row.title}`}><Eye size={18}/></a></div></article>)}</div>{view.queue.items.length===0?<p>{view.queue.state==='out_of_range'?(kk?'Бұл бет бос. Бірінші бетке оралыңыз.':'На этой странице нет записей. Вернитесь на первую страницу.'):(kk?'Бұл сүзгі бойынша хабарландыру жоқ.':'Объявлений по этому фильтру нет.')}</p>:null}
+ <footer className="moderation-pagination">{view.queue.page>1?<a href={`/admin?filter=${view.filter}&page=${view.queue.page-1}`} onClick={e=>click(e,`/admin?filter=${view.filter}&page=${view.queue.page-1}`)}>{kk?'Алдыңғы бет':'Предыдущая страница'}</a>:null}{view.queue.nextCursor?<a href={`/admin?filter=${view.filter}&page=${view.queue.nextCursor}`} onClick={e=>click(e,`/admin?filter=${view.filter}&page=${view.queue.nextCursor}`)}>{kk?'Келесі бет':'Следующая страница'}</a>:null}</footer></section><ModerationMetrics locale={locale}/></>:null}
+ {item?<><a href={backPath} onClick={e=>click(e,backPath)}>{kk?'← Тізімге оралу':'← Вернуться к списку'}</a><div className="admin-detail-grid"><section className="dashboard-card moderation-case"><h2>{item.title}</h2><p className="moderation-current-status">{txt(item.status)}</p><div className="moderation-photo-grid">{item.images.map((image,i)=><img key={image.id} src={image.url} alt={`${item.title} — ${i+1}`} loading={i?'lazy':'eager'}/>)}</div><h3>{kk?'Сипаттама':'Описание'}</h3><p className="moderation-description">{item.description}</p><dl>{[[kk?'Бағасы':'Цена',item.priceLabel],[kk?'Санат':'Категория',item.categoryPath.join(' → ')],[kk?'Қала':'Город',item.cityLabel],[kk?'Сатушы':'Продавец',item.sellerName],[kk?'Құрылған':'Создано',item.createdLabel],...item.attributes.map(a=>[a.label,a.value])].map(([label,value],i)=><div key={i}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
+ <div className="moderation-detail-controls"><section className="dashboard-card"><h2>{kk?'Тексеру нәтижесі':'Результат проверки'}</h2><p className="moderation-final-status">{txt(item.summary.manual_decision??item.summary.decision??item.summary.status)}</p><p>{txt(item.summary.provider_status==='success'?item.summary.basis:item.summary.provider_status??item.summary.basis)}</p>{item.summary.manual_decision?<p>{kk?'Автоматты шешім тарихта сақталды.':'Автоматическое решение сохранено в истории.'}</p>:null}</section>
+ {(item.status==='pending'||item.summary.owner_controls)?<ModerationDecision key={item.id} listingId={item.id} revision={item.summary.current_revision} onSaved={saved}/>:null}<ModerationAudit key={`${item.id}-${auditVersion}`} listingId={item.id} locale={locale}/>
+ <details className="dashboard-card moderation-technical"><summary>{kk?'Техникалық мәліметтер':'Технические сведения'}</summary><pre>{JSON.stringify({listing_id:item.id,seller_id:item.sellerId,...item.summary},null,2)}</pre></details>
+ {item.summary.owner_controls?<ModerationOwnerControls key={item.id} listingId={item.id} revision={item.summary.current_revision} title={item.title} description={item.description} price={item.priceMinor} locale={locale}/>:null}</div></div></>:null}
+ </div>;
+}

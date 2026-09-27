@@ -16,7 +16,7 @@ export async function executeShadow(input:{provider:MultimodalModerationProvider
   }catch(error){
    if(!(error instanceof AIProviderError))throw error; // DB failure: queue retry, never silently approve.
    if(error.metadata)await input.record(attempt,{...error.metadata,retry_count:attempt-1});
-   if(!['timeout','network_error','provider_5xx','provider_rate_limit'].includes(error.code)||attempt>=2||retry>=1)return emptyShadow(error.code);
+   if(!['timeout','network_error','provider_5xx','provider_rate_limit','invalid_schema'].includes(error.code)||attempt>=2||retry>=1)return emptyShadow(error.code);
    await sleep(500*2**retry);
   }
  }

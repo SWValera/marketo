@@ -121,6 +121,8 @@ export type Database = {
       };
     };
     Functions: {
+      moderation_case: {Args:{target_listing_id:string};Returns:Json};
+      moderate_listing_checked: {Args:{target_listing_id:string;decision:string;expected_revision:string;request_id:string;reason_code?:string|null;note?:string|null};Returns:Json};
       moderation_dashboard: { Args: {selected_filter?:string;requested_page?:number;page_size?:number}; Returns: Json };
       moderation_owner_listing: { Args: {target_listing_id:string;operation:string;payload:Json}; Returns: Json };
       count_moderation_image_reuse: { Args: {target_listing_id:string;hashes:string[]}; Returns: number };

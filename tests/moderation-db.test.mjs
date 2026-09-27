@@ -71,7 +71,7 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
   const next=await make();await submit(next);const j=await claim();assert.equal((await finish(j,{...result,stages:[]})).rows[0].result,'HUMAN_REVIEW');
  });
  await t.test('manual override records actor/reason; edit reapproval and promotion preserve lifetime/hash',async()=>{
-  await assert.rejects(as(staff,"select public.moderate_listing($1,'approve',null,null)",[id]),/reason/);
+  await as(staff,"select public.moderate_listing($1,'approve',null,null)",[id]);
   await as(staff,"select public.moderate_listing($1,'approve',null,'Reviewed all content')",[id]);
   const before=(await db.query('select * from public.listings where id=$1',[id])).rows[0];
   const hash=(await db.query('select private.moderation_hash(private.moderation_content($1)) h',[id])).rows[0].h;

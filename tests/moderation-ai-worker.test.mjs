@@ -22,7 +22,7 @@ test('real workerd: R2 bytes -> bounded derivatives -> PNG dHash -> Responses/OC
  const network=createFetchMock();network.disableNetConnect();const observed=cleanObservation();observed.visible_text[0].text='TEST CARD 4242 4242 4242 4242';
  let calls=0,captured;network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(options=>{calls++;captured=new Response(options.body).json();return {statusCode:200,data:JSON.stringify(responseBody(observed)),responseOptions:{headers:{'content-type':'application/json','x-request-id':'req_workerd_fixture'}}};});
  network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(429,'{}').times(2);
- network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(200,JSON.stringify({...responseBody(observed),status:'incomplete'}));
+ network.get('https://api.openai.com').intercept({path:'/v1/responses',method:'POST'}).reply(200,JSON.stringify({...responseBody(observed),status:'incomplete'})).times(2);
  const mf=new Miniflare({host:'127.0.0.1',modules:true,script:bundled.outputFiles[0].text,compatibilityDate:'2026-05-22',compatibilityFlags:['nodejs_compat'],fetchMock:network,r2Buckets:['MEDIA'],bindings:{JPEG:jpeg.toString('base64'),PNG:png.toString('base64')}});
  try{
   await (await mf.getR2Bucket('MEDIA')).put('synthetic-card.jpg',jpeg);

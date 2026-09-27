@@ -370,7 +370,8 @@ export const moderationRepository = {
     decision: ModerationDecision,
     reasonCode?: ModerationRejectionReason,
     note?: string,
+    receipt?: {revision:string;requestId:string},
   ) {
-    return moderateListing(client, id, decision, reasonCode, note);
+    return moderateListing(client, id, decision, reasonCode, note, receipt);
   },
 };
