@@ -121,6 +121,8 @@ export type Database = {
       };
     };
     Functions: {
+      moderation_dashboard: { Args: {selected_filter?:string;requested_page?:number;page_size?:number}; Returns: Json };
+      moderation_owner_listing: { Args: {target_listing_id:string;operation:string;payload:Json}; Returns: Json };
       count_moderation_image_reuse: { Args: {target_listing_id:string;hashes:string[]}; Returns: number };
       moderation_shadow_job: { Args: {operation:string;job_id:string;token:string;payload?:Json}; Returns: Json };
       claim_moderation_job: { Args: Record<string, never>; Returns: Json };

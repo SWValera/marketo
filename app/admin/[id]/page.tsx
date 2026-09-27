@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- Pending media must keep the moderator session and private cache policy. */
+import {hasRole} from "@/lib/auth/context";
 import { ModerationAudit } from "@/components/moderation-audit";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -103,7 +104,7 @@ async function ModerationCasePageContent({ params }: ModerationCasePageProps) {
           </dl> : <p className="moderation-empty-inline">{t("admin.noAttributes")}</p>}
         </section>
       </section>
-      <div>{item.status === "pending" ? <ModerationDecision listingId={item.id} /> : null}<ModerationAudit listingId={item.id} locale={locale} /></div>
+      <div>{(item.status === "pending" || hasRole(authContext,"admin")&&["active","rejected","archived"].includes(item.status)) ? <ModerationDecision listingId={item.id} /> : null}<ModerationAudit listingId={item.id} locale={locale} item={item} /></div>
     </div>
   </DashboardShell>;
 }

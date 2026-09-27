@@ -10,14 +10,15 @@ import {moderationAIConfig} from './ai-config';
 import {OpenAIModerationProvider} from './openai-provider';
 import {moderationDerivatives} from './image-derivatives';
 import {executeShadow} from './ai-execution';
-import {emptyShadow,enforceShadowDecision} from './shadow';
+import {emptyShadow} from './shadow';
 import {semanticCallRequired} from './lexical';
 import {recordLexicalExecution,lexicalAIStateAfterShadow} from './lexical-execution';
 import {bounded} from './providers';
-import type {AIInput} from './ai-contract';
+import type {AIInput,AICallResult} from './ai-contract';
+import {evaluateAutomatic} from './automatic';
 import type {Json} from '../supabase/database.types';
 
-const jobSchema=z.object({id:z.string().uuid(),listing_id:z.string().uuid(),claim_token:z.string().uuid(),created_at:z.string(),snapshot:snapshotSchema,rules:z.array(ruleSchema).min(1),auto_approve:z.boolean(),fraud:z.object({recent_submissions:z.number(),prior_rejections:z.number(),confirmed_reports:z.number(),duplicate_content:z.number(),reused_images:z.number()})});
+const jobSchema=z.object({id:z.string().uuid(),listing_id:z.string().uuid(),claim_token:z.string().uuid(),created_at:z.string(),engine_version:z.string().optional(),automatic_enabled:z.boolean().default(false),auto_reject:z.boolean().default(false),automatic_since:z.string().nullable().optional(),snapshot:snapshotSchema,rules:z.array(ruleSchema).min(1),auto_approve:z.boolean(),fraud:z.object({recent_submissions:z.number(),prior_rejections:z.number(),confirmed_reports:z.number(),duplicate_content:z.number(),reused_images:z.number()})});
 /** Bounded durable jobs. Never called by a public unauthenticated mutation API. */
 export async function processModerationQueue(){
   if(env.MODERATION_FRAMEWORK_ENABLED!=='true')return;
@@ -30,12 +31,14 @@ export async function processModerationQueue(){
   try{
     const job=jobSchema.parse(claimed.data);
     const config=moderationAIConfig(env,job.created_at),loaded=new Map<string,Uint8Array>();
-    // Preserve the deterministic engine. New provider-derived data is strictly
-    // separate and cannot enter its findings or publication path.
-    const result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,lexicalAIState:env.MODERATION_EXTERNAL_AI_ENABLED!=='true'?'DISABLED':config.enabled&&config.eligible&&config.key&&config.model?'READY':'UNAVAILABLE',
+    // Local policy checks run before any external analysis.
+    let result=await moderate({snapshot:job.snapshot,rules:job.rules,fraud:job.fraud,ai:new UnavailableAIProvider(),ocr:new UnavailableOCRProvider(),allowExternal:false,timeoutMs:3000,lexicalAIState:env.MODERATION_EXTERNAL_AI_ENABLED!=='true'?'DISABLED':config.enabled&&config.eligible&&config.key&&config.model?'READY':'UNAVAILABLE',
       loadImage:async key=>{const object=await getListingMediaBucket().get(key);if(!object||object.size>4*1024*1024)throw new Error('image_unavailable');const bytes=new Uint8Array(await object.arrayBuffer());loaded.set(key,bytes);return bytes;}});
+    const localDurationMs=Date.now()-start;
+    let response:AICallResult|undefined;
     let shadow=emptyShadow(!config.enabled?'disabled':!config.eligible?'not_eligible':!config.key||!config.model?'configuration_missing':'content_unavailable');
-    const vision=config.enabled&&config.eligible&&Boolean(config.key&&config.model)&&semanticCallRequired(result.lexical,job.snapshot.images.length>0),derivatives:AIInput['images']=[];
+    const automaticEligible=job.engine_version===ENGINE_VERSION&&job.automatic_enabled&&env.MODERATION_AUTOMATIC_ENABLED==='true'&&Boolean(job.automatic_since)&&Date.parse(job.created_at)>=Date.parse(job.automatic_since!);
+    const vision=(env.MODERATION_AI_SHADOW_MODE!=='false'||automaticEligible)&&config.enabled&&config.eligible&&Boolean(config.key&&config.model)&&semanticCallRequired(result.lexical,job.snapshot.images.length>0),derivatives:AIInput['images']=[];
     const shadowRPC=async(operation:string,payload:Json={})=>{const reply=await client.rpc('moderation_shadow_job',{operation,job_id:job.id,token:job.claim_token,payload});if(reply.error)throw new Error('shadow_storage_failed');return reply.data;};
     const duplicates:{image_index:number;exact:number;perceptual:number}[]=[];
     try{
@@ -54,7 +57,7 @@ export async function processModerationQueue(){
         const rules=job.rules.filter(r=>r.applicable_categories.length===0||job.snapshot.category_path.some(c=>r.applicable_categories.includes(c.slug)));
         shadow=await executeShadow({provider:new OpenAIModerationProvider({key:config.key,model:config.model}),data:{title:job.snapshot.title,description:job.snapshot.description,attributes:JSON.stringify(job.snapshot.attributes),category:job.snapshot.category_path.map(c=>`${c.slug} ${c.ru} ${c.kk}`).join(' / '),images:derivatives},rules,base:result,signal:new AbortController().signal,
           reserve:async()=>{const value=await shadowRPC('reserve',{model:config.model!,eligible_since:config.since!});return value===null?null:z.number().int().min(1).max(2).parse(value);},
-          record:async(attempt,metadata)=>{await shadowRPC('record',{attempt,...metadata});}});
+          record:async(attempt,metadata)=>{await shadowRPC('record',{attempt,...metadata});},onValidated:value=>{response=value;}});
       }
     }catch{shadow=emptyShadow('content_unavailable');}
     finally{loaded.clear();derivatives.length=0;}
@@ -63,9 +66,12 @@ export async function processModerationQueue(){
     const reused=await client.rpc('count_moderation_image_reuse',{target_listing_id:job.listing_id,hashes:result.images.flatMap(i=>i.sha256?[i.sha256]:[])});
     if(reused.error)throw new Error('fraud_read_failed');
     if(reused.data>3){result.findings.push(finding('reused_images','HUMAN_REVIEW','fraud'));result.risk_score=Math.max(40,result.risk_score);if(result.decision!=='REJECTED')result.decision='HUMAN_REVIEW';}
-    enforceShadowDecision(result);
+    const enabled=automaticEligible&&env.MODERATION_AI_SHADOW_MODE==='false';
+    const automatic=await evaluateAutomatic({base:result,rules:job.rules,response,providerStatus:shadow.status,localDurationMs,switches:{enabled,approval:job.auto_approve&&env.MODERATION_AUTOMATIC_APPROVAL_ENABLED==='true',rejection:job.auto_reject&&env.MODERATION_AUTOMATIC_REJECTION_ENABLED==='true'}});
+    result=automatic.result;
+    response=undefined; // Raw OCR/observations were consumed in memory only.
     if(result.lexical)recordLexicalExecution(result.lexical,result.stages,env.MODERATION_EXTERNAL_AI_ENABLED!=='true'?'DISABLED':!config.enabled?'UNAVAILABLE':lexicalAIStateAfterShadow(shadow.status));
-    const finished=await client.rpc('finish_moderation_job',{job_id:job.id,token:job.claim_token,result:{...result,shadow} as unknown as Json});
+    const finished=await client.rpc('finish_moderation_job',{job_id:job.id,token:job.claim_token,result:{...result,shadow,automatic:automatic.trace} as unknown as Json});
     if(finished.error)throw new Error('moderation_finish_failed');
     console.info(JSON.stringify({event:'moderation.completed',engine:ENGINE_VERSION,decision:finished.data,duration_ms:Date.now()-start,shadow_status:shadow.status,shadow_recommendation:shadow.recommendation,provider_error:lexicalAIStateAfterShadow(shadow.status)==='PROVIDER_ERROR',finding_codes:result.findings.map(f=>f.finding_code),...(result.lexical?{lexical_routing_decision:result.lexical.lexical_routing_decision,execution_decision:result.lexical.execution_decision,fallback_reason:result.lexical.fallback_reason,canonical_finding_families:result.lexical.canonical_finding_families}:{})}));
   }catch{

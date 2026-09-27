@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {useI18n} from './i18n-provider';
 type State={run_id:string|null;status:string;reasons:{ru:string;kk:string}[];can_appeal?:boolean};
-const labels:Record<string,{ru:string;kk:string}>={AUTOMATIC_MODERATION:{ru:'Проверяем объявление',kk:'Хабарландыру тексеріліп жатыр'},APPROVED:{ru:'Объявление одобрено',kk:'Хабарландыру мақұлданды'},NEEDS_FIX:{ru:'Исправьте объявление',kk:'Хабарландыруды түзетіңіз'},REJECTED:{ru:'Объявление отклонено',kk:'Хабарландыру қабылданбады'},HUMAN_REVIEW:{ru:'Объявление требует дополнительной проверки.',kk:'Хабарландыру қосымша тексеруді қажет етеді.'},DRAFT:{ru:'Черновик',kk:'Жоба'}};
+const labels:Record<string,{ru:string;kk:string}>={AUTOMATIC_MODERATION:{ru:'Проверяем объявление',kk:'Хабарландыру тексеріліп жатыр'},APPROVED:{ru:'Объявление опубликовано',kk:'Хабарландыру жарияланды'},NEEDS_FIX:{ru:'Нужно исправить объявление',kk:'Хабарландыруды түзетіңіз'},REJECTED:{ru:'Объявление не опубликовано',kk:'Хабарландыру қабылданбады'},HUMAN_REVIEW:{ru:'Объявление требует дополнительной проверки.',kk:'Хабарландыру қосымша тексеруді қажет етеді.'},DRAFT:{ru:'Черновик',kk:'Жоба'}};
 export function ModerationStatus({listingId}:{listingId:string}){
  const {locale}=useI18n(),router=useRouter();const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[feedback,setFeedback]=useState(''),[open,setOpen]=useState(false),[busy,setBusy]=useState(false);
  useEffect(()=>{let live=true,timer:ReturnType<typeof setTimeout>;const controller=new AbortController();const started=Date.now();

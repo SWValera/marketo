@@ -160,7 +160,9 @@ export type ModerationQueueItem = {
   sellerId: string | null;
   sellerName: string;
   imageUrl: string | null;
-  status: "pending";
+  status: string;
+  automaticDecision?: string | null;
+  overridden?: boolean;
 };
 
 export type ModerationAttribute = {
@@ -170,6 +172,7 @@ export type ModerationAttribute = {
 };
 
 export type ModerationListingDetail = {
+  priceMinor: number | null;
   id: string;
   title: string;
   description: string;

@@ -356,7 +356,7 @@ export const notificationRepository = {
 export const moderationRepository = {
   async list(
     client: JevuSupabaseClient,
-    options: { page?: number; pageSize?: number; locale?: Locale } = {},
+    options: { page?: number; pageSize?: number; locale?: Locale; filter?: string } = {},
   ): Promise<NumberedPageResult<ModerationQueueItem>> {
     return listModerationQueue(client, options);
   },

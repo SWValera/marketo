@@ -1,6 +1,9 @@
 declare namespace Cloudflare {
   interface Env {
     MODERATION_FRAMEWORK_ENABLED?: string;
+    MODERATION_AUTOMATIC_ENABLED?: string;
+    MODERATION_AUTOMATIC_APPROVAL_ENABLED?: string;
+    MODERATION_AUTOMATIC_REJECTION_ENABLED?: string;
     MODERATION_AI_ENABLED?: string;
     MODERATION_EXTERNAL_AI_ENABLED?: string;
     MODERATION_AI_MODEL?: string;

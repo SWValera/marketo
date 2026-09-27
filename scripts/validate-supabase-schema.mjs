@@ -48,6 +48,7 @@ const expectedMigrations = [
   "0039_bump_execution_freshness.sql",
   "0040_automated_moderation.sql",
   "0041_moderation_ai_shadow.sql",
+  "0042_automatic_moderation_control.sql",
 ];
 
 const immutableMigrationHashes = {

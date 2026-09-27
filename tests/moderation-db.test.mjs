@@ -24,6 +24,7 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
  const category=(await db.query("select id from public.categories where slug='free-other'")).rows[0].id;
  for(const id of [owner,staff,buyer])await db.query("insert into auth.users(id,raw_user_meta_data) values($1,'{\"display_name\":\"Fixture\"}')",[id]);
  await db.query("insert into public.user_roles(user_id,role) values($1,'admin')",[staff]);
+ await as(staff,"select public.moderation_admin('settings',$1)",[{automatic_enabled:true,auto_reject:true,reason:'Explicit deterministic release fixture'}]);
  let seq=0;
  const make=async()=>{const id=(await as(owner,"insert into public.listings(owner_id,category_id,settlement_id,slug,title,description) values($1,$2,$3,$4,'Ordinary furniture','Ordinary furniture in good condition') returning id",[owner,category,city,'moderation-fixture-'+seq++])).rows[0].id;await as(owner,"insert into public.listing_contacts(listing_id,contact_name) values($1,'Fixture')",[id]);await db.query("insert into public.listing_images(listing_id,storage_key,sort_order) values($1,$2,0)",[id,'listings/'+id+'/image.jpg']);return id;};
  const submit=id=>as(owner,'select public.submit_listing_with_promotion_choice($1,null)',[id]);
@@ -66,7 +67,7 @@ test('moderation migration, RLS, revision race, jobs, manual review, appeals and
  await t.test('production defaults never auto-approve; missing required stages cannot approve',async()=>{
   assert.equal((await finish(job,result)).rows[0].result,'HUMAN_REVIEW');assert.equal((await db.query('select status from public.listings where id=$1',[id])).rows[0].status,'pending');
   assert.equal((await finish(job,result)).rows[0].result,'ignored');
-  await assert.rejects(as(staff,"select public.moderation_admin('settings','{\"auto_approve\":true,\"reason\":\"isolated test\"}')"),/automatic approval disabled/);
+  await as(staff,"select public.moderation_admin('settings','{\"auto_approve\":true,\"reason\":\"isolated test: approval still requires ledger/trace\"}')");
   const next=await make();await submit(next);const j=await claim();assert.equal((await finish(j,{...result,stages:[]})).rows[0].result,'HUMAN_REVIEW');
  });
  await t.test('manual override records actor/reason; edit reapproval and promotion preserve lifetime/hash',async()=>{

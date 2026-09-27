@@ -73,10 +73,10 @@ test('bounded durable retry ledger prevents repeat callbacks and retry storms',a
  const run=()=>executeShadow({provider,data,rules,base,signal,reserve:async()=>reserved<2?++reserved:null,record:async(a,m)=>records.push({a,...m}),sleep:async()=>{}});
  assert.equal((await run()).recommendation,'SHADOW_APPROVE');assert.equal(count,2);assert.equal(records[1].retry_count,1);assert.equal((await run()).status,'budget_exhausted');assert.equal(count,2);
 });
-test('feature defaults and explicit cutoff disallow backfill/approval opt-in',()=>{
+test('feature defaults and explicit cutoff disallow backfill; automatic mode uses the same provider',()=>{
  assert.equal(moderationAIConfig({},new Date().toISOString()).enabled,false);
  const env={MODERATION_EXTERNAL_AI_ENABLED:'true',MODERATION_AI_PROVIDER:'openai',MODERATION_OCR_PROVIDER:'openai_vision_ocr',MODERATION_EXTERNAL_PROCESSING_BASIS:'test authorization',MODERATION_AI_ENABLED_SINCE:'2026-09-26T00:00:00Z'};
- assert.equal(moderationAIConfig(env,'2026-09-25T00:00:00Z').eligible,false);assert.equal(moderationAIConfig(env,'2026-09-26T01:00:00Z').enabled,true);assert.equal(moderationAIConfig({...env,MODERATION_AI_SHADOW_MODE:'false'},'2026-09-26T01:00:00Z').enabled,false);
+ assert.equal(moderationAIConfig(env,'2026-09-25T00:00:00Z').eligible,false);assert.equal(moderationAIConfig(env,'2026-09-26T01:00:00Z').enabled,true);assert.equal(moderationAIConfig({...env,MODERATION_AI_SHADOW_MODE:'false'},'2026-09-26T01:00:00Z').enabled,true);
 });
 test('dHash real PNG decoding deterministic, resize/brightness near; opposite structure distant',async()=>{
  const pixels=Buffer.alloc(90*80*3);for(let y=0;y<80;y++)for(let x=0;x<90;x++){const v=40+Math.floor((x<45?x:90-x)*3);pixels.fill(v,(y*90+x)*3,(y*90+x+1)*3);}

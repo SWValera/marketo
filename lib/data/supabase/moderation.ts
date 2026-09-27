@@ -75,32 +75,19 @@ function safeNumber(value: unknown) {
 
 export async function listModerationQueue(
   client: JevuSupabaseClient,
-  options: { page?: number; pageSize?: number; locale?: Locale } = {},
+  options: { page?: number; pageSize?: number; locale?: Locale; filter?: string } = {},
 ): Promise<NumberedPageResult<ModerationQueueItem>> {
   const page = normalizePositivePage(options.page);
   const pageSize = normalizePageSize(options.pageSize, 24, MAX_QUEUE_PAGE_SIZE);
   const locale = options.locale ?? "ru";
-  const countResponse = await client
-    .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
-  if (countResponse.error || countResponse.count === null) {
-    throw new ModerationDataError("QUEUE_UNAVAILABLE", countResponse.error);
-  }
-  const pagination = pageWindow(countResponse.count, page, pageSize);
-  if (pagination.offset === null || pagination.rangeEnd === null) {
-    return { items: [], total: countResponse.count, nextCursor: null, page, totalPages: pagination.totalPages, state: pagination.outOfRange ? "out_of_range" : "empty" };
-  }
-  const offset = pagination.offset;
-  const response = await client
-    .from("listings")
-    .select(
-      "id, title, price_minor, currency_code, status, owner_id, category_id, settlement_id, created_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)",
-    )
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true })
-    .range(offset, pagination.rangeEnd);
+  const dashboard=await client.rpc('moderation_dashboard',{selected_filter:options.filter??'all',requested_page:page,page_size:pageSize});
+  if(dashboard.error||!dashboard.data)throw new ModerationDataError('QUEUE_UNAVAILABLE',dashboard.error);
+  const summary=dashboard.data as unknown as {total:number;items:{id:string;decision:string|null;overridden:boolean}[]};
+  const pagination=pageWindow(summary.total,page,pageSize);
+  if(pagination.offset===null||pagination.rangeEnd===null)return {items:[],total:summary.total,nextCursor:null,page,totalPages:pagination.totalPages,state:pagination.outOfRange?'out_of_range':'empty'};
+  const offset=pagination.offset;
+  const countResponse={count:summary.total};
+  const response=await client.from('listings').select('id, title, price_minor, currency_code, status, owner_id, category_id, settlement_id, created_at, categories(id, name_ru, name_kk), settlements(id, name_ru, name_kk)').in('id',summary.items.map(i=>i.id)).order('created_at',{ascending:false}).order('id',{ascending:false});
   const { rows } = normalizeModerationQueueQueryResult({ ...response, count: countResponse.count } as unknown as QueueQueryResult);
   const total = countResponse.count;
   if (rows.length === 0) throw new ModerationDataError("QUEUE_UNAVAILABLE");
@@ -146,7 +133,9 @@ export async function listModerationQueue(
           ? sellerById.get(row.owner_id) ?? (locale === "kk" ? "Сатушы" : "Продавец")
           : (locale === "kk" ? "Профиль жойылған" : "Профиль удалён"),
         imageUrl: moderationMediaUrl(firstImageByListing.get(row.id) ?? null),
-        status: "pending" as const,
+        status: row.status,
+        automaticDecision: summary.items.find(i=>i.id===row.id)?.decision,
+        overridden: summary.items.find(i=>i.id===row.id)?.overridden,
       };
     }),
     total,
@@ -261,6 +250,7 @@ export async function getModerationListingDetail(
       sellerId: row.owner_id,
       sellerName: seller?.display_name ?? (locale === "kk" ? "Сатушы" : "Продавец"),
       status: row.status as ModerationListingDetail["status"],
+      priceMinor: safeNumber(row.price_minor),
       attributes: mapModerationAttributes(attributes, locale),
       images,
     };
